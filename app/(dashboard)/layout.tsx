@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from  'next/link';
 import { use, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
