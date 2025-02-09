@@ -5,6 +5,20 @@ import { UserProvider } from '@/lib/auth';
 import { getUser } from '@/lib/db/queries';
 import { Toaster } from '@/components/ui/toaster';
 
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen">
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  );
+}
+
 export const metadata: Metadata = {
   title: 'PPT翻訳アプリ',
   description: 'PowerPointファイルを簡単に翻訳',
@@ -16,7 +30,7 @@ export const viewport: Viewport = {
 
 const inter = Inter({ subsets: ['latin'] });
 
-export default function RootLayout({
+export function Layout({
   children,
 }: {
   children: React.ReactNode;

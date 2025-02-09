@@ -27,7 +27,7 @@ export async function translateText(text: string, fromLang: string, toLang: stri
 
     return {
       success: true,
-      translatedText: message.content[0].text
+      translatedText: message.content[0].type === 'text' ? message.content[0].text : ''
     };
   } catch (error) {
     console.error('Translation error:', error);
