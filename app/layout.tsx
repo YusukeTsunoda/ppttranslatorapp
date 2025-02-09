@@ -5,17 +5,28 @@ import { UserProvider } from '@/lib/auth';
 import { getUser } from '@/lib/db/queries';
 import { Toaster } from '@/components/ui/toaster';
 
-export default function RootLayout({
+const inter = Inter({ subsets: ['latin'] });
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const userPromise = getUser();
+
   return (
-    <div className="min-h-screen">
-      <main className="flex-1">
-        {children}
-      </main>
-    </div>
+    <html lang="ja" className={inter.className}>
+      <body>
+        <UserProvider userPromise={userPromise}>
+          <div className="min-h-screen">
+            <main className="flex-1">
+              {children}
+            </main>
+            <Toaster />
+          </div>
+        </UserProvider>
+      </body>
+    </html>
   );
 }
 
@@ -27,27 +38,3 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   maximumScale: 1,
 };
-
-const inter = Inter({ subsets: ['latin'] });
-
-export function Layout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  let userPromise = getUser();
-
-  return (
-    <html
-      lang="ja"
-      className={inter.className}
-    >
-      <body className="min-h-[100dvh] bg-gray-50">
-        <UserProvider userPromise={userPromise}>
-          {children}
-          <Toaster />
-        </UserProvider>
-      </body>
-    </html>
-  );
-}

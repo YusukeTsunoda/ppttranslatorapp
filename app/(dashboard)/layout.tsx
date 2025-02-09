@@ -39,7 +39,7 @@ function Header() {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/" className="flex items-center">
+        <Link href="/dashboard" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
           <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
         </Link>
@@ -95,11 +95,12 @@ function Sidebar() {
   const pathname = usePathname();
   
   const navigation = [
+    { name: 'ダッシュボード', href: '/dashboard', icon: LayoutDashboard },
+    { name: '翻訳', href: '/dashboard/translate', icon: Settings },
+    { name: '履歴', href: '/dashboard/history', icon: History },
     { name: 'プロフィール', href: '/dashboard/profile', icon: User },
-    { name: '履歴とクレジット', href: '/dashboard/history', icon: History },
-    { name: '翻訳設定', href: '/dashboard/settings', icon: Settings },
+    { name: '設定', href: '/dashboard/settings', icon: Settings },
     { name: 'API連携', href: '/dashboard/integrations', icon: LinkIcon },
-    { name: 'お知らせ', href: '/dashboard/notifications', icon: Bell },
   ];
 
   return (
