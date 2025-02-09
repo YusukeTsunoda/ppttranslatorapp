@@ -32,14 +32,14 @@ function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
         <Link href="/" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
-          <span className="ml-2 text-xl font-semibold text-gray-900">ACME</span>
+          <span className="ml-2 text-xl font-semibold text-gray-900">YTAppSystems</span>
         </Link>
         <div className="flex items-center space-x-4">
           <Link
             href="/pricing"
             className="text-sm font-medium text-gray-700 hover:text-gray-900"
           >
-            Pricing
+            料金プラン
           </Link>
           {user ? (
             <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -58,14 +58,14 @@ function Header() {
                 <DropdownMenuItem className="cursor-pointer">
                   <Link href="/dashboard" className="flex w-full items-center">
                     <Home className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
+                    <span>ダッシュボード</span>
                   </Link>
                 </DropdownMenuItem>
                 <form action={handleSignOut} className="w-full">
                   <button type="submit" className="flex w-full">
                     <DropdownMenuItem className="w-full flex-1 cursor-pointer">
                       <LogOut className="mr-2 h-4 w-4" />
-                      <span>Sign out</span>
+                      <span>ログアウト</span>
                     </DropdownMenuItem>
                   </button>
                 </form>
@@ -76,7 +76,7 @@ function Header() {
               asChild
               className="bg-black hover:bg-gray-800 text-white text-sm px-4 py-2 rounded-full"
             >
-              <Link href="/sign-up">Sign Up</Link>
+              <Link href="/sign-up">新規登録</Link>
             </Button>
           )}
         </div>

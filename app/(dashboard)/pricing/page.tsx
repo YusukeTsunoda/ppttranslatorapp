@@ -12,38 +12,50 @@ export default async function PricingPage() {
     getStripeProducts(),
   ]);
 
-  const basePlan = products.find((product) => product.name === 'Base');
-  const plusPlan = products.find((product) => product.name === 'Plus');
+  const starterPlan = products.find((product) => product.name === 'Starter');
+  const proPlan = products.find((product) => product.name === 'Professional');
 
-  const basePrice = prices.find((price) => price.productId === basePlan?.id);
-  const plusPrice = prices.find((price) => price.productId === plusPlan?.id);
+  const starterPrice = prices.find((price) => price.productId === starterPlan?.id);
+  const proPrice = prices.find((price) => price.productId === proPlan?.id);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">
+        料金プラン
+      </h1>
+      <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+        ニーズに合わせて最適なプランをお選びください。スタータープランは7日間の無料トライアルをご利用いただけます。
+      </p>
       <div className="grid md:grid-cols-2 gap-8 max-w-xl mx-auto">
         <PricingCard
-          name={basePlan?.name || 'Base'}
-          price={basePrice?.unitAmount || 800}
-          interval={basePrice?.interval || 'month'}
-          trialDays={basePrice?.trialPeriodDays || 7}
+          name="スタータープラン"
+          price={1000}
+          interval="month"
+          trialDays={14}
           features={[
-            'Unlimited Usage',
-            'Unlimited Workspace Members',
-            'Email Support',
+            '月間100ページまで翻訳可能',
+            '対応言語：日本語、英語、中国語、タイ語、韓国語、ベトナム語、インドネシア語',
+            'カスタム用語・専門用語の登録機能',
+            'メールサポート',
           ]}
-          priceId={basePrice?.id}
+          priceId={starterPrice?.id}
+          buttonText="無料トライアルを開始"
+          isPopular={false}
         />
         <PricingCard
-          name={plusPlan?.name || 'Plus'}
-          price={plusPrice?.unitAmount || 1200}
-          interval={plusPrice?.interval || 'month'}
-          trialDays={plusPrice?.trialPeriodDays || 7}
+          name="プロフェッショナルプラン"
+          price={3000}
+          interval="month"
+          trialDays={0}
           features={[
-            'Everything in Base, and:',
-            'Early Access to New Features',
-            '24/7 Support + Slack Access',
+            'スタータープランの全機能',
+            '対応言語の拡大',
+            '翻訳修正結果の自動学習機能',
+            'PPT、PDF、Webコンテンツの翻訳対応',
           ]}
-          priceId={plusPrice?.id}
+          priceId={proPrice?.id}
+          buttonText="今すぐ契約"
+          isPopular={true}
         />
       </div>
     </main>
@@ -57,6 +69,8 @@ function PricingCard({
   trialDays,
   features,
   priceId,
+  buttonText,
+  isPopular,
 }: {
   name: string;
   price: number;
@@ -64,17 +78,26 @@ function PricingCard({
   trialDays: number;
   features: string[];
   priceId?: string;
+  buttonText: string;
+  isPopular: boolean;
 }) {
   return (
-    <div className="pt-6">
+    <div className={`pt-6 rounded-xl border ${isPopular ? 'border-orange-500' : 'border-gray-200'} p-8 relative`}>
+      {isPopular && (
+        <div className="absolute top-0 right-0 bg-orange-500 text-white px-4 py-1 rounded-bl-lg text-sm">
+          おすすめ
+        </div>
+      )}
       <h2 className="text-2xl font-medium text-gray-900 mb-2">{name}</h2>
-      <p className="text-sm text-gray-600 mb-4">
-        with {trialDays} day free trial
-      </p>
+      {trialDays > 0 && (
+        <p className="text-sm text-gray-600 mb-4">
+          {trialDays}日間の無料トライアル付き
+        </p>
+      )}
       <p className="text-4xl font-medium text-gray-900 mb-6">
-        ${price / 100}{' '}
+        ¥{price.toLocaleString()}{' '}
         <span className="text-xl font-normal text-gray-600">
-          per user / {interval}
+          /月
         </span>
       </p>
       <ul className="space-y-4 mb-8">
@@ -87,7 +110,9 @@ function PricingCard({
       </ul>
       <form action={checkoutAction}>
         <input type="hidden" name="priceId" value={priceId} />
-        <SubmitButton />
+        <SubmitButton className={`w-full ${isPopular ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-900 hover:bg-gray-800'} text-white`}>
+          {buttonText}
+        </SubmitButton>
       </form>
     </div>
   );
