@@ -39,7 +39,7 @@ function Header() {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/dashboard" className="flex items-center">
+        <Link href="/" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
           <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
         </Link>
@@ -47,6 +47,8 @@ function Header() {
           <Link
             href="/pricing"
             className="text-sm text-gray-600 hover:text-gray-900"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             料金プラン
           </Link>
@@ -62,7 +64,7 @@ function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem className="cursor-pointer">
-                  <Link href="/dashboard" className="flex w-full items-center">
+                  <Link href="/" className="flex w-full items-center">
                     <Home className="mr-2 h-4 w-4" />
                     <span>マイページ</span>
                   </Link>
@@ -95,12 +97,12 @@ function Sidebar() {
   const pathname = usePathname();
   
   const navigation = [
-    { name: 'ダッシュボード', href: '/dashboard', icon: LayoutDashboard },
-    { name: '翻訳', href: '/dashboard/translate', icon: Settings },
-    { name: '履歴', href: '/dashboard/history', icon: History },
-    { name: 'プロフィール', href: '/dashboard/profile', icon: User },
-    { name: '設定', href: '/dashboard/settings', icon: Settings },
-    { name: 'API連携', href: '/dashboard/integrations', icon: LinkIcon },
+    { name: 'ダッシュボード', href: '/', icon: LayoutDashboard },
+    { name: '翻訳', href: '/translate', icon: Settings },
+    { name: '履歴', href: '/history', icon: History },
+    { name: 'プロフィール', href: '/profile', icon: User },
+    { name: '設定', href: '/settings', icon: Settings },
+    { name: 'API連携', href: '/integrations', icon: LinkIcon },
   ];
 
   return (
