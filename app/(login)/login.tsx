@@ -43,10 +43,10 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
         <div className="flex justify-center">
           <CircleIcon className="h-12 w-12 text-orange-500" />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
           {mode === 'signin'
-            ? 'Sign in to your account'
-            : 'Create your account'}
+            ? 'ログイン'
+            : '新規アカウント作成'}
         </h2>
       </div>
 
@@ -60,7 +60,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email
+              メールアドレス
             </Label>
             <div className="mt-1">
               <Input
@@ -70,8 +70,8 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 autoComplete="email"
                 required
                 maxLength={50}
-                className="appearance-none rounded-full relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                placeholder="メールアドレスを入力"
               />
             </div>
           </div>
@@ -81,7 +81,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700"
             >
-              Password
+              パスワード
             </Label>
             <div className="mt-1">
               <Input
@@ -94,61 +94,63 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 required
                 minLength={8}
                 maxLength={100}
-                className="appearance-none rounded-full relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your password"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                placeholder="パスワードを入力"
               />
             </div>
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm">{error}</div>
+            <div className="rounded-md bg-red-50 p-4 mt-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    {error === 'An error occurred. Please try again.'
+                      ? 'エラーが発生しました。もう一度お試しください。'
+                      : error}
+                  </h3>
+                </div>
+              </div>
+            </div>
           )}
 
           <div>
             <Button
               type="submit"
-              className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
               disabled={isLoading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                  Loading...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  処理中...
                 </>
               ) : mode === 'signin' ? (
-                'Sign in'
+                'ログイン'
               ) : (
-                'Sign up'
+                'アカウント作成'
               )}
             </Button>
           </div>
         </form>
 
         <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">
-                {mode === 'signin'
-                  ? 'New to our platform?'
-                  : 'Already have an account?'}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <Link
-              href={`${mode === 'signin' ? '/sign-up' : '/sign-in'}${
-                redirect ? `?redirect=${redirect}` : ''
-              }${priceId ? `&priceId=${priceId}` : ''}`}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-full shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-            >
-              {mode === 'signin'
-                ? 'Create an account'
-                : 'Sign in to existing account'}
-            </Link>
+          <div className="text-sm text-center">
+            {mode === 'signin' ? (
+              <p>
+                アカウントをお持ちでない方は{' '}
+                <Link href="/sign-up" className="font-medium text-orange-600 hover:text-orange-500">
+                  新規登録
+                </Link>
+              </p>
+            ) : (
+              <p>
+                すでにアカウントをお持ちの方は{' '}
+                <Link href="/sign-in" className="font-medium text-orange-600 hover:text-orange-500">
+                  ログイン
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
