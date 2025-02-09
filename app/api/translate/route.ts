@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/route";
 import { join } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { auth } from "@/lib/auth/auth";
 
 const execAsync = promisify(exec);
 
@@ -15,7 +14,7 @@ async function translateText(text: string, targetLang: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
