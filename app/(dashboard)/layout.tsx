@@ -1,6 +1,6 @@
 'use client';
 
-import Link from  'next/link';
+import Link from 'next/link';
 import { use, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
@@ -23,6 +23,7 @@ import {
   Bell,
   User
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -30,11 +31,15 @@ function Header() {
   const user = use(userPromise);
   const router = useRouter();
 
-  async function handleSignOut() {
-    await signOut();
-    router.refresh();
-    router.push('/');
-  }
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.refresh();
+      router.push('/');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm">
@@ -54,29 +59,27 @@ function Header() {
           </Link>
           {user ? (
             <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger>
-                <Avatar className="cursor-pointer size-8">
-                  <AvatarImage alt={user.name || ''} />
-                  <AvatarFallback>
-                    {user.email[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage alt={user.name || ''} />
+                    <AvatarFallback>
+                      {user.email?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem className="cursor-pointer">
-                  <Link href="/" className="flex w-full items-center">
+              <DropdownMenuContent align="end" className="w-56">
+                <Link href="/" passHref legacyBehavior>
+                  <DropdownMenuItem className="cursor-pointer">
                     <Home className="mr-2 h-4 w-4" />
                     <span>マイページ</span>
-                  </Link>
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>ログアウト</span>
                 </DropdownMenuItem>
-                <form action={handleSignOut} className="w-full">
-                  <button type="submit" className="flex w-full">
-                    <DropdownMenuItem className="w-full cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>ログアウト</span>
-                    </DropdownMenuItem>
-                  </button>
-                </form>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -97,7 +100,7 @@ function Sidebar() {
   const pathname = usePathname();
   
   const navigation = [
-    { name: 'トップページ', href: '/', icon: Home },
+    { name: 'ダッシュボード', href: '/dashboard', icon: LayoutDashboard },
     { name: '翻訳', href: '/translate', icon: Settings },
     { name: '履歴', href: '/history', icon: History },
     { name: 'プロフィール', href: '/profile', icon: User },
@@ -106,23 +109,25 @@ function Sidebar() {
   ];
 
   return (
-    <nav className="flex-1 space-y-1 px-2 py-4">
+    <nav className="flex flex-col space-y-1 p-4">
       {navigation.map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link
             key={item.name}
             href={item.href}
-            className={`${
+            className={cn(
+              "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
               isActive
-                ? 'bg-orange-50 text-orange-600'
-                : 'text-gray-600 hover:bg-gray-50'
-            } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                ? "bg-orange-50 text-orange-600"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            )}
           >
             <item.icon
-              className={`${
-                isActive ? 'text-orange-600' : 'text-gray-400'
-              } mr-3 flex-shrink-0 h-5 w-5`}
+              className={cn(
+                "mr-3 h-5 w-5",
+                isActive ? "text-orange-600" : "text-gray-400"
+              )}
               aria-hidden="true"
             />
             {item.name}
@@ -139,10 +144,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
-          <div className="w-64 bg-white shadow-sm rounded-lg">
+          <aside className="w-64 bg-white shadow-sm rounded-lg overflow-hidden">
             <Sidebar />
-          </div>
-          <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
+          </aside>
+          <main className="flex-1 bg-white shadow-sm rounded-lg p-6 overflow-auto">
             {children}
           </main>
         </div>

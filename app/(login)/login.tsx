@@ -17,10 +17,12 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setIsLoading(true);
     setError('');
     try {
+      const formData = new FormData(e.currentTarget);
       const action = mode === 'signin' ? signIn : signUp;
       const result = await action({ 
         email: formData.get('email') as string,
@@ -51,7 +53,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <form className="space-y-6" action={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
           <input type="hidden" name="inviteId" value={inviteId || ''} />
