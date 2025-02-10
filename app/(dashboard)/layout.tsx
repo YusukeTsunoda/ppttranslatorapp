@@ -44,7 +44,7 @@ function Header() {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/dashboard" className="flex items-center">
+        <Link href="/translate" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
           <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
         </Link>
@@ -70,7 +70,7 @@ function Header() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <Link href="/" passHref legacyBehavior>
+                <Link href="/profile" passHref legacyBehavior>
                   <DropdownMenuItem className="cursor-pointer">
                     <Home className="mr-2 h-4 w-4" />
                     <span>マイページ</span>
@@ -100,7 +100,6 @@ function Sidebar() {
   const pathname = usePathname();
   
   const navigation = [
-    { name: 'ダッシュボード', href: '/dashboard', icon: LayoutDashboard },
     { name: '翻訳', href: '/translate', icon: Settings },
     { name: '履歴', href: '/history', icon: History },
     { name: 'プロフィール', href: '/profile', icon: User },
@@ -116,21 +115,26 @@ function Sidebar() {
           <Link
             key={item.name}
             href={item.href}
-            className={cn(
-              "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-              isActive
-                ? "bg-orange-50 text-orange-600"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            )}
+            passHref
+            legacyBehavior
           >
-            <item.icon
+            <a
               className={cn(
-                "mr-3 h-5 w-5",
-                isActive ? "text-orange-600" : "text-gray-400"
+                "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                isActive
+                  ? "bg-orange-50 text-orange-600"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               )}
-              aria-hidden="true"
-            />
-            {item.name}
+            >
+              <item.icon
+                className={cn(
+                  "mr-3 h-5 w-5",
+                  isActive ? "text-orange-600" : "text-gray-400"
+                )}
+                aria-hidden="true"
+              />
+              {item.name}
+            </a>
           </Link>
         );
       })}
