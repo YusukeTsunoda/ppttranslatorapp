@@ -1,48 +1,40 @@
+#!/usr/bin/env python3
+import sys
+import json
 from pptx import Presentation
 from typing import List, Dict, Any
-import json
 
-def extract_text_from_pptx(file_path: str) -> List[Dict[str, Any]]:
-    """
-    PPTXファイルからテキストを抽出し、スライドごとの情報を返す
-    
-    Args:
-        file_path (str): PPTXファイルのパス
-    
-    Returns:
-        List[Dict[str, Any]]: スライドごとのテキスト情報
-    """
+def extract_text_from_shape(shape):
+    if hasattr(shape, "text"):
+        return shape.text.strip()
+    return ""
+
+def parse_pptx(file_path):
     prs = Presentation(file_path)
-    slides_data = []
+    slides = []
     
     for slide_index, slide in enumerate(prs.slides):
-        slide_texts = []
-        
+        texts = []
         for shape in slide.shapes:
-            if hasattr(shape, "text") and shape.text.strip():
-                # シェイプの位置情報と共にテキストを保存
-                text_data = {
-                    "text": shape.text.strip(),
-                    "shape_id": shape.shape_id,
+            text = extract_text_from_shape(shape)
+            if text:
+                texts.append({
+                    "text": text,
+                    "type": "text",
                     "position": {
-                        "left": shape.left,
-                        "top": shape.top,
+                        "x": shape.left,
+                        "y": shape.top,
                         "width": shape.width,
                         "height": shape.height
-                    },
-                    "type": shape.shape_type
-                }
-                slide_texts.append(text_data)
+                    }
+                })
         
-        # スライドの情報をまとめる
-        slide_info = {
-            "slide_index": slide_index,
-            "texts": slide_texts,
-            "layout_name": slide.slide_layout.name
-        }
-        slides_data.append(slide_info)
+        slides.append({
+            "index": slide_index,
+            "texts": texts
+        })
     
-    return slides_data
+    return slides
 
 def update_pptx_with_translations(
     original_file: str,
@@ -86,9 +78,14 @@ def update_pptx_with_translations(
         return False
 
 if __name__ == "__main__":
-    # テスト用コード
-    import sys
-    if len(sys.argv) > 1:
+    if len(sys.argv) != 2:
+        print(json.dumps({"error": "ファイルパスが必要です"}))
+        sys.exit(1)
+    
+    try:
         file_path = sys.argv[1]
-        slides_data = extract_text_from_pptx(file_path)
-        print(json.dumps(slides_data, ensure_ascii=False, indent=2))
+        slides = parse_pptx(file_path)
+        print(json.dumps({"slides": slides}, ensure_ascii=False))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+        sys.exit(1)

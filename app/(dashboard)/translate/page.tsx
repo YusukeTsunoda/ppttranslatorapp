@@ -12,6 +12,8 @@ export default function TranslatePage() {
   const [uploading, setUploading] = useState(false);
   const [slides, setSlides] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [sourceLang, setSourceLang] = useState("ja");
+  const [targetLang, setTargetLang] = useState("en");
   const { toast } = useToast();
 
   const handleFileUpload = async (file: File) => {
@@ -198,7 +200,7 @@ export default function TranslatePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">原文の言語</label>
-                <Select>
+                <Select value={sourceLang} onValueChange={setSourceLang}>
                   <SelectTrigger>
                     <SelectValue placeholder="言語を選択" />
                   </SelectTrigger>
@@ -211,7 +213,7 @@ export default function TranslatePage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">翻訳後の言語</label>
-                <Select>
+                <Select value={targetLang} onValueChange={setTargetLang}>
                   <SelectTrigger>
                     <SelectValue placeholder="言語を選択" />
                   </SelectTrigger>

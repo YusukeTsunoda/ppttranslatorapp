@@ -11,7 +11,7 @@ import { signIn, signUp } from './actions';
 
 export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect');
+  const redirect = searchParams.get('redirect') || '/translate';
   const priceId = searchParams.get('priceId');
   const inviteId = searchParams.get('inviteId');
   const [isLoading, setIsLoading] = useState(false);
