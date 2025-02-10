@@ -1,11 +1,12 @@
-"use client";
+'use client';
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,8 +16,9 @@ export default function TranslatePage() {
   const [sourceLang, setSourceLang] = useState("ja");
   const [targetLang, setTargetLang] = useState("en");
   const { toast } = useToast();
+  const router = useRouter();
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.endsWith(".pptx")) {
       toast({
         title: "エラー",
@@ -34,13 +36,25 @@ export default function TranslatePage() {
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        credentials: 'include', // Cookieを含める
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error);
+      if (response.status === 401) {
+        toast({
+          title: "エラー",
+          description: "セッションが切れました。再度ログインしてください。",
+          variant: "destructive",
+        });
+        router.push('/login');
+        return;
       }
 
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'アップロードに失敗しました');
+      }
+
+      const data = await response.json();
       setSlides(data.slides);
       toast({
         title: "アップロード成功",
@@ -55,7 +69,7 @@ export default function TranslatePage() {
     } finally {
       setUploading(false);
     }
-  };
+  }, [toast, router]);
 
   const handleTranslate = async () => {
     if (!slides.length) return;
@@ -66,19 +80,31 @@ export default function TranslatePage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include', // Cookieを含める
         body: JSON.stringify({
           slideIndex: currentSlide,
           texts: slides[currentSlide].texts,
-          targetLang: "en", // TODO: 言語選択から取得
+          sourceLang,
+          targetLang,
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error);
+      if (response.status === 401) {
+        toast({
+          title: "エラー",
+          description: "セッションが切れました。再度ログインしてください。",
+          variant: "destructive",
+        });
+        router.push('/login');
+        return;
       }
 
-      // 翻訳結果を反映
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || '翻訳に失敗しました');
+      }
+
+      const data = await response.json();
       const updatedSlides = [...slides];
       updatedSlides[currentSlide].translations = data.translations;
       setSlides(updatedSlides);
@@ -96,25 +122,29 @@ export default function TranslatePage() {
     }
   };
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* 左側: ファイルアップロード & プレビューエリア */}
         <div className="space-y-4">
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">PPTファイルをアップロード</h2>
             <div 
-              className="border-2 border-dashed rounded-lg p-8 text-center"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const file = e.dataTransfer.files[0];
-                if (file) handleFileUpload(file);
-              }}
+              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('file-upload')?.click()}
             >
               <input
                 type="file"
@@ -126,142 +156,118 @@ export default function TranslatePage() {
                   if (file) handleFileUpload(file);
                 }}
               />
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center"
+              <svg
+                className="w-12 h-12 text-gray-400 mb-4 mx-auto"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="w-12 h-12 text-gray-400 mb-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <span className="text-gray-600">
-                  {uploading
-                    ? "アップロード中..."
-                    : "クリックまたはドラッグ＆ドロップでファイルを選択"}
-                </span>
-                <span className="text-sm text-gray-500 mt-2">
-                  .pptxファイルのみ対応
-                </span>
-              </label>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <span className="text-gray-600 block">
+                {uploading
+                  ? "アップロード中..."
+                  : "クリックまたはドラッグ＆ドロップでファイルを選択"}
+              </span>
+              <span className="text-sm text-gray-500 mt-2 block">
+                PPTXファイルのみ対応
+              </span>
             </div>
           </Card>
-          
-          {/* プレビューエリア */}
+
           {slides.length > 0 && (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">
-                プレビュー（{currentSlide + 1} / {slides.length}）
-              </h3>
-              <div className="space-y-4">
-                <div className="aspect-video bg-gray-100 rounded-lg p-4">
-                  {slides[currentSlide].texts.map((text: any, index: number) => (
-                    <div key={index} className="mb-2">
-                      <p className="text-sm text-gray-600">{text.text}</p>
-                      {text.translated_text && (
-                        <p className="text-sm text-blue-600">{text.translated_text}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
+                <div className="flex gap-2">
                   <Button
-                    onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                    variant="outline"
+                    onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
                     disabled={currentSlide === 0}
                   >
                     前へ
                   </Button>
                   <Button
-                    onClick={() =>
-                      setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))
-                    }
+                    variant="outline"
+                    onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
                     disabled={currentSlide === slides.length - 1}
                   >
                     次へ
                   </Button>
                 </div>
               </div>
+              <div className="aspect-video bg-gray-100 rounded-lg mb-4">
+                {/* TODO: スライドプレビュー */}
+              </div>
             </Card>
           )}
         </div>
 
-        {/* 右側: 翻訳設定 & テキストエリア */}
         <div className="space-y-4">
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">翻訳設定</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">原文の言語</label>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  翻訳元言語
+                </label>
                 <Select value={sourceLang} onValueChange={setSourceLang}>
                   <SelectTrigger>
-                    <SelectValue placeholder="言語を選択" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ja">日本語</SelectItem>
                     <SelectItem value="en">英語</SelectItem>
-                    <SelectItem value="zh">中国語</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">翻訳後の言語</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  翻訳先言語
+                </label>
                 <Select value={targetLang} onValueChange={setTargetLang}>
                   <SelectTrigger>
-                    <SelectValue placeholder="言語を選択" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ja">日本語</SelectItem>
                     <SelectItem value="en">英語</SelectItem>
-                    <SelectItem value="zh">中国語</SelectItem>
+                    <SelectItem value="ja">日本語</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+            <Button
+              className="w-full"
+              onClick={handleTranslate}
+              disabled={!slides.length}
+            >
+              翻訳を開始
+            </Button>
           </Card>
 
-          {slides.length > 0 && (
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">翻訳テキスト</h2>
-              <div className="space-y-4">
-                {slides[currentSlide].texts.map((text: any, index: number) => (
-                  <div key={index} className="space-y-2">
-                    <div>
-                      <label className="text-sm font-medium">原文</label>
-                      <textarea
-                        className="w-full h-24 mt-2 p-2 border rounded-md bg-gray-50"
-                        readOnly
-                        value={text.text}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">翻訳文</label>
-                      <textarea
-                        className="w-full h-24 mt-2 p-2 border rounded-md"
-                        value={text.translated_text || ""}
-                        onChange={(e) => {
-                          const updatedSlides = [...slides];
-                          updatedSlides[currentSlide].texts[index].translated_text =
-                            e.target.value;
-                          setSlides(updatedSlides);
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-                <Button className="w-full" onClick={handleTranslate}>
-                  翻訳を更新
-                </Button>
+          {slides[currentSlide]?.texts?.map((text: string, index: number) => (
+            <Card key={index} className="p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  原文
+                </label>
+                <div className="p-3 bg-gray-50 rounded-md">{text}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  翻訳文
+                </label>
+                <div className="p-3 bg-gray-50 rounded-md">
+                  {slides[currentSlide]?.translations?.[index] || "未翻訳"}
+                </div>
               </div>
             </Card>
-          )}
+          ))}
         </div>
       </div>
     </div>

@@ -21,7 +21,9 @@ import {
   Settings,
   Link as LinkIcon,
   Bell,
-  User
+  User,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -98,6 +100,7 @@ function Header() {
 
 function Sidebar() {
   const pathname = usePathname();
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const navigation = [
     { name: '翻訳', href: '/translate', icon: Settings },
@@ -108,37 +111,55 @@ function Sidebar() {
   ];
 
   return (
-    <nav className="flex flex-col space-y-1 p-4">
-      {navigation.map((item) => {
-        const isActive = pathname === item.href;
-        return (
-          <Link
-            key={item.name}
-            href={item.href}
-            passHref
-            legacyBehavior
-          >
-            <a
-              className={cn(
-                "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                isActive
-                  ? "bg-orange-50 text-orange-600"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              )}
+    <div className="relative h-full">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="absolute -right-4 top-2 bg-white rounded-full p-1.5 shadow-md hover:bg-gray-50 z-50 cursor-pointer border border-gray-200"
+      >
+        {isExpanded ? (
+          <ChevronLeft className="h-4 w-4 text-gray-600" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-600" />
+        )}
+      </button>
+      <nav className={cn(
+        "flex flex-col space-y-1 p-4 transition-all duration-300 ease-in-out",
+        isExpanded ? "w-64" : "w-16"
+      )}>
+        {navigation.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              passHref
+              legacyBehavior
             >
-              <item.icon
+              <a
                 className={cn(
-                  "mr-3 h-5 w-5",
-                  isActive ? "text-orange-600" : "text-gray-400"
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative",
+                  isActive
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                  !isExpanded && "justify-center"
                 )}
-                aria-hidden="true"
-              />
-              {item.name}
-            </a>
-          </Link>
-        );
-      })}
-    </nav>
+                title={!isExpanded ? item.name : undefined}
+              >
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0",
+                    isExpanded ? "mr-3" : "mr-0",
+                    isActive ? "text-orange-600" : "text-gray-400"
+                  )}
+                  aria-hidden="true"
+                />
+                {isExpanded && <span className="whitespace-nowrap">{item.name}</span>}
+              </a>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 
@@ -148,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
-          <aside className="w-64 bg-white shadow-sm rounded-lg overflow-hidden">
+          <aside className="bg-white shadow-sm rounded-lg overflow-visible">
             <Sidebar />
           </aside>
           <main className="flex-1 bg-white shadow-sm rounded-lg p-6 overflow-auto">
