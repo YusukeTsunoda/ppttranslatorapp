@@ -250,13 +250,13 @@ export default function TranslatePage() {
             </Button>
           </Card>
 
-          {slides[currentSlide]?.texts?.map((text: string, index: number) => (
+          {slides[currentSlide]?.texts?.map((textObj: any, index: number) => (
             <Card key={index} className="p-6">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   原文
                 </label>
-                <div className="p-3 bg-gray-50 rounded-md">{text}</div>
+                <div className="p-3 bg-gray-50 rounded-md">{textObj.text}</div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

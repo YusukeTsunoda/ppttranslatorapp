@@ -32,14 +32,13 @@ const handler = NextAuth({
       return token;
     },
     async signIn({ user, account }) {
-      if (!user?.email) {
+      if (!user?.email || !user?.id) {
         return false;
       }
 
       try {
         const sessionToken = await signToken({
-          userId: user.id,
-          email: user.email,
+          user: { id: parseInt(user.id) },
           expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         });
 
@@ -58,7 +57,7 @@ const handler = NextAuth({
     },
   },
   events: {
-    async signOut({ token }) {
+    async signOut() {
       // セッショントークンを削除
       const response = new Response(null, { status: 200 });
       response.headers.set(
