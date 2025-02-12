@@ -1,40 +1,204 @@
 #!/usr/bin/env python3
 import sys
 import json
+import os
 from pptx import Presentation
 from typing import List, Dict, Any
+import subprocess
+from pdf2image import convert_from_path
+
+def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[int, int]]:
+    """
+    PPTXの各スライドをPNG画像に変換する
+    
+    Args:
+        pptx_path (str): PPTXファイルのパス
+        output_dir (str): 出力ディレクトリ
+    
+    Returns:
+        tuple[List[str], tuple[int, int]]: 画像パスのリストと画像サイズ
+    """
+    try:
+        # 出力ディレクトリが存在しない場合は作成
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # PPTXをPDFに変換
+        pptx_name = os.path.splitext(os.path.basename(pptx_path))[0]
+        pdf_path = os.path.join(output_dir, f"{pptx_name}.pdf")
+        
+        print(f"Converting PPTX to PDF: {pptx_path} -> {pdf_path}", file=sys.stderr)
+        
+        if sys.platform == "darwin":  # macOS
+            result = subprocess.run(
+                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, pptx_path],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                print(f"Error converting to PDF: {result.stderr}", file=sys.stderr)
+                return [], (0, 0)
+        else:  # Linux
+            result = subprocess.run(
+                ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, pptx_path],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                print(f"Error converting to PDF: {result.stderr}", file=sys.stderr)
+                return [], (0, 0)
+
+        if not os.path.exists(pdf_path):
+            print(f"PDF file not found at: {pdf_path}", file=sys.stderr)
+            return [], (0, 0)
+            
+        print(f"Converting PDF to images: {pdf_path}", file=sys.stderr)
+            
+        # PDFを画像に変換（アスペクト比を保持）
+        try:
+            # 720x540のコンテナサイズに合わせて変換
+            target_width = 720
+            target_height = 540
+            images = convert_from_path(pdf_path, size=(target_width, target_height))
+            
+            if not images:
+                return [], (0, 0)
+                
+            # 実際の画像サイズを取得
+            actual_width = images[0].width
+            actual_height = images[0].height
+            
+            print(f"Generated image size: {actual_width}x{actual_height}", file=sys.stderr)
+            
+        except Exception as e:
+            print(f"Error converting PDF to images: {str(e)}", file=sys.stderr)
+            return [], (0, 0)
+        
+        image_paths = []
+        for i, image in enumerate(images):
+            image_path = os.path.join(output_dir, f"slide_{i+1}.png")
+            image.save(image_path, "PNG")
+            rel_path = f"slide_{i+1}.png"
+            image_paths.append(rel_path)
+            print(f"Saved image: {image_path}", file=sys.stderr)
+        
+        try:
+            os.remove(pdf_path)
+            print(f"Removed temporary PDF: {pdf_path}", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Could not delete temporary PDF: {str(e)}", file=sys.stderr)
+        
+        return image_paths, (actual_width, actual_height)
+        
+    except Exception as e:
+        print(f"Error converting to PNG: {str(e)}", file=sys.stderr)
+        return [], (0, 0)
+
+def convert_coordinates(x: float, y: float, width: float, height: float, 
+                      slide_width: float, slide_height: float,
+                      image_width: float, image_height: float) -> dict:
+    """
+    PowerPointの座標系（EMU）をピクセル座標に変換
+    
+    Args:
+        x, y: 元の座標（EMU）
+        width, height: 元のサイズ（EMU）
+        slide_width: スライドの幅（EMU）
+        slide_height: スライドの高さ（EMU）
+        image_width: 画像の幅（ピクセル）
+        image_height: 画像の高さ（ピクセル）
+    
+    Returns:
+        dict: 変換後の座標とサイズ
+    """
+    # スライドと画像のアスペクト比を計算
+    slide_aspect = slide_width / slide_height
+    image_aspect = image_width / image_height
+    
+    # スケーリング係数を計算
+    if slide_aspect > image_aspect:
+        # 幅に合わせてスケーリング
+        scale = image_width / slide_width
+        # 余白を計算
+        margin_y = (image_height - (slide_height * scale)) / 2
+    else:
+        # 高さに合わせてスケーリング
+        scale = image_height / slide_height
+        # 余白を計算
+        margin_x = (image_width - (slide_width * scale)) / 2
+        
+    # 座標を変換
+    scaled_x = x * scale
+    scaled_y = y * scale
+    scaled_width = width * scale
+    scaled_height = height * scale
+    
+    # 余白を適用
+    if slide_aspect > image_aspect:
+        final_x = scaled_x
+        final_y = scaled_y + margin_y
+    else:
+        final_x = scaled_x + margin_x
+        final_y = scaled_y
+    
+    return {
+        "x": round(final_x),
+        "y": round(final_y),
+        "width": round(scaled_width),
+        "height": round(scaled_height)
+    }
 
 def extract_text_from_shape(shape):
     if hasattr(shape, "text"):
         return shape.text.strip()
     return ""
 
-def parse_pptx(file_path):
-    prs = Presentation(file_path)
-    slides = []
-    
-    for slide_index, slide in enumerate(prs.slides):
-        texts = []
-        for shape in slide.shapes:
-            text = extract_text_from_shape(shape)
-            if text:
-                texts.append({
-                    "text": text,
-                    "type": "text",
-                    "position": {
-                        "x": shape.left,
-                        "y": shape.top,
-                        "width": shape.width,
-                        "height": shape.height
-                    }
-                })
+def parse_pptx(file_path: str, output_dir: str) -> List[Dict[str, Any]]:
+    try:
+        print(f"Processing PPTX file: {file_path}", file=sys.stderr)
+        prs = Presentation(file_path)
+        slides = []
         
-        slides.append({
-            "index": slide_index,
-            "texts": texts
-        })
-    
-    return slides
+        # スライドを画像に変換
+        image_paths, (image_width, image_height) = convert_to_png(file_path, output_dir)
+        
+        if not image_paths:
+            print("No images were generated", file=sys.stderr)
+            return []
+            
+        for slide_index, slide in enumerate(prs.slides):
+            texts = []
+            
+            # スライドのサイズを取得
+            slide_width = prs.slide_width
+            slide_height = prs.slide_height
+            
+            for shape in slide.shapes:
+                text = extract_text_from_shape(shape)
+                if text:
+                    # 座標を変換
+                    position = convert_coordinates(
+                        shape.left, shape.top, 
+                        shape.width, shape.height,
+                        slide_width, slide_height,
+                        image_width, image_height
+                    )
+                    texts.append({
+                        "text": text,
+                        "type": "text",
+                        "position": position
+                    })
+            
+            slides.append({
+                "index": slide_index,
+                "texts": texts,
+                "image_path": image_paths[slide_index] if slide_index < len(image_paths) else None
+            })
+        
+        return slides
+        
+    except Exception as e:
+        print(f"Error parsing PPTX: {str(e)}", file=sys.stderr)
+        return []
 
 def update_pptx_with_translations(
     original_file: str,
@@ -78,13 +242,14 @@ def update_pptx_with_translations(
         return False
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(json.dumps({"error": "ファイルパスが必要です"}))
+    if len(sys.argv) != 3:
+        print(json.dumps({"error": "ファイルパスと出力ディレクトリが必要です"}))
         sys.exit(1)
     
     try:
         file_path = sys.argv[1]
-        slides = parse_pptx(file_path)
+        output_dir = sys.argv[2]
+        slides = parse_pptx(file_path, output_dir)
         print(json.dumps({"slides": slides}, ensure_ascii=False))
     except Exception as e:
         print(json.dumps({"error": str(e)}))
