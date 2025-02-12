@@ -53,11 +53,11 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
             
         print(f"Converting PDF to images: {pdf_path}", file=sys.stderr)
             
-        # PDFを画像に変換（アスペクト比を保持）
+        # PDFを画像に変換（16:9のアスペクト比を保持）
         try:
-            # 720x540のコンテナサイズに合わせて変換
+            # 720x405のサイズ（16:9）で変換
             target_width = 720
-            target_height = 540
+            target_height = int(target_width * 9 / 16)  # 405px
             images = convert_from_path(pdf_path, size=(target_width, target_height))
             
             if not images:
@@ -114,35 +114,26 @@ def convert_coordinates(x: float, y: float, width: float, height: float,
     slide_aspect = slide_width / slide_height
     image_aspect = image_width / image_height
     
-    # スケーリング係数を計算
-    if slide_aspect > image_aspect:
-        # 幅に合わせてスケーリング
-        scale = image_width / slide_width
-        # 余白を計算
-        margin_y = (image_height - (slide_height * scale)) / 2
-    else:
-        # 高さに合わせてスケーリング
-        scale = image_height / slide_height
-        # 余白を計算
-        margin_x = (image_width - (slide_width * scale)) / 2
-        
+    # 基本のスケーリング係数を計算（幅に基づく）
+    scale = image_width / slide_width
+    
     # 座標を変換
     scaled_x = x * scale
     scaled_y = y * scale
     scaled_width = width * scale
     scaled_height = height * scale
     
-    # 余白を適用
-    if slide_aspect > image_aspect:
-        final_x = scaled_x
-        final_y = scaled_y + margin_y
-    else:
-        final_x = scaled_x + margin_x
-        final_y = scaled_y
+    # アスペクト比の違いによる調整
+    if slide_aspect != image_aspect:
+        # 高さの差を計算
+        expected_height = slide_height * scale
+        height_diff = image_height - expected_height
+        # Y座標を調整（中央揃え）
+        scaled_y += height_diff / 2
     
     return {
-        "x": round(final_x),
-        "y": round(final_y),
+        "x": round(scaled_x),
+        "y": round(scaled_y),
         "width": round(scaled_width),
         "height": round(scaled_height)
     }

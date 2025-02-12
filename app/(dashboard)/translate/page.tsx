@@ -8,6 +8,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -26,6 +28,8 @@ export default function TranslatePage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [editedTranslations, setEditedTranslations] = useState<{ [key: number]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isTranslationComplete, setIsTranslationComplete] = useState(false);
 
   // 利用可能なモデルのリスト
   const availableModels = [
@@ -62,6 +66,7 @@ export default function TranslatePage() {
     }
 
     setUploading(true);
+    setIsTranslationComplete(false); // 新しいファイルがアップロードされたらリセット
     const formData = new FormData();
     formData.append("file", file);
 
@@ -118,8 +123,7 @@ export default function TranslatePage() {
     if (!slides.length || !slides[slideIndex]?.texts?.length) return;
 
     try {
-      console.log('Translation request:', {
-        slideIndex,
+      console.log('Translation request for slide', slideIndex, ':', {
         texts: slides[slideIndex].texts,
         sourceLang,
         targetLang,
@@ -157,24 +161,29 @@ export default function TranslatePage() {
       }
 
       const data = await response.json();
-      console.log('Translation response:', data);
+      console.log('Translation response for slide', slideIndex, ':', data);
 
+      // 翻訳データを保存
       const updatedSlides = [...slides];
+      if (!updatedSlides[slideIndex].translations) {
+        updatedSlides[slideIndex].translations = [];
+      }
       updatedSlides[slideIndex].translations = data.translations;
-      console.log('Updated slides:', updatedSlides[slideIndex]);
+      console.log('Updated translations for slide', slideIndex, ':', updatedSlides[slideIndex].translations);
       setSlides(updatedSlides);
 
       // 次のスライドがある場合は、それも翻訳
       if (slideIndex < slides.length - 1) {
         await handleTranslateSlide(updatedSlides, slideIndex + 1);
       } else {
+        setIsTranslationComplete(true); // すべてのスライドの翻訳が完了
         toast({
           title: "翻訳完了",
           description: "すべてのスライドの翻訳が完了しました",
         });
       }
     } catch (error) {
-      console.error('Translation error:', error);
+      console.error('Translation error for slide', slideIndex, ':', error);
       toast({
         title: "エラー",
         description: error instanceof Error ? error.message : "翻訳に失敗しました",
@@ -246,12 +255,87 @@ export default function TranslatePage() {
     setEditedTranslations({});
   }, [currentSlide]);
 
+  const handleDownload = async () => {
+    try {
+      setIsGenerating(true);
+      
+      // 翻訳済みデータを準備
+      const fileId = slides[0]?.fileId;  // fileIdを取得
+      if (!fileId) {
+        throw new Error('ファイルIDが見つかりません');
+      }
+
+      const translations = slides.map((slide) => ({
+        index: slide.index,
+        texts: slide.texts.map((text: { text: string; }, idx: number) => {
+          const translation = slide.translations?.[idx];
+          console.log(`Slide ${slide.index}, Text ${idx}:`, {
+            originalText: text.text,
+            translation: translation
+          });
+          return {
+            text: text.text,
+            translation: translation || null,
+          };
+        }),
+      }));
+
+      // デバッグ用のログ出力を追加
+      console.log('Full translation data:', JSON.stringify(translations, null, 2));
+      
+      // PPTXファイル生成をリクエスト
+      const response = await fetch('/api/pptx/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId,
+          translations
+        }),
+        credentials: 'include',  // セッションCookieを含める
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate PPTX');
+      }
+      
+      const data = await response.json();
+      
+      // ダウンロードリンクを生成
+      const link = document.createElement('a');
+      link.href = data.downloadUrl;
+      link.download = 'translated_presentation.pptx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "ダウンロード開始",
+        description: "翻訳済みのPPTXファイルのダウンロードを開始しました。",
+        duration: 3000,
+      });
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "エラー",
+        description: error instanceof Error ? error.message : "PPTXファイルの生成に失敗しました。",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-4">
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="space-y-4">
               <h2 className="text-lg font-semibold">PPTファイルをアップロード</h2>
               <div 
                 className="border-2 border-dashed rounded-lg p-2 text-center cursor-pointer"
@@ -269,7 +353,7 @@ export default function TranslatePage() {
                     if (file) handleFileUpload(file);
                   }}
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <svg
                     className="w-5 h-5 text-gray-400"
                     fill="none"
@@ -288,6 +372,27 @@ export default function TranslatePage() {
                   </span>
                 </div>
               </div>
+              {slides.length > 0 && (
+                <Button
+                  onClick={handleDownload}
+                  disabled={isGenerating || !isTranslationComplete}
+                  className="w-full"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      生成中...
+                    </>
+                  ) : !isTranslationComplete ? (
+                    "翻訳完了までお待ちください..."
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      PPTXをダウンロード
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </Card>
 
@@ -295,7 +400,33 @@ export default function TranslatePage() {
             <Card className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 mr-4">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(scale - 0.1)}
+                      title="縮小"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={resetZoom}
+                      title="リセット"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(scale + 0.1)}
+                      title="拡大"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </Button>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
@@ -312,31 +443,7 @@ export default function TranslatePage() {
                   </Button>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 mb-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleZoom(scale - 0.1)}
-                >
-                  縮小
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetZoom}
-                >
-                  リセット
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleZoom(scale + 0.1)}
-                >
-                  拡大
-                </Button>
-              </div>
-              <div 
-                className="aspect-video bg-gray-100 rounded-lg mb-4 relative overflow-hidden"
+              <div className="aspect-video bg-gray-100 rounded-lg mb-4 relative overflow-hidden"
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -352,29 +459,84 @@ export default function TranslatePage() {
                       transition: isDragging ? 'none' : 'transform 0.2s'
                     }}
                   >
-                    <div className="relative" style={{ width: '720px', height: '540px' }}>
+                    {/* スライドのメタデータをコンソールに出力（一度だけ） */}
+                    {currentSlide === 0 && (
+                      <>
+                        {(console.log('Initial slide metadata:', slides[0]?.metadata), null)}
+                        {(console.log('Slide dimensions:', slides[0]?.metadata?.dimensions), null)}
+                        {null}
+                      </>
+                    )}
+                    
+                    <div 
+                      className="relative"
+                      style={{ 
+                        width: '720px',
+                        height: '405px',
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        transform: 'scale(1)',  // 初期スケールを1に設定
+                        transformOrigin: 'top left'
+                      }}
+                    >
                       <img
                         src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
                         alt={`Slide ${currentSlide + 1}`}
-                        className="w-full h-full"
-                        style={{ objectFit: 'contain' }}
+                        className="w-full h-full object-contain"
+                        style={{ 
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                        }}
                         draggable={false}
+                        onLoad={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          console.log('Loaded image dimensions:', {
+                            natural: {
+                              width: img.naturalWidth,
+                              height: img.naturalHeight
+                            },
+                            display: {
+                              width: img.width,
+                              height: img.height
+                            }
+                          });
+                        }}
                       />
                       {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                        // デバッグ情報を出力
-                        console.log(`Text ${index + 1} position:`, textObj.position);
+                        const position = textObj.position;
+                        
+                        // スケール係数を0.5に設定
+                        const scaleX = 10.75;
+                        const scaleY = 2.5;
+                        
+                        // 位置とサイズを半分にスケーリング
+                        const scaledPosition = {
+                          x: Math.round(position.x * scaleX),
+                          y: Math.round(position.y * scaleY),
+                          width: Math.round(position.width * scaleX),
+                          height: Math.round(position.height * scaleY)
+                        };
+                        
+                        // 最初のテキストのみデバッグ情報を出力
+                        if (index === 0) {
+                          console.log('Text position calculation:', {
+                            original: position,
+                            scale: { x: scaleX, y: scaleY },
+                            scaled: scaledPosition
+                          });
+                        }
                         
                         return (
                           <div
                             key={index}
-                            className={`absolute border-[3px] transition-colors duration-200 z-10 pointer-events-none ${
+                            className={`absolute border-2 transition-colors duration-200 z-10 pointer-events-none ${
                               selectedTextIndex === index ? 'border-orange-500 bg-orange-100/20' : 'border-orange-300/50'
                             }`}
                             style={{
-                              left: `${textObj.position.x}px`,
-                              top: `${textObj.position.y}px`,
-                              width: `${textObj.position.width}px`,
-                              height: `${textObj.position.height}px`,
+                              left: `${scaledPosition.x}px`,
+                              top: `${scaledPosition.y}px`,
+                              width: `${scaledPosition.width}px`,
+                              height: `${scaledPosition.height}px`,
                             }}
                           >
                             {selectedTextIndex === index && (

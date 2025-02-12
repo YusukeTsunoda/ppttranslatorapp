@@ -32,7 +32,9 @@ const cleanupOldFiles = async (userId: string) => {
   const baseDir = join(process.cwd(), "tmp", "users", userId);
   if (!existsSync(baseDir)) return;
 
-  const { stdout } = await execAsync(`find "${baseDir}" -type f -mtime +1 -delete`);
+  // 7日以上経過したファイルを削除するように変更
+  const { stdout } = await execAsync(`find "${baseDir}" -type f -mtime +7 -delete`);
+  console.log('Cleanup results:', stdout);
 };
 
 export async function POST(request: NextRequest) {
@@ -85,6 +87,13 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
+    
+    console.log('File saved:', {
+      filePath,
+      fileId,
+      fileName,
+      uploadDir
+    });
 
     // Pythonスクリプトの実行
     const pythonScript = join(process.cwd(), "lib/python/pptx_parser.py");
@@ -115,7 +124,7 @@ export async function POST(request: NextRequest) {
       }
 
       // スライドデータにfileIdを追加
-      const slidesWithFileId = slideData.slides.map(slide => ({
+      const slidesWithFileId = slideData.slides.map((slide: any) => ({
         ...slide,
         fileId,
         image_path: `${fileId}/${slide.image_path}`
