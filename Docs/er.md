@@ -31,4 +31,4 @@ erDiagram
     
     User ||--o{ TranslationHistory : "has"
     TranslationHistory ||--o{ Slide : "contains"
-} 
+```

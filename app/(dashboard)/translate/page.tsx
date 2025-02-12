@@ -475,8 +475,9 @@ export default function TranslatePage() {
                         height: '405px',
                         maxWidth: '100%',
                         maxHeight: '100%',
-                        transform: 'scale(1)',  // 初期スケールを1に設定
-                        transformOrigin: 'top left'
+                        transform: 'scale(1)',
+                        transformOrigin: 'top left',
+                        position: 'relative'
                       }}
                     >
                       <img
@@ -486,6 +487,8 @@ export default function TranslatePage() {
                         style={{ 
                           maxWidth: '100%',
                           maxHeight: '100%',
+                          position: 'relative',
+                          zIndex: 1
                         }}
                         draggable={false}
                         onLoad={(e) => {
@@ -505,11 +508,10 @@ export default function TranslatePage() {
                       {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
                         const position = textObj.position;
                         
-                        // スケール係数を0.5に設定
-                        const scaleX = 10.75;
-                        const scaleY = 2.5;
+                        // スケール係数を画像サイズに基づいて計算
+                        const scaleX = 720 / 1225;  // PPTXの標準幅は9144 EMU
+                        const scaleY = 405 / 690;  // PPTXの標準高さは5143 EMU
                         
-                        // 位置とサイズを半分にスケーリング
                         const scaledPosition = {
                           x: Math.round(position.x * scaleX),
                           y: Math.round(position.y * scaleY),
@@ -517,19 +519,10 @@ export default function TranslatePage() {
                           height: Math.round(position.height * scaleY)
                         };
                         
-                        // 最初のテキストのみデバッグ情報を出力
-                        if (index === 0) {
-                          console.log('Text position calculation:', {
-                            original: position,
-                            scale: { x: scaleX, y: scaleY },
-                            scaled: scaledPosition
-                          });
-                        }
-                        
                         return (
                           <div
                             key={index}
-                            className={`absolute border-2 transition-colors duration-200 z-10 pointer-events-none ${
+                            className={`absolute border-2 transition-colors duration-200 ${
                               selectedTextIndex === index ? 'border-orange-500 bg-orange-100/20' : 'border-orange-300/50'
                             }`}
                             style={{
@@ -537,7 +530,12 @@ export default function TranslatePage() {
                               top: `${scaledPosition.y}px`,
                               width: `${scaledPosition.width}px`,
                               height: `${scaledPosition.height}px`,
+                              zIndex: 2,
+                              pointerEvents: 'auto'
                             }}
+                            onClick={() => setSelectedTextIndex(index)}
+                            onMouseEnter={() => setSelectedTextIndex(index)}
+                            onMouseLeave={() => setSelectedTextIndex(null)}
                           >
                             {selectedTextIndex === index && (
                               <span className="absolute -top-6 left-0 bg-orange-500 text-white px-2 py-1 text-xs rounded z-20">
