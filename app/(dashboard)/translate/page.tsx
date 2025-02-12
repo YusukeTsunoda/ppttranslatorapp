@@ -17,8 +17,8 @@ export default function TranslatePage() {
   const [slides, setSlides] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedTextIndex, setSelectedTextIndex] = useState<number | null>(null);
-  const [sourceLang, setSourceLang] = useState("en");
-  const [targetLang, setTargetLang] = useState("ja");
+  const [sourceLang, setSourceLang] = useState("ja");  // 翻訳元言語を日本語に
+  const [targetLang, setTargetLang] = useState("en");  // 翻訳先言語を英語に
   const { toast } = useToast();
   const router = useRouter();
   const [isPremium, setIsPremium] = useState(false); // TODO: 実際のユーザー情報から取得
@@ -478,7 +478,8 @@ export default function TranslatePage() {
                         transform: 'scale(1)',
                         transformOrigin: 'top left',
                         position: 'relative',
-                        overflow: 'visible'
+                        overflow: 'visible',
+                        pointerEvents: 'auto'
                       }}
                     >
                       <img
@@ -489,7 +490,8 @@ export default function TranslatePage() {
                           maxWidth: '100%',
                           maxHeight: '100%',
                           position: 'relative',
-                          zIndex: 1
+                          zIndex: 1,
+                          pointerEvents: 'none'
                         }}
                         draggable={false}
                         onLoad={(e) => {
@@ -572,11 +574,7 @@ export default function TranslatePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     翻訳先言語
                   </label>
-                  <Select value={targetLang} onValueChange={(value) => {
-                    setTargetLang(value);
-                    // 翻訳先言語が変更された場合、翻訳元言語を自動的に反対の言語に設定
-                    setSourceLang(value === "ja" ? "en" : "ja");
-                  }}>
+                  <Select value={targetLang} onValueChange={setTargetLang}>
                     <SelectTrigger>
                       <SelectValue placeholder="言語を選択" />
                     </SelectTrigger>
