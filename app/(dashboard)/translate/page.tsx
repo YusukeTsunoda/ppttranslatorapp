@@ -477,7 +477,8 @@ export default function TranslatePage() {
                         maxHeight: '100%',
                         transform: 'scale(1)',
                         transformOrigin: 'top left',
-                        position: 'relative'
+                        position: 'relative',
+                        overflow: 'visible'
                       }}
                     >
                       <img
@@ -508,9 +509,8 @@ export default function TranslatePage() {
                       {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
                         const position = textObj.position;
                         
-                        // スケール係数を画像サイズに基づいて計算
-                        const scaleX = 720 / 1225;  // PPTXの標準幅は9144 EMU
-                        const scaleY = 405 / 690;  // PPTXの標準高さは5143 EMU
+                        const scaleX = 720 / 1225;
+                        const scaleY = 405 / 690;
                         
                         const scaledPosition = {
                           x: Math.round(position.x * scaleX),
@@ -536,13 +536,7 @@ export default function TranslatePage() {
                             onClick={() => setSelectedTextIndex(index)}
                             onMouseEnter={() => setSelectedTextIndex(index)}
                             onMouseLeave={() => setSelectedTextIndex(null)}
-                          >
-                            {selectedTextIndex === index && (
-                              <span className="absolute -top-6 left-0 bg-orange-500 text-white px-2 py-1 text-xs rounded z-20">
-                                テキスト {index + 1}
-                              </span>
-                            )}
-                          </div>
+                          />
                         );
                       })}
                     </div>
