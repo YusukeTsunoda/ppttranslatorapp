@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // セッションチェック
     const session = await auth();
     if (!session || !session.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: "ログインしてください" }, { status: 401 });
     }
 
     const formData = await request.formData();

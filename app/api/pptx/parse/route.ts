@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     if (!session) {
       return NextResponse.json(
-        { success: false, error: '認証が必要です' },
+        { success: false, error: 'ログインしてください' },
         { status: 401 }
       );
     }
