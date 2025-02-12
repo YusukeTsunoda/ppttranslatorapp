@@ -522,8 +522,10 @@ export default function TranslatePage() {
                         return (
                           <div
                             key={index}
-                            className={`absolute border-2 transition-colors duration-200 ${
-                              selectedTextIndex === index ? 'border-orange-500 bg-orange-100/20' : 'border-orange-300/50'
+                            className={`absolute transition-all duration-200 ${
+                              selectedTextIndex === index 
+                                ? 'bg-orange-100/20 ring-2 ring-orange-500' 
+                                : 'ring-2 ring-orange-300/50'
                             }`}
                             style={{
                               left: `${scaledPosition.x}px`,
@@ -531,11 +533,7 @@ export default function TranslatePage() {
                               width: `${scaledPosition.width}px`,
                               height: `${scaledPosition.height}px`,
                               zIndex: 2,
-                              pointerEvents: 'auto'
                             }}
-                            onClick={() => setSelectedTextIndex(index)}
-                            onMouseEnter={() => setSelectedTextIndex(index)}
-                            onMouseLeave={() => setSelectedTextIndex(null)}
                           />
                         );
                       })}
@@ -628,10 +626,9 @@ export default function TranslatePage() {
             {slides[currentSlide]?.texts?.map((textObj: any, index: number) => (
               <Card 
                 key={index} 
-                className={`p-6 cursor-pointer transition-all duration-200 ${
-                  selectedTextIndex === index ? 'ring-2 ring-orange-500' : ''
+                className={`p-4 transition-all duration-200 ${
+                  selectedTextIndex === index ? 'ring-2 ring-orange-500 bg-orange-100/20' : ''
                 }`}
-                onClick={() => setSelectedTextIndex(index)}
                 onMouseEnter={() => setSelectedTextIndex(index)}
                 onMouseLeave={() => setSelectedTextIndex(null)}
               >
