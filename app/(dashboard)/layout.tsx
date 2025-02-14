@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
 import {
@@ -29,19 +29,45 @@ import { cn } from '@/lib/utils';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, setUser } = useUser();
   const router = useRouter();
+
+  useEffect(() => {
+    console.log('Header: マウントされました');
+    console.log('Header: 現在のユーザー状態:', user);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
+      router.push('/login');
+      return;
+    }
+  }, [user, router]);
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      setUser(null);
+      console.log('Header: ログアウト成功');
       router.refresh();
       router.push('/');
     } catch (error) {
-      console.error('ログアウトエラー:', error);
+      console.error('Header: ログアウトエラー:', error);
     }
   };
+
+  if (!user) {
+    console.log('Header: ローディング表示を返します');
+    return (
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+          <div className="animate-pulse h-8 w-32 bg-gray-200 rounded"></div>
+          <div className="animate-pulse h-8 w-8 bg-gray-200 rounded-full"></div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="bg-white shadow-sm">
@@ -59,39 +85,30 @@ function Header() {
           >
             料金プラン
           </Link>
-          {user ? (
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage alt={user.name || ''} />
-                    <AvatarFallback>
-                      {user.email?.[0]?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <Link href="/profile" passHref legacyBehavior>
-                  <DropdownMenuItem className="cursor-pointer">
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>マイページ</span>
-                  </DropdownMenuItem>
-                </Link>
-                <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>ログアウト</span>
+          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage alt={user.name || ''} />
+                  <AvatarFallback>
+                    {user.email?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <Link href="/profile" passHref legacyBehavior>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Home className="mr-2 h-4 w-4" />
+                  <span>マイページ</span>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              asChild
-              className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-4 py-2 rounded-md"
-            >
-              <Link href="/sign-up">新規登録</Link>
-            </Button>
-          )}
+              </Link>
+              <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>ログアウト</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
@@ -164,15 +181,19 @@ function Sidebar() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    console.log('DashboardLayout: マウントされました');
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
-          <aside className="bg-white shadow-sm rounded-lg overflow-visible">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8 h-full">
+          <aside className="bg-white shadow-sm rounded-lg h-full">
             <Sidebar />
           </aside>
-          <main className="flex-1 bg-white shadow-sm rounded-lg p-6 overflow-auto">
+          <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
             {children}
           </main>
         </div>

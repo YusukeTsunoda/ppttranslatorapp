@@ -12,12 +12,12 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const userPromise = getUser();
+  const initialUser = await getUser();
 
   return (
     <html lang="ja" className={inter.className}>
       <body>
-        <UserProvider userPromise={userPromise}>
+        <UserProvider initialUser={initialUser}>
           <div className="min-h-screen">
             <main className="flex-1">
               {children}

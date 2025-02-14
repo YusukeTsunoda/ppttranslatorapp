@@ -1,16 +1,17 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { User } from '@/lib/db/schema';
 
 type UserContextType = {
-  userPromise: Promise<User | null>;
+  user: User | null;
+  setUser: (user: User | null) => void;
 };
 
 const UserContext = createContext<UserContextType | null>(null);
 
-export function useUser(): UserContextType {
-  let context = useContext(UserContext);
+export function useUser() {
+  const context = useContext(UserContext);
   if (context === null) {
     throw new Error('useUser must be used within a UserProvider');
   }
@@ -19,13 +20,20 @@ export function useUser(): UserContextType {
 
 export function UserProvider({
   children,
-  userPromise
+  initialUser
 }: {
   children: ReactNode;
-  userPromise: Promise<User | null>;
+  initialUser: User | null;
 }) {
+  const [user, setUser] = useState<User | null>(initialUser);
+
+  // デバッグ用のログ出力
+  useEffect(() => {
+    console.log('UserProvider: ユーザー状態が更新されました', { user });
+  }, [user]);
+
   return (
-    <UserContext.Provider value={{ userPromise }}>
+    <UserContext.Provider value={{ user, setUser }}>
       {children}
     </UserContext.Provider>
   );

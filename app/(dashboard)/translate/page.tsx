@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { Download } from "lucide-react";
+import Link from "next/link";
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -30,6 +31,7 @@ export default function TranslatePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTranslationComplete, setIsTranslationComplete] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 利用可能なモデルのリスト
   const availableModels = [
@@ -54,6 +56,48 @@ export default function TranslatePage() {
   ];
 
   const [selectedModel, setSelectedModel] = useState(availableModels[0].value);
+
+  // コンポーネントの初期化
+  useEffect(() => {
+    if (!isInitialized) {
+      // ステートをリセット
+      setFile(null);
+      setUploading(false);
+      setSlides([]);
+      setCurrentSlide(0);
+      setSelectedTextIndex(null);
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+      setIsDragging(false);
+      setDragStart({ x: 0, y: 0 });
+      setEditedTranslations({});
+      setIsSaving(false);
+      setIsGenerating(false);
+      setIsTranslationComplete(false);
+      setIsInitialized(true);
+    }
+  }, [isInitialized]);
+
+  // クリーンアップ関数
+  useEffect(() => {
+    return () => {
+      setIsInitialized(false);
+    };
+  }, []);
+
+  // マウスイベントのクリーンアップ
+  useEffect(() => {
+    const cleanup = () => {
+      if (isDragging) {
+        setIsDragging(false);
+      }
+    };
+
+    window.addEventListener('mouseup', cleanup);
+    return () => {
+      window.removeEventListener('mouseup', cleanup);
+    };
+  }, [isDragging]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.endsWith(".pptx")) {
@@ -204,26 +248,36 @@ export default function TranslatePage() {
     if (file) handleFileUpload(file);
   }, [handleFileUpload]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!isInitialized) return;
+    e.preventDefault();
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
       y: e.clientY - position.y
     });
-  };
+  }, [isInitialized, position.x, position.y]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isInitialized) return;
+    e.preventDefault();
     if (isDragging) {
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
       });
     }
-  };
+  }, [isInitialized, isDragging, dragStart.x, dragStart.y]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
+    if (!isInitialized) return;
     setIsDragging(false);
-  };
+  }, [isInitialized]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!isInitialized) return;
+    setIsDragging(false);
+  }, [isInitialized]);
 
   const handleZoom = (newScale: number) => {
     setScale(Math.max(0.5, Math.min(3, newScale)));
@@ -443,109 +497,133 @@ export default function TranslatePage() {
                   </Button>
                 </div>
               </div>
-              <div className="aspect-video bg-gray-100 rounded-lg mb-4 relative overflow-hidden"
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-              >
-                {slides[currentSlide]?.image_path ? (
-                  <div 
-                    className="relative w-full h-full flex items-center justify-center"
-                    style={{
-                      transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
-                      transformOrigin: 'center',
-                      transition: isDragging ? 'none' : 'transform 0.2s'
-                    }}
-                  >
-                    {/* スライドのメタデータをコンソールに出力（一度だけ） */}
-                    {currentSlide === 0 && (
-                      <>
-                        {(console.log('Initial slide metadata:', slides[0]?.metadata), null)}
-                        {(console.log('Slide dimensions:', slides[0]?.metadata?.dimensions), null)}
-                        {null}
-                      </>
-                    )}
-                    
-                    <div 
-                      className="relative"
-                      style={{ 
-                        width: '720px',
-                        height: '405px',
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        transform: 'scale(1)',
-                        transformOrigin: 'top left',
-                        position: 'relative',
-                        overflow: 'visible',
-                        pointerEvents: 'auto'
+              <div className="flex flex-col gap-4">
+                <div
+                  className="relative overflow-hidden bg-gray-100 rounded-lg"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseLeave}
+                  style={{
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    userSelect: 'none',
+                    height: '405px',
+                    width: '100%',
+                    touchAction: 'none'
+                  }}
+                >
+                  {slides[currentSlide] && (
+                    <div
+                      style={{
+                        transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
+                        transformOrigin: '0 0',
+                        transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%'
                       }}
                     >
-                      <img
-                        src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
-                        alt={`Slide ${currentSlide + 1}`}
-                        className="w-full h-full object-contain"
+                      {/* スライドのメタデータをコンソールに出力（一度だけ） */}
+                      {currentSlide === 0 && (
+                        <>
+                          {(console.log('Initial slide metadata:', slides[0]?.metadata), null)}
+                          {(console.log('Slide dimensions:', slides[0]?.metadata?.dimensions), null)}
+                          {null}
+                        </>
+                      )}
+                      
+                      <div 
+                        className="relative"
                         style={{ 
+                          width: '720px',
+                          height: '405px',
                           maxWidth: '100%',
                           maxHeight: '100%',
+                          transform: 'scale(1)',
+                          transformOrigin: 'top left',
                           position: 'relative',
-                          zIndex: 1,
-                          pointerEvents: 'none'
+                          overflow: 'visible',
+                          pointerEvents: 'auto'
                         }}
-                        draggable={false}
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          console.log('Loaded image dimensions:', {
-                            natural: {
-                              width: img.naturalWidth,
-                              height: img.naturalHeight
-                            },
-                            display: {
-                              width: img.width,
-                              height: img.height
-                            }
-                          });
-                        }}
-                      />
-                      {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                        const position = textObj.position;
-                        
-                        const scaleX = 720 / 1225;
-                        const scaleY = 405 / 690;
-                        
-                        const scaledPosition = {
-                          x: Math.round(position.x * scaleX),
-                          y: Math.round(position.y * scaleY),
-                          width: Math.round(position.width * scaleX),
-                          height: Math.round(position.height * scaleY)
-                        };
-                        
-                        return (
-                          <div
-                            key={index}
-                            className={`absolute transition-all duration-200 ${
-                              selectedTextIndex === index 
-                                ? 'bg-orange-100/20 ring-2 ring-orange-500' 
-                                : 'ring-2 ring-orange-300/50'
-                            }`}
-                            style={{
-                              left: `${scaledPosition.x}px`,
-                              top: `${scaledPosition.y}px`,
-                              width: `${scaledPosition.width}px`,
-                              height: `${scaledPosition.height}px`,
-                              zIndex: 2,
-                            }}
-                          />
-                        );
-                      })}
+                      >
+                        <img
+                          src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
+                          alt={`Slide ${currentSlide + 1}`}
+                          className="w-full h-full object-contain"
+                          style={{ 
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            position: 'relative',
+                            zIndex: 1,
+                            pointerEvents: 'none'
+                          }}
+                          draggable={false}
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            console.log('Loaded image dimensions:', {
+                              natural: {
+                                width: img.naturalWidth,
+                                height: img.naturalHeight
+                              },
+                              display: {
+                                width: img.width,
+                                height: img.height
+                              }
+                            });
+                          }}
+                        />
+                        {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
+                          const position = textObj.position;
+                          
+                          const scaleX = 720 / 1225;
+                          const scaleY = 405 / 690;
+                          
+                          const scaledPosition = {
+                            x: Math.round(position.x * scaleX),
+                            y: Math.round(position.y * scaleY),
+                            width: Math.round(position.width * scaleX),
+                            height: Math.round(position.height * scaleY)
+                          };
+                          
+                          return (
+                            <div
+                              key={index}
+                              className={`absolute transition-all duration-200 cursor-pointer ${
+                                selectedTextIndex === index 
+                                  ? 'bg-orange-100/20 ring-2 ring-orange-500' 
+                                  : 'ring-2 ring-orange-300/50 hover:ring-orange-400'
+                              }`}
+                              style={{
+                                left: `${scaledPosition.x}px`,
+                                top: `${scaledPosition.y}px`,
+                                width: `${scaledPosition.width}px`,
+                                height: `${scaledPosition.height}px`,
+                                zIndex: 2,
+                                pointerEvents: 'auto'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTextIndex(index);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setSelectedTextIndex(index);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                if (!isDragging) {
+                                  setSelectedTextIndex(null);
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    スライドプレビューを読み込めません
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </Card>
           )}
