@@ -4,9 +4,8 @@ import { cookies } from 'next/headers';
 import { NewUser } from '@/lib/db/schema';
 
 // Node.jsランタイムを明示的に指定
-export const config = {
-  runtime: 'nodejs',
-};
+// bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
+export const runtime = 'nodejs';
 
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;

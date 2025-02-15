@@ -3,6 +3,7 @@ import { hashPassword } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
 
 // Node.jsランタイムを明示的に指定
+// bcryptjsを使用するため、Edge Runtimeでは動作しません
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
