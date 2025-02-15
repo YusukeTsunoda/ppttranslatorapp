@@ -1,9 +1,3 @@
-// TODO: 将来的なリファクタリング計画
-// 1. プロジェクトルートにauth.tsを作成
-// 2. NextAuth.js v5の新しい設定形式に移行
-// 3. auth()関数を使用する実装に更新
-// 4. 正しい型定義の導入
-
 import NextAuth from "next-auth";
 import type { Session, User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
@@ -11,12 +5,8 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 
-// Node.jsランタイムを明示的に指定
-export const runtime = 'nodejs';
-
 const prisma = new PrismaClient();
 
-// 認証設定
 export const authOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -46,8 +36,4 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-// NextAuth.jsハンドラーの作成
-const handler = NextAuth(authOptions);
-
-// ハンドラーのエクスポート
-export { handler as GET, handler as POST };
+export default NextAuth(authOptions); 
