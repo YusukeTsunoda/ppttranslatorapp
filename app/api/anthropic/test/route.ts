@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { anthropic } from '@/lib/anthropic/client';
 
+// Node.jsランタイムを明示的に指定
+export const runtime = 'nodejs';
+
 export async function POST() {
   try {
     // 簡単な接続テスト
@@ -13,15 +16,20 @@ export async function POST() {
       }]
     });
 
+    if (!message.content[0] || message.content[0].type !== 'text') {
+      throw new Error('Unexpected response format from Anthropic API');
+    }
+
     return NextResponse.json({ 
       success: true, 
-      message: 'API connection successful' 
+      message: 'API connection successful',
+      response: message.content[0].text
     });
   } catch (error) {
     console.error('API test failed:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'API connection failed' 
+      error: error instanceof Error ? error.message : 'API connection failed'
     }, { status: 500 });
   }
 }

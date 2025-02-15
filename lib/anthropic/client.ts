@@ -1,11 +1,16 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 
-if (!process.env.ANTHROPIC_API_KEY) {
+// Node.jsランタイムを明示的に指定
+export const runtime = 'nodejs';
+
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+if (!ANTHROPIC_API_KEY) {
   throw new Error('Missing ANTHROPIC_API_KEY environment variable');
 }
 
 export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_API_KEY,
 });
 
 export type TranslationResult = {
@@ -25,9 +30,13 @@ export async function translateText(text: string, fromLang: string, toLang: stri
       }]
     });
 
+    if (!message.content[0] || message.content[0].type !== 'text') {
+      throw new Error('Unexpected response format from Anthropic API');
+    }
+
     return {
       success: true,
-      translatedText: message.content[0].type === 'text' ? message.content[0].text : ''
+      translatedText: message.content[0].text
     };
   } catch (error) {
     console.error('Translation error:', error);
