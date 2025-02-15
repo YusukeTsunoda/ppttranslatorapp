@@ -89,8 +89,3 @@ export async function hashPassword(password: string): Promise<string> {
   // パスワードハッシュの実装例
   return password; // 実際は bcrypt などを使用してください
 }
-
-export function setSession(user: any): void {
-  // セッション設定の実装例
-  console.log('Session set for:', user);
-}
