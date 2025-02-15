@@ -4,15 +4,14 @@
 // 3. auth()関数を使用する実装に更新
 // 4. 正しい型定義の導入
 
+// Node.jsランタイムを明示的に指定
+// bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
+export const runtime = 'nodejs';
+
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
-
-// Node.jsランタイムを明示的に指定
-export const config = {
-  runtime: 'nodejs'
-};
 
 const prisma = new PrismaClient();
 
