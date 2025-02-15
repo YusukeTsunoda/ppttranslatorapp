@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { anthropic } from '@/lib/anthropic/client';
+import { getAnthropicClient } from '@/lib/anthropic/client';
 
 // Node.jsランタイムを明示的に指定
 export const runtime = 'nodejs';
 
 export async function POST() {
   try {
+    const anthropic = getAnthropicClient();
     // 簡単な接続テスト
     const message = await anthropic.messages.create({
       model: 'claude-3-sonnet-20240229',

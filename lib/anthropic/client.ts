@@ -1,17 +1,23 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 
-// Node.jsランタイムを明示的に指定
-export const runtime = 'nodejs';
+let anthropicClient: Anthropic | null = null;
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+export function getAnthropicClient() {
+  if (anthropicClient) {
+    return anthropicClient;
+  }
 
-if (!ANTHROPIC_API_KEY) {
-  throw new Error('Missing ANTHROPIC_API_KEY environment variable');
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing ANTHROPIC_API_KEY environment variable');
+  }
+
+  anthropicClient = new Anthropic({
+    apiKey,
+  });
+
+  return anthropicClient;
 }
-
-export const anthropic = new Anthropic({
-  apiKey: ANTHROPIC_API_KEY,
-});
 
 export type TranslationResult = {
   success: boolean;
@@ -21,7 +27,8 @@ export type TranslationResult = {
 
 export async function translateText(text: string, fromLang: string, toLang: string): Promise<TranslationResult> {
   try {
-    const message = await anthropic.messages.create({
+    const client = getAnthropicClient();
+    const message = await client.messages.create({
       model: 'claude-3-sonnet-20240229',
       max_tokens: 1024,
       messages: [{
