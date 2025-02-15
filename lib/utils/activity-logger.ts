@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import {
   createDatabaseError,
   createValidationError,
@@ -92,7 +93,7 @@ export async function logActivity({
         userId,
         action,
         ipAddress,
-        metadata: metadata ? JSON.stringify(metadata) : null,
+        metadata: metadata as Prisma.InputJsonValue | undefined,
       },
     });
   } catch (error) {

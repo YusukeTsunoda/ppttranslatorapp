@@ -1,4 +1,5 @@
-import { NextAuthConfig } from "next-auth";
+import type { DefaultSession } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
@@ -6,9 +7,17 @@ import { PrismaClient } from "@prisma/client";
 // Node.jsランタイムを使用することを明示
 export const runtime = 'nodejs';
 
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: {
+      id: string;
+    } & DefaultSession["user"]
+  }
+}
+
 const prisma = new PrismaClient();
 
-export const authOptions: NextAuthConfig = {
+export const config = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -21,13 +30,13 @@ export const authOptions: NextAuthConfig = {
     error: "/sign-in",
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account }: { token: JWT; user?: any; account?: any }) {
       if (account && user) {
         token.accessToken = account.access_token;
       }
       return token;
     },
-    async signIn({ user, account }) {
+    async signIn({ user, account }: { user: any; account: any }) {
       if (!account || !user) {
         return false;
       }
