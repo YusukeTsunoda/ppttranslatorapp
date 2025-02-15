@@ -2,6 +2,11 @@ import { compare, hash } from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NewUser } from '@/lib/db/schema';
+import type { DefaultSession, Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { PrismaClient } from "@prisma/client";
+import GoogleProvider from "next-auth/providers/google";
 
 // Node.jsランタイムを明示的に指定
 // bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
@@ -9,6 +14,32 @@ export const runtime = 'nodejs';
 
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;
+
+const prisma = new PrismaClient();
+
+export const authOptions = {
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/login",
+  },
+  callbacks: {
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (session?.user && token?.sub) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+  },
+} as const;
 
 export async function hashPassword(password: string) {
   return hash(password, SALT_ROUNDS);
