@@ -59,33 +59,26 @@ export default function TranslatePage() {
 
   // コンポーネントの初期化
   useEffect(() => {
-    if (!isInitialized) {
-      // ステートをリセット
-      setFile(null);
-      setUploading(false);
-      setSlides([]);
-      setCurrentSlide(0);
-      setSelectedTextIndex(null);
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
-      setIsDragging(false);
-      setDragStart({ x: 0, y: 0 });
-      setEditedTranslations({});
-      setIsSaving(false);
-      setIsGenerating(false);
-      setIsTranslationComplete(false);
-      setIsInitialized(true);
-    }
+    // ステートをリセット
+    setFile(null);
+    setUploading(false);
+    setSlides([]);
+    setCurrentSlide(0);
+    setSelectedTextIndex(null);
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+    setIsDragging(false);
+    setDragStart({ x: 0, y: 0 });
+    setEditedTranslations({});
+    setIsSaving(false);
+    setIsGenerating(false);
+    setIsTranslationComplete(false);
+    setIsInitialized(true);
 
-    // クリーンアップ関数
     return () => {
       setIsInitialized(false);
-      // マウスイベントのクリーンアップ
-      if (isDragging) {
-        setIsDragging(false);
-      }
     };
-  }, [isInitialized, isDragging]);
+  }, []); // 依存配列を空にして、マウント時のみ実行
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.endsWith(".pptx")) {
@@ -237,38 +230,33 @@ export default function TranslatePage() {
   }, [handleFileUpload]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!isInitialized) return;
     e.preventDefault();
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
       y: e.clientY - position.y
     });
-  }, [isInitialized, position.x, position.y]);
+  }, [position.x, position.y]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isInitialized || !isDragging) return;
+    if (!isDragging) return;
     e.preventDefault();
     setPosition({
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y
     });
-  }, [isInitialized, isDragging, dragStart.x, dragStart.y]);
+  }, [isDragging, dragStart.x, dragStart.y]);
 
   const handleMouseUp = useCallback(() => {
-    if (!isInitialized) return;
     setIsDragging(false);
-  }, [isInitialized]);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isInitialized) return;
     setIsDragging(false);
-  }, [isInitialized]);
+  }, []);
 
-  // マウスイベントリスナーの設定
+  // マウスイベントのクリーンアップを最適化
   useEffect(() => {
-    if (!isInitialized) return;
-
     const handleGlobalMouseUp = () => {
       if (isDragging) {
         setIsDragging(false);
@@ -279,7 +267,7 @@ export default function TranslatePage() {
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isInitialized, isDragging]);
+  }, [isDragging]);
 
   const handleZoom = (newScale: number) => {
     setScale(Math.max(0.5, Math.min(3, newScale)));
@@ -306,10 +294,27 @@ export default function TranslatePage() {
     setSlides(updatedSlides);
   };
 
-  // スライド変更時に編集状態をリセット
+  // スライド変更時の編集状態リセット
   useEffect(() => {
-    setEditedTranslations({});
-  }, [currentSlide]);
+    if (currentSlide !== null) {
+      setEditedTranslations({});
+    }
+  }, [currentSlide]); // slidesへの依存を削除
+
+  // スライドのメタデータログ出力を最適化
+  useEffect(() => {
+    if (currentSlide === 0 && slides.length > 0) {
+      console.log('Initial slide metadata:', slides[0]?.metadata);
+    }
+  }, [slides.length]); // currentSlideへの依存を削除し、slides.lengthのみに依存
+
+  // 現在のスライドのメタデータログ出力
+  useEffect(() => {
+    const currentSlideData = slides[currentSlide];
+    if (currentSlideData?.metadata) {
+      console.log('Current slide metadata:', currentSlideData.metadata);
+    }
+  }, [currentSlide, slides]); // 必要な依存のみを保持
 
   const handleDownload = async () => {
     try {
@@ -385,19 +390,6 @@ export default function TranslatePage() {
       setIsGenerating(false);
     }
   };
-
-  useEffect(() => {
-    if (currentSlide === 0 && slides.length > 0) {
-      console.log('Initial slide metadata:', slides[0]?.metadata);
-      console.log('Slide dimensions:', slides[0]?.metadata?.dimensions);
-    }
-  }, [currentSlide, slides]);
-
-  useEffect(() => {
-    if (slides[currentSlide]) {
-      console.log('Current slide metadata:', slides[currentSlide]?.metadata);
-    }
-  }, [currentSlide, slides]);
 
   // 画像のサイズと位置を管理するための状態を追加
   const [imageSize, setImageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
@@ -560,8 +552,13 @@ export default function TranslatePage() {
                     height: '405px',
                     maxWidth: '100%',
                     maxHeight: '100%',
-                    position: 'relative'
+                    position: 'relative',
+                    cursor: isDragging ? 'grabbing' : 'grab'
                   }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseLeave}
                 >
                   {slides[currentSlide] && (
                     <>
