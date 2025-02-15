@@ -1,31 +1,71 @@
+# シーケンス図
+
+## ファイルアップロードと翻訳フロー
+
 ```mermaid
 sequenceDiagram
-    participant User as ユーザー
-    participant Frontend as フロントエンド
-    participant API as APIサーバー
-    participant Python as Pythonスクリプト
-    participant FileSystem as ファイルシステム
+    actor User
+    participant Frontend
+    participant Backend
+    participant Storage
+    participant Claude
+    participant Stripe
 
     User->>Frontend: PPTXファイルをアップロード
-    Frontend->>API: /api/upload (POST)
-    API->>Python: pptx_parser.pyを実行
-    Python->>FileSystem: PPTXを解析・画像生成
-    Python-->>API: スライド情報を返却
-    API-->>Frontend: スライド情報を返却
+    Frontend->>Backend: ファイルをPOST /api/upload
+    Backend->>Storage: ファイルを保存
+    Backend->>Backend: PPTXを解析
+    Backend->>Storage: スライド画像を保存
+    Backend->>Frontend: スライド情報を返却
 
-    User->>Frontend: 翻訳を実行
-    Frontend->>API: /api/translate (POST)
-    API->>API: Claude APIで翻訳
-    API-->>Frontend: 翻訳結果を返却
+    loop 各スライド
+        Frontend->>Backend: 翻訳リクエスト POST /api/translate
+        Backend->>Claude: テキスト翻訳リクエスト
+        Claude->>Backend: 翻訳結果
+        Backend->>Frontend: 翻訳結果を返却
+    end
 
-    User->>Frontend: 翻訳PPTXをダウンロード
-    Frontend->>API: /api/pptx/generate (POST)
-    API->>FileSystem: 翻訳データをJSONとして保存
-    API->>Python: pptx_generator.pyを実行
-    Python->>FileSystem: 翻訳PPTXを生成
-    Python-->>API: 生成結果を返却
-    API-->>Frontend: ダウンロードURLを返却
-    Frontend->>API: /api/download/[userId]/[filename] (GET)
-    API-->>Frontend: 翻訳済みPPTXファイル
-    Frontend-->>User: ファイルダウンロード
+    User->>Frontend: 翻訳結果を確認・編集
+    User->>Frontend: ダウンロードをリクエスト
+    Frontend->>Backend: POST /api/pptx/generate
+    Backend->>Storage: 翻訳済みPPTXを生成
+    Backend->>Frontend: ダウンロードURLを返却
+    Frontend->>User: 翻訳済みPPTXをダウンロード
+
+    alt Premiumプラン未加入
+        User->>Frontend: Premiumプランへのアップグレード
+        Frontend->>Backend: POST /api/checkout
+        Backend->>Stripe: チェックアウトセッション作成
+        Stripe->>Frontend: セッションURL
+        Frontend->>User: Stripe決済ページへリダイレクト
+    end
+```
+
+## 認証フロー
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Frontend
+    participant Backend
+    participant Google
+    participant Database
+
+    alt Googleログイン
+        User->>Frontend: Googleログインをクリック
+        Frontend->>Google: 認証リクエスト
+        Google->>Frontend: 認証コード
+        Frontend->>Backend: POST /api/auth/callback/google
+        Backend->>Google: トークン検証
+        Google->>Backend: ユーザー情報
+        Backend->>Database: ユーザー情報保存/更新
+        Backend->>Frontend: セッショントークン
+        Frontend->>User: ダッシュボードへリダイレクト
+    else メールログイン
+        User->>Frontend: メールアドレス・パスワードを入力
+        Frontend->>Backend: POST /api/auth/login
+        Backend->>Database: 認証情報検証
+        Backend->>Frontend: セッショントークン
+        Frontend->>User: ダッシュボードへリダイレクト
+    end
 ``` 

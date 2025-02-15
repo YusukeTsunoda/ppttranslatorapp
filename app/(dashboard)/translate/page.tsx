@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
@@ -384,6 +384,58 @@ export default function TranslatePage() {
     }
   };
 
+  useEffect(() => {
+    if (currentSlide === 0 && slides.length > 0) {
+      console.log('Initial slide metadata:', slides[0]?.metadata);
+      console.log('Slide dimensions:', slides[0]?.metadata?.dimensions);
+    }
+  }, [currentSlide, slides]);
+
+  useEffect(() => {
+    if (slides[currentSlide]) {
+      console.log('Current slide metadata:', slides[currentSlide]?.metadata);
+    }
+  }, [currentSlide, slides]);
+
+  // 画像のサイズと位置を管理するための状態を追加
+  const [imageSize, setImageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 720, height: 405 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  // 画像がロードされた時のサイズ計算
+  const calculateImageDisplaySize = (naturalWidth: number, naturalHeight: number) => {
+    const containerWidth = containerSize.width;
+    const containerHeight = containerSize.height;
+    
+    const aspectRatio = naturalWidth / naturalHeight;
+    let displayWidth = containerWidth;
+    let displayHeight = containerWidth / aspectRatio;
+    
+    if (displayHeight > containerHeight) {
+      displayHeight = containerHeight;
+      displayWidth = containerHeight * aspectRatio;
+    }
+    
+    return { width: displayWidth, height: displayHeight };
+  };
+
+  // コンテナのリサイズを監視
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+      }
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -499,129 +551,68 @@ export default function TranslatePage() {
               </div>
               <div className="flex flex-col gap-4">
                 <div
-                  className="relative overflow-hidden bg-gray-100 rounded-lg"
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseLeave}
-                  style={{
-                    cursor: isDragging ? 'grabbing' : 'grab',
-                    userSelect: 'none',
+                  ref={containerRef}
+                  className="relative overflow-hidden bg-gray-100"
+                  style={{ 
+                    width: '720px',
                     height: '405px',
-                    width: '100%',
-                    touchAction: 'none'
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    position: 'relative'
                   }}
                 >
                   {slides[currentSlide] && (
-                    <div
-                      style={{
-                        transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
-                        transformOrigin: '0 0',
-                        transition: isDragging ? 'none' : 'transform 0.3s ease-out',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%'
-                      }}
-                    >
-                      {/* スライドのメタデータをコンソールに出力（一度だけ） */}
-                      {currentSlide === 0 && (
-                        <>
-                          {(console.log('Initial slide metadata:', slides[0]?.metadata), null)}
-                          {(console.log('Slide dimensions:', slides[0]?.metadata?.dimensions), null)}
-                          {null}
-                        </>
-                      )}
-                      
-                      <div 
-                        className="relative"
+                    <>
+                      <img
+                        ref={imageRef}
+                        src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
+                        alt={`Slide ${currentSlide + 1}`}
+                        className="max-w-full max-h-full object-contain"
                         style={{ 
-                          width: '720px',
-                          height: '405px',
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          transform: 'scale(1)',
-                          transformOrigin: 'top left',
-                          position: 'relative',
-                          overflow: 'visible',
-                          pointerEvents: 'auto'
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          pointerEvents: 'none'
                         }}
-                      >
-                        <img
-                          src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
-                          alt={`Slide ${currentSlide + 1}`}
-                          className="w-full h-full object-contain"
-                          style={{ 
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            position: 'relative',
-                            zIndex: 1,
-                            pointerEvents: 'none'
-                          }}
-                          draggable={false}
-                          onLoad={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            console.log('Loaded image dimensions:', {
-                              natural: {
-                                width: img.naturalWidth,
-                                height: img.naturalHeight
-                              },
-                              display: {
-                                width: img.width,
-                                height: img.height
-                              }
-                            });
-                          }}
-                        />
-                        {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                          const position = textObj.position;
-                          
-                          const scaleX = 720 / 1225;
-                          const scaleY = 405 / 690;
-                          
-                          const scaledPosition = {
-                            x: Math.round(position.x * scaleX),
-                            y: Math.round(position.y * scaleY),
-                            width: Math.round(position.width * scaleX),
-                            height: Math.round(position.height * scaleY)
-                          };
-                          
-                          return (
-                            <div
-                              key={index}
-                              className={`absolute transition-all duration-200 cursor-pointer ${
-                                selectedTextIndex === index 
-                                  ? 'bg-orange-100/20 ring-2 ring-orange-500' 
-                                  : 'ring-2 ring-orange-300/50 hover:ring-orange-400'
-                              }`}
-                              style={{
-                                left: `${scaledPosition.x}px`,
-                                top: `${scaledPosition.y}px`,
-                                width: `${scaledPosition.width}px`,
-                                height: `${scaledPosition.height}px`,
-                                zIndex: 2,
-                                pointerEvents: 'auto'
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedTextIndex(index);
-                              }}
-                              onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setSelectedTextIndex(index);
-                              }}
-                              onMouseLeave={(e) => {
-                                e.stopPropagation();
-                                if (!isDragging) {
-                                  setSelectedTextIndex(null);
-                                }
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
+                        draggable={false}
+                        onLoad={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          const displaySize = calculateImageDisplaySize(img.naturalWidth, img.naturalHeight);
+                          setImageSize(displaySize);
+                        }}
+                      />
+                      {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
+                        const position = textObj.position;
+                        const slideMetadata = slides[currentSlide]?.metadata?.dimensions || { width: 1225, height: 690 };
+                        
+                        const scaleX = imageSize.width / slideMetadata.width;
+                        const scaleY = imageSize.height / slideMetadata.height;
+                        
+                        const offsetX = (containerSize.width - imageSize.width) / 2;
+                        const offsetY = (containerSize.height - imageSize.height) / 2;
+                        
+                        const left = offsetX + position.x * scaleX;
+                        const top = offsetY + position.y * scaleY;
+                        const width = position.width * scaleX;
+                        const height = position.height * scaleY;
+                        
+                        return (
+                          <div
+                            key={index}
+                            style={{
+                              position: 'absolute',
+                              left: `${left}px`,
+                              top: `${top}px`,
+                              width: `${width}px`,
+                              height: `${height}px`,
+                              border: '2px solid orange',
+                              pointerEvents: 'none'
+                            }}
+                          />
+                        );
+                      })}
+                    </>
                   )}
                 </div>
               </div>

@@ -23,7 +23,8 @@ import {
   Bell,
   User,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -122,6 +123,7 @@ function Sidebar() {
   const navigation = [
     { name: '翻訳', href: '/translate', icon: Settings },
     { name: '履歴', href: '/history', icon: History },
+    { name: 'アクティビティ', href: '/activity', icon: Activity },
     { name: 'プロフィール', href: '/profile', icon: User },
     { name: '設定', href: '/settings', icon: Settings },
     { name: 'API連携', href: '/integrations', icon: LinkIcon },

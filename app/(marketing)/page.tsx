@@ -86,43 +86,6 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-
-      {/* 料金プランセクション */}
-      <div id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
-        <h2 className="text-4xl font-bold text-center text-gray-900 mb-16">
-          <span className="bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">料金プラン</span>
-        </h2>
-        <div className="grid md:grid-cols-2 gap-10 max-w-5xl mx-auto">
-          {pricingPlans.map((plan, index) => (
-            <div key={index} className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-600 to-pink-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
-              <div className="relative bg-white p-8 rounded-2xl shadow-xl">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
-                    <p className="text-gray-600 mt-2">{plan.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-4xl font-bold text-gray-900">{plan.price}</div>
-                    <div className="text-gray-600">{plan.period}</div>
-                  </div>
-                </div>
-                <ul className="space-y-5 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start space-x-4">
-                      <CheckCircle className="h-5 w-5 text-orange-500 mt-1" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button asChild className="w-full bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700 shadow-lg shadow-orange-600/20">
-                  <Link href="/sign-up">プランを選択</Link>
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
