@@ -76,28 +76,16 @@ export default function TranslatePage() {
       setIsTranslationComplete(false);
       setIsInitialized(true);
     }
-  }, [isInitialized]);
 
-  // クリーンアップ関数
-  useEffect(() => {
+    // クリーンアップ関数
     return () => {
       setIsInitialized(false);
-    };
-  }, []);
-
-  // マウスイベントのクリーンアップ
-  useEffect(() => {
-    const cleanup = () => {
+      // マウスイベントのクリーンアップ
       if (isDragging) {
         setIsDragging(false);
       }
     };
-
-    window.addEventListener('mouseup', cleanup);
-    return () => {
-      window.removeEventListener('mouseup', cleanup);
-    };
-  }, [isDragging]);
+  }, [isInitialized, isDragging]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.endsWith(".pptx")) {
@@ -259,14 +247,12 @@ export default function TranslatePage() {
   }, [isInitialized, position.x, position.y]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isInitialized) return;
+    if (!isInitialized || !isDragging) return;
     e.preventDefault();
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
   }, [isInitialized, isDragging, dragStart.x, dragStart.y]);
 
   const handleMouseUp = useCallback(() => {
@@ -278,6 +264,22 @@ export default function TranslatePage() {
     if (!isInitialized) return;
     setIsDragging(false);
   }, [isInitialized]);
+
+  // マウスイベントリスナーの設定
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isInitialized, isDragging]);
 
   const handleZoom = (newScale: number) => {
     setScale(Math.max(0.5, Math.min(3, newScale)));

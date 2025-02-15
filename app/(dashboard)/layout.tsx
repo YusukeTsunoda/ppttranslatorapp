@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
 import {
@@ -33,20 +33,7 @@ function Header() {
   const { user, setUser } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    console.log('Header: マウントされました');
-    console.log('Header: 現在のユーザー状態:', user);
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
-      router.push('/login');
-      return;
-    }
-  }, [user, router]);
-
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await signOut();
       setUser(null);
@@ -56,7 +43,15 @@ function Header() {
     } catch (error) {
       console.error('Header: ログアウトエラー:', error);
     }
-  };
+  }, [setUser, router]);
+
+  useEffect(() => {
+    if (!user) {
+      console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
+      router.push('/login');
+      return;
+    }
+  }, [user, router]);
 
   if (!user) {
     console.log('Header: ローディング表示を返します');
@@ -120,6 +115,10 @@ function Sidebar() {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
   
+  const handleToggle = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
   const navigation = [
     { name: '翻訳', href: '/translate', icon: Settings },
     { name: '履歴', href: '/history', icon: History },
@@ -132,7 +131,7 @@ function Sidebar() {
   return (
     <div className="relative h-full">
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
         className="absolute -right-4 top-2 bg-white rounded-full p-1.5 shadow-md hover:bg-gray-50 z-50 cursor-pointer border border-gray-200"
       >
         {isExpanded ? (
@@ -183,8 +182,17 @@ function Sidebar() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    console.log('DashboardLayout: マウントされました');
+    if (!isInitialized) {
+      console.log('DashboardLayout: 初期化');
+      setIsInitialized(true);
+    }
+    return () => {
+      console.log('DashboardLayout: クリーンアップ');
+      setIsInitialized(false);
+    };
   }, []);
 
   return (
