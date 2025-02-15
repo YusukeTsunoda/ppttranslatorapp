@@ -12,6 +12,9 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 import { signToken } from "@/lib/auth/session";
 
+// Node.jsランタイムを使用することを明示
+export const runtime = 'nodejs';
+
 const prisma = new PrismaClient();
 
 // TODO: 後でauth.tsに移動する設定

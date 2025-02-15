@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { signToken, verifyToken } from '@/lib/auth/session';
 
+// Node.jsランタイムを使用することを明示
+export const runtime = 'nodejs';
+
 // 保護されたルートのパターン
 const protectedPaths = ['/dashboard', '/translate', '/profile', '/settings', '/history', '/integrations'];
 
