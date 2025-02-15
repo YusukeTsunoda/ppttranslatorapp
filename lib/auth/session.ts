@@ -3,6 +3,11 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NewUser } from '@/lib/db/schema';
 
+// Node.jsランタイムを明示的に指定
+export const config = {
+  runtime: 'nodejs',
+};
+
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;
 
