@@ -1,3 +1,7 @@
+// Node.jsランタイムを明示的に指定
+// ファイルシステム操作を含むため、Edge Runtimeでは動作しません
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import { join } from 'path';

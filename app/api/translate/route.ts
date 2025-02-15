@@ -1,3 +1,7 @@
+// Node.jsランタイムを明示的に指定
+// Anthropic APIの処理を含むため、Edge Runtimeでは動作しません
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth/session";
 import Anthropic from "@anthropic-ai/sdk";

@@ -10,7 +10,9 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 
 // Node.jsランタイムを明示的に指定
-export const runtime = 'nodejs';
+export const config = {
+  runtime: 'nodejs'
+};
 
 const prisma = new PrismaClient();
 
@@ -30,10 +32,15 @@ const handler = NextAuth({
   },
   callbacks: {
     async session({ session, token }) {
-      if (session?.user && token?.sub) {
-        session.user.id = token.sub;
+      try {
+        if (session?.user && token?.sub) {
+          session.user.id = token.sub;
+        }
+        return session;
+      } catch (error) {
+        console.error('Session callback error:', error);
+        return session;
       }
-      return session;
     },
   },
 });

@@ -71,8 +71,10 @@ export function handleError(error: unknown): AppError {
 }
 
 export function getErrorMessage(error: unknown): string {
-  const appError = handleError(error);
-  return appError.message;
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Unknown error occurred";
 }
 
 // バリデーションエラーの作成

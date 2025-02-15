@@ -1,3 +1,7 @@
+// Node.jsランタイムを明示的に指定
+// ファイルシステム操作とchild_processを含むため、Edge Runtimeでは動作しません
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
