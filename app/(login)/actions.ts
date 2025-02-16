@@ -63,7 +63,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   await Promise.all([
     setSession(user),
-    team ? logActivity(team.id, user.id, ActivityAction.SIGN_IN) : Promise.resolve(),
+    team ? logActivity(team.id, user.id, ActivityAction.sign_in) : Promise.resolve(),
   ]);
 
   const redirectTo = formData.get('redirect') as string | null;
@@ -134,7 +134,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
         data: { status: 'accepted' }
       });
 
-      await logActivity(invitation.teamId, user.id, ActivityAction.ACCEPT_INVITATION);
+      await logActivity(invitation.teamId, user.id, ActivityAction.accept_invitation);
 
       team = await prisma.team.findUnique({
         where: { id: invitation.teamId }
@@ -164,7 +164,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     }
 
     userRole = 'owner';
-    await logActivity(team.id, user.id, ActivityAction.CREATE_TEAM);
+    await logActivity(team.id, user.id, ActivityAction.create_team);
   }
 
   if (team) {
@@ -176,7 +176,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
           role: userRole
         }
       }),
-      logActivity(team.id, user.id, ActivityAction.SIGN_UP),
+      logActivity(team.id, user.id, ActivityAction.sign_up),
       setSession(user)
     ]);
   }
@@ -196,7 +196,7 @@ export async function signOut() {
   
   const userWithTeam = await getUserWithTeam(user.id);
   if (userWithTeam) {
-    await logActivity(userWithTeam.teamId, user.id, ActivityAction.SIGN_OUT);
+    await logActivity(userWithTeam.teamId, user.id, ActivityAction.sign_out);
   }
   (await cookies()).delete('session');
 }
@@ -271,7 +271,7 @@ export const deleteAccount = validatedActionWithUser(
       await logActivity(
         userWithTeam.teamId,
         user.id,
-        ActivityAction.DELETE_ACCOUNT,
+        ActivityAction.delete_account,
       );
     }
 
@@ -318,7 +318,7 @@ export const updateAccount = validatedActionWithUser(
       await logActivity(
         userWithTeam.teamId,
         user.id,
-        ActivityAction.UPDATE_ACCOUNT,
+        ActivityAction.update_account,
       );
     }
 
@@ -350,7 +350,7 @@ export const removeTeamMember = validatedActionWithUser(
     await logActivity(
       userWithTeam.teamId,
       user.id,
-      ActivityAction.REMOVE_TEAM_MEMBER,
+      ActivityAction.remove_team_member,
     );
 
     return { success: 'Team member removed successfully' };
@@ -414,7 +414,7 @@ export const inviteTeamMember = validatedActionWithUser(
     await logActivity(
       userWithTeam.teamId,
       user.id,
-      ActivityAction.INVITE_TEAM_MEMBER,
+      ActivityAction.invite_team_member,
     );
 
     // TODO: Send invitation email and include ?inviteId={id} to sign-up URL
