@@ -563,10 +563,8 @@ export default function TranslatePage() {
                   ref={containerRef}
                   className="relative overflow-hidden bg-gray-100"
                   style={{ 
-                    width: '720px',
-                    height: '405px',
-                    maxWidth: '100%',
-                    maxHeight: '100%',
+                    width: '100%',
+                    paddingTop: '56.25%', // 16:9のアスペクト比を維持
                     position: 'relative',
                     cursor: isDragging ? 'grabbing' : 'grab'
                   }}
@@ -581,53 +579,42 @@ export default function TranslatePage() {
                         ref={imageRef}
                         src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
                         alt={`Slide ${currentSlide + 1}`}
-                        className="max-w-full max-h-full object-contain"
+                        className="absolute inset-0 w-full h-full object-contain"
                         style={{ 
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: `translate(-50%, -50%) scale(${scale})`,
+                          transform: `scale(${scale})`,
                           transformOrigin: 'center',
                           pointerEvents: 'none'
                         }}
                         draggable={false}
                         onLoad={handleImageLoad}
                       />
-                      {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                        const position = textObj.position;
-                        
-                        // スケーリング係数を計算
-                        const scaleX = imageSize.width / 1920; // 標準的なスライドの幅
-                        const scaleY = imageSize.height / 1080; // 標準的なスライドの高さ
-                        
-                        // 画像の実際の表示位置を考慮してオフセットを計算
-                        const offsetX = (containerSize.width - imageSize.width) / 2;
-                        const offsetY = (containerSize.height - imageSize.height) / 2;
-                        
-                        // 最終的な位置を計算
-                        const left = offsetX + position.x * scaleX;
-                        const top = offsetY + position.y * scaleY;
-                        const width = position.width * scaleX;
-                        const height = position.height * scaleY;
-                        
-                        return (
-                          <div
-                            key={index}
-                            style={{
-                              position: 'absolute',
-                              left: `${left}px`,
-                              top: `${top}px`,
-                              width: `${width}px`,
-                              height: `${height}px`,
-                              border: selectedTextIndex === index ? '2px solid orange' : '2px solid rgba(255, 165, 0, 0.5)',
-                              backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
-                              pointerEvents: 'none',
-                              transform: `scale(${scale})`,
-                              transformOrigin: 'top left'
-                            }}
-                          />
-                        );
-                      })}
+                      <div className="absolute inset-0" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+                        {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
+                          const position = textObj.position;
+                          
+                          // パーセンテージに変換
+                          const left = (position.x / 1920) * 100;  // 1920はスライドの標準幅
+                          const top = (position.y / 1080) * 100;   // 1080はスライドの標準高さ
+                          const width = (position.width / 1920) * 100;
+                          const height = (position.height / 1080) * 100;
+                          
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                position: 'absolute',
+                                left: `${left}%`,
+                                top: `${top}%`,
+                                width: `${width}%`,
+                                height: `${height}%`,
+                                border: selectedTextIndex === index ? '2px solid orange' : '2px solid rgba(255, 165, 0, 0.5)',
+                                backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
                     </>
                   )}
                 </div>
