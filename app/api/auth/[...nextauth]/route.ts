@@ -13,6 +13,11 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 
+// Node.jsランタイムを明示的に指定
+export const config = {
+  runtime: 'nodejs'
+};
+
 const prisma = new PrismaClient();
 
 const handler = NextAuth({
