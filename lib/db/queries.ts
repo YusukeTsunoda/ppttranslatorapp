@@ -29,12 +29,20 @@ export async function getUser() {
         id: true,
         email: true,
         name: true,
+        passwordHash: true,
         createdAt: true,
         updatedAt: true,
+        role: true,
+        deletedAt: true,
       },
     });
 
-    return user;
+    if (!user) return null;
+
+    return {
+      ...user,
+      id: parseInt(user.id), // stringからnumberに変換
+    };
   } catch (error) {
     console.error('Error in getUser:', error);
     return null;
