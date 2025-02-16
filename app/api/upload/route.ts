@@ -3,64 +3,27 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { join } from "path";
-import { verifyToken } from "@/lib/auth/session";
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
 import { exec } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
+import { generateFileId, createUserDirectories, cleanupOldFiles } from '@/lib/utils/file-utils';
 
 const execAsync = promisify(exec);
 
-// ファイル名を生成する関数
-const generateFileId = () => {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  return `${timestamp}_${random}`;
-};
-
-// ユーザーのディレクトリを作成する関数
-const createUserDirectories = async (userId: string, fileId: string) => {
-  const baseDir = join(process.cwd(), "tmp", "users", userId);
-  const uploadDir = join(baseDir, "uploads");
-  const slidesDir = join(baseDir, "slides", fileId);
-
-  await mkdir(uploadDir, { recursive: true });
-  await mkdir(slidesDir, { recursive: true });
-
-  return { uploadDir, slidesDir };
-};
-
-// 古いファイルを削除する関数（24時間以上経過したファイル）
-const cleanupOldFiles = async (userId: string) => {
-  const baseDir = join(process.cwd(), "tmp", "users", userId);
-  if (!existsSync(baseDir)) return;
-
-  // 7日以上経過したファイルを削除するように変更
-  const { stdout } = await execAsync(`find "${baseDir}" -type f -mtime +7 -delete`);
-  console.log('Cleanup results:', stdout);
-};
-
 export async function POST(request: NextRequest) {
   try {
-    // セッションチェック
-    const sessionCookie = request.cookies.get('session');
-    if (!sessionCookie) {
+    // セッションチェックを新しい方式に変更
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    let session;
-    try {
-      session = await verifyToken(sessionCookie.value);
-      if (!session) {
-        return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-      }
-    } catch (error) {
-      return NextResponse.json({ error: "認証が無効です" }, { status: 401 });
-    }
-
-    // userIdを文字列に変換
-    const userId = session.user.id.toString();
+    // userIdを取得
+    const userId = session.user.id;
     const fileId = generateFileId();
 
     // 古いファイルの削除を実行

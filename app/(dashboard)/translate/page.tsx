@@ -108,7 +108,8 @@ export default function TranslatePage() {
           description: "セッションが切れました。再度ログインしてください。",
           variant: "destructive",
         });
-        router.push('/login');
+        const currentPath = window.location.pathname;
+        router.push(`/sign-in?redirect=${encodeURIComponent(currentPath)}`);
         return;
       }
 
@@ -176,7 +177,8 @@ export default function TranslatePage() {
           description: "セッションが切れました。再度ログインしてください。",
           variant: "destructive",
         });
-        router.push('/login');
+        const currentPath = window.location.pathname;
+        router.push(`/sign-in?redirect=${encodeURIComponent(currentPath)}`);
         return;
       }
 
