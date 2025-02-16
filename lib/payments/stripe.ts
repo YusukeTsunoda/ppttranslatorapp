@@ -7,8 +7,17 @@ import {
   updateTeamSubscription
 } from '@/lib/db/queries';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia'
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+}
+
+if (!process.env.BASE_URL) {
+  throw new Error('BASE_URL environment variable is not set');
+}
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2025-01-27.acacia',
+  typescript: true,
 });
 
 export async function createCheckoutSession({

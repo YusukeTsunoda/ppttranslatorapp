@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { setSession } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/payments/stripe';
