@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 declare global {
   var prisma: PrismaClient | undefined;
@@ -6,7 +6,12 @@ declare global {
 
 // 開発環境でのホットリロード時の重複インスタンス化を防ぐ
 const prisma = global.prisma || new PrismaClient({
-  log: ['error'],
+  log: [
+    {
+      emit: 'event',
+      level: 'query',
+    },
+  ],
   datasources: {
     db: {
       url: process.env.DATABASE_URL,
@@ -15,7 +20,7 @@ const prisma = global.prisma || new PrismaClient({
 });
 
 // クエリログのイベントリスナーを設定
-prisma.$on<any>('query', (e: Prisma.QueryEvent) => {
+(prisma.$on as any)('query', (e: Prisma.QueryEvent) => {
   console.log('Query:', e.query);
   console.log('Params:', e.params);
   console.log('Duration:', e.duration + 'ms');

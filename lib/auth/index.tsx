@@ -1,9 +1,10 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   name: string | null;
   passwordHash: string | null;
@@ -22,17 +23,26 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({
   children,
-  initialUser,
 }: {
   children: React.ReactNode;
-  initialUser: User | null;
 }) {
-  const [user, setUser] = useState<User | null>(initialUser);
+  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
 
-  // デバッグ用のログ出力
   useEffect(() => {
-    console.log('UserProvider: ユーザー状態が更新されました', { user });
-  }, [user]);
+    const fetchUser = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        if (data.user) {
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      }
+    };
+    fetchUser();
+  }, []);
 
   return (
     <UserContext.Provider value={{ user, setUser }}>

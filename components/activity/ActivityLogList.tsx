@@ -8,7 +8,15 @@ import {
   Settings,
   UserPlus,
   Languages,
-  Activity
+  Activity,
+  LogIn,
+  LogOut,
+  UserPlus2,
+  Users,
+  UserMinus,
+  UserCog,
+  Key,
+  Trash2,
 } from 'lucide-react';
 
 interface ActivityLogItem {
@@ -23,6 +31,16 @@ interface ActivityLogItem {
 }
 
 const actionIcons = {
+  sign_in: LogIn,
+  sign_up: UserPlus2,
+  sign_out: LogOut,
+  create_team: Users,
+  accept_invitation: UserPlus,
+  invite_team_member: UserPlus,
+  remove_team_member: UserMinus,
+  update_account: UserCog,
+  update_password: Key,
+  delete_account: Trash2,
   file_upload: FileUp,
   translation: Languages,
   download: Download,
@@ -31,6 +49,16 @@ const actionIcons = {
 };
 
 const actionLabels = {
+  sign_in: 'ログイン',
+  sign_up: '新規登録',
+  sign_out: 'ログアウト',
+  create_team: 'チーム作成',
+  accept_invitation: '招待承認',
+  invite_team_member: 'メンバー招待',
+  remove_team_member: 'メンバー削除',
+  update_account: 'アカウント更新',
+  update_password: 'パスワード更新',
+  delete_account: 'アカウント削除',
   file_upload: 'ファイルアップロード',
   translation: '翻訳',
   download: 'ダウンロード',
