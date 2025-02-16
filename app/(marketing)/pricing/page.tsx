@@ -7,7 +7,6 @@ import Link from "next/link";
 
 const plans = [
   {
-<<<<<<< HEAD
     name: "ベーシックプラン",
     price: "¥1,000",
     description: "個人向け有料プラン",
@@ -16,22 +15,11 @@ const plans = [
       "月10件までのファイル翻訳",
       "ファイルサイズ上限10MB",
       "年間契約で最大20%割引"
-=======
-    name: "Free",
-    price: "¥0",
-    description: "個人利用に最適",
-    features: [
-      "月5ファイルまで翻訳可能",
-      "基本的な翻訳機能",
-      "Claude 3 Haikuモデル",
-      "ファイル履歴7日間",
->>>>>>> 8b9d260495e07edb5fb81b4acf561a969ffe809a
     ],
     buttonText: "無料で始める",
     href: "/sign-up",
   },
   {
-<<<<<<< HEAD
     name: "プレミアムプラン",
     price: "¥3,000",
     description: "ヘビーユーザー向け",
@@ -46,38 +34,6 @@ const plans = [
     href: "/sign-up",
     featured: true,
   }
-=======
-    name: "Pro",
-    price: "¥2,980",
-    description: "プロフェッショナル向け",
-    features: [
-      "無制限のファイル翻訳",
-      "高品質な翻訳機能",
-      "Claude 3 Sonnetモデル",
-      "ファイル履歴30日間",
-      "優先サポート",
-    ],
-    buttonText: "アップグレード",
-    href: "/checkout?plan=pro",
-    featured: true,
-  },
-  {
-    name: "Team",
-    price: "¥9,800",
-    description: "チーム利用に最適",
-    features: [
-      "無制限のファイル翻訳",
-      "高品質な翻訳機能",
-      "Claude 3 Sonnetモデル",
-      "ファイル履歴無制限",
-      "優先サポート",
-      "チームメンバー5名まで",
-      "共有ライブラリ",
-    ],
-    buttonText: "チームプランを選択",
-    href: "/checkout?plan=team",
-  },
->>>>>>> 8b9d260495e07edb5fb81b4acf561a969ffe809a
 ];
 
 export default function PricingPage() {
@@ -90,11 +46,7 @@ export default function PricingPage() {
             あなたのニーズに合わせたプランをお選びください
           </p>
         </div>
-<<<<<<< HEAD
         <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2 lg:gap-x-8 xl:gap-x-12">
-=======
-        <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3 lg:gap-x-8 xl:gap-x-12">
->>>>>>> 8b9d260495e07edb5fb81b4acf561a969ffe809a
           {plans.map((plan) => (
             <Card
               key={plan.name}
@@ -105,11 +57,7 @@ export default function PricingPage() {
               {plan.featured && (
                 <div className="absolute -top-4 right-8">
                   <div className="rounded-full bg-orange-600 px-4 py-1 text-xs font-semibold leading-5 text-white">
-<<<<<<< HEAD
                     おすすめ
-=======
-                    人気
->>>>>>> 8b9d260495e07edb5fb81b4acf561a969ffe809a
                   </div>
                 </div>
               )}
@@ -119,11 +67,7 @@ export default function PricingPage() {
                   <p className="mt-4 text-sm leading-6 text-gray-600">{plan.description}</p>
                   <p className="mt-6 flex items-baseline gap-x-1">
                     <span className="text-4xl font-bold tracking-tight text-gray-900">{plan.price}</span>
-<<<<<<< HEAD
                     <span className="text-sm font-semibold leading-6 text-gray-600">/月額</span>
-=======
-                    <span className="text-sm font-semibold leading-6 text-gray-600">/月</span>
->>>>>>> 8b9d260495e07edb5fb81b4acf561a969ffe809a
                   </p>
                   <ul role="list" className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
                     {plan.features.map((feature) => (
