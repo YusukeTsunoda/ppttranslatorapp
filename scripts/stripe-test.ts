@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 
+// 環境変数を読み込む
 dotenv.config();
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -10,8 +11,14 @@ if (!stripeSecretKey) {
   process.exit(1);
 }
 
+// APIキーがテスト環境のものかチェック
+if (!stripeSecretKey.startsWith('sk_test_')) {
+  console.error('Please use a test environment API key (starts with sk_test_)');
+  process.exit(1);
+}
+
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-01-27.acacia',
+  apiVersion: '2025-01-27.acacia'
 });
 
 async function testStripeConnection() {
@@ -24,4 +31,4 @@ async function testStripeConnection() {
   }
 }
 
-testStripeConnection();
+testStripeConnection(); 
