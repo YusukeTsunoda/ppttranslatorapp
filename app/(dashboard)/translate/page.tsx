@@ -448,6 +448,7 @@ export default function TranslatePage() {
                   accept=".pptx"
                   className="hidden"
                   id="file-upload"
+                  data-testid="file-upload"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileUpload(file);

@@ -99,7 +99,11 @@ function Header() {
                   <span>マイページ</span>
                 </DropdownMenuItem>
               </Link>
-              <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+              <DropdownMenuItem
+                className="cursor-pointer flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
+                onSelect={handleSignOut}
+                data-testid="logout-button"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>ログアウト</span>
               </DropdownMenuItem>
