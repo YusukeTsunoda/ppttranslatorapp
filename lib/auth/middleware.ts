@@ -1,12 +1,23 @@
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
+import { TeamDataWithMembers } from '@/lib/db/schema';
 import { getTeamForUser, getUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  passwordHash: string | null;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
 
 export type ActionState = {
   error?: string;
   success?: string;
-  [key: string]: any; // This allows for additional properties
+  [key: string]: any;
 };
 
 type ValidatedActionFunction<S extends z.ZodType<any, any>, T> = (
@@ -71,5 +82,17 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
     }
 
     return action(formData, team);
+  };
+}
+
+export function withAuth<T>(
+  action: (data: T, formData: FormData, user: User) => Promise<Response>
+) {
+  return async (data: T, formData: FormData, user: User) => {
+    if (!user) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    return action(data, formData, user);
   };
 }

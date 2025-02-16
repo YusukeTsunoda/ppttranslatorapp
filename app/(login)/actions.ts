@@ -25,23 +25,19 @@ import {
   validatedAction,
   validatedActionWithUser,
 } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/db';
+import { ActivityAction } from '@/lib/utils/activity-logger';
+import { verifyToken } from '@/lib/auth/session';
 
-async function logActivity(
-  teamId: number | null | undefined,
-  userId: number,
-  type: ActivityType,
-  ipAddress?: string,
-) {
-  if (teamId === null || teamId === undefined) {
-    return;
-  }
-  const newActivity: NewActivityLog = {
-    teamId,
-    userId,
-    action: type,
-    ipAddress: ipAddress || '',
-  };
-  await db.insert(activityLogs).values(newActivity);
+async function logActivity(teamId: string, userId: string, action: ActivityAction) {
+  await prisma.activityLog.create({
+    data: {
+      teamId,
+      userId,
+      action,
+      ipAddress: '127.0.0.1'
+    }
+  });
 }
 
 const signInSchema = z.object({
@@ -227,7 +223,7 @@ export async function signOut() {
   
   const userWithTeam = await getUserWithTeam(user.id);
   if (userWithTeam) {
-    await logActivity(userWithTeam.teamId, user.id, ActivityType.SIGN_OUT);
+    await logActivity(userWithTeam.teamId, user.id, 'sign_out' as ActivityAction);
   }
   (await cookies()).delete('session');
 }
@@ -248,9 +244,16 @@ export const updatePassword = validatedActionWithUser(
   async (data, _, user) => {
     const { currentPassword, newPassword } = data;
 
+    if (!user.passwordHash) {
+      return {
+        error: 'パスワードが設定されていません。',
+        currentPassword,
+      };
+    }
+
     const isPasswordValid = await comparePasswords(
       currentPassword,
-      user.passwordHash,
+      user.passwordHash
     );
 
     if (!isPasswordValid) {

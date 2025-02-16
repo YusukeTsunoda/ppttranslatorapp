@@ -1,28 +1,30 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { User } from '@/lib/db/schema';
+import { createContext, useContext, useState, useEffect } from 'react';
 
-type UserContextType = {
+export interface User {
+  id: number;
+  email: string;
+  name: string | null;
+  passwordHash: string | null;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+interface UserContextType {
   user: User | null;
   setUser: (user: User | null) => void;
-};
-
-const UserContext = createContext<UserContextType | null>(null);
-
-export function useUser() {
-  const context = useContext(UserContext);
-  if (context === null) {
-    throw new Error('useUser must be used within a UserProvider');
-  }
-  return context;
 }
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({
   children,
-  initialUser
+  initialUser,
 }: {
-  children: ReactNode;
+  children: React.ReactNode;
   initialUser: User | null;
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
@@ -37,4 +39,12 @@ export function UserProvider({
       {children}
     </UserContext.Provider>
   );
+}
+
+export function useUser() {
+  const context = useContext(UserContext);
+  if (context === undefined) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
 }

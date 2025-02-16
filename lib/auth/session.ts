@@ -39,7 +39,7 @@ export const authOptions = {
 } as const;
 
 type SessionData = {
-  user: { id: number };
+  user: { id: string };
   expires: string;
 };
 
@@ -67,7 +67,7 @@ export async function getSession() {
 export async function setSession(user: NewUser) {
   const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const session: SessionData = {
-    user: { id: user.id! },
+    user: { id: user.id!.toString() },
     expires: expiresInOneDay.toISOString(),
   };
   const encryptedSession = await signToken(session);
@@ -80,7 +80,8 @@ export async function setSession(user: NewUser) {
   });
 }
 
-export async function comparePasswords(plainText: string, hash: string): Promise<boolean> {
+export async function comparePasswords(plainText: string, hash: string | null): Promise<boolean> {
+  if (!hash) return false;
   // パスワード比較の実装例
   return plainText === hash; // 実際は bcrypt などを使用すべきです
 }

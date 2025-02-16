@@ -3,7 +3,7 @@ import { db } from './drizzle';
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
-import { prisma } from '@/lib/db';
+import { prisma, Prisma } from '@/lib/db';
 
 export async function getUser() {
   try {
@@ -23,24 +23,13 @@ export async function getUser() {
 
     const user = await prisma.user.findUnique({
       where: {
-        id: sessionData.user.id.toString(),
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        passwordHash: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+        id: sessionData.user.id
+      }
     });
 
     if (!user) return null;
 
-    return {
-      ...user,
-      id: parseInt(user.id), // stringからnumberに変換
-    };
+    return user;
   } catch (error) {
     console.error('Error in getUser:', error);
     return null;
@@ -75,18 +64,28 @@ export async function updateTeamSubscription(
     .where(eq(teams.id, teamId));
 }
 
-export async function getUserWithTeam(userId: number) {
-  const result = await db
-    .select({
-      user: users,
-      teamId: teamMembers.teamId,
-    })
-    .from(users)
-    .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-    .where(eq(users.id, userId))
-    .limit(1);
+export async function getUserWithTeam(userId: string) {
+  const userWithTeam = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      teams: {
+        include: {
+          team: true
+        }
+      }
+    }
+  });
 
-  return result[0];
+  if (!userWithTeam) return null;
+
+  const teamMember = userWithTeam.teams[0];
+  if (!teamMember) return null;
+
+  return {
+    ...userWithTeam,
+    teamId: teamMember.teamId,
+    team: teamMember.team
+  };
 }
 
 export async function getActivityLogs(userId: string) {
