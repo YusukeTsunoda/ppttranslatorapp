@@ -1,53 +1,50 @@
-import { desc, and, eq, isNull } from 'drizzle-orm';
-import { db } from './drizzle';
-import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
+import { prisma } from '@/lib/db';
 
 export async function getUser() {
-  const sessionCookie = (await cookies()).get('session');
-  if (!sessionCookie || !sessionCookie.value) {
+  try {
+    const sessionCookie = cookies().get('session');
+    if (!sessionCookie?.value) {
+      return null;
+    }
+
+    const sessionData = await verifyToken(sessionCookie.value);
+    if (!sessionData?.user?.id) {
+      return null;
+    }
+
+    if (new Date(sessionData.expires) < new Date()) {
+      return null;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: sessionData.user.id
+      }
+    });
+
+    if (!user) return null;
+
+    return user;
+  } catch (error) {
+    console.error('Error in getUser:', error);
     return null;
   }
-
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
-
-  if (new Date(sessionData.expires) < new Date()) {
-    return null;
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
-    .limit(1);
-
-  if (user.length === 0) {
-    return null;
-  }
-
-  return user[0];
 }
 
 export async function getTeamByStripeCustomerId(customerId: string) {
-  const result = await db
-    .select()
-    .from(teams)
-    .where(eq(teams.stripeCustomerId, customerId))
-    .limit(1);
+  const team = await prisma.team.findFirst({
+    where: {
+      stripeCustomerId: customerId
+    }
+  });
 
-  return result.length > 0 ? result[0] : null;
+  return team;
 }
 
 export async function updateTeamSubscription(
-  teamId: number,
+  teamId: string,
   subscriptionData: {
     stripeSubscriptionId: string | null;
     stripeProductId: string | null;
@@ -55,75 +52,87 @@ export async function updateTeamSubscription(
     subscriptionStatus: string;
   }
 ) {
-  await db
-    .update(teams)
-    .set({
+  await prisma.team.update({
+    where: {
+      id: teamId
+    },
+    data: {
       ...subscriptionData,
-      updatedAt: new Date(),
-    })
-    .where(eq(teams.id, teamId));
+      updatedAt: new Date()
+    }
+  });
 }
 
-export async function getUserWithTeam(userId: number) {
-  const result = await db
-    .select({
-      user: users,
-      teamId: teamMembers.teamId,
-    })
-    .from(users)
-    .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-    .where(eq(users.id, userId))
-    .limit(1);
+export async function getUserWithTeam(userId: string) {
+  const userWithTeam = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      teams: {
+        include: {
+          team: true
+        }
+      }
+    }
+  });
 
-  return result[0];
+  if (!userWithTeam) return null;
+
+  const teamMember = userWithTeam.teams[0];
+  if (!teamMember) return null;
+
+  return {
+    ...userWithTeam,
+    teamId: teamMember.teamId,
+    team: teamMember.team
+  };
 }
 
-export async function getActivityLogs() {
-  const user = await getUser();
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-
-  return await db
-    .select({
-      id: activityLogs.id,
-      action: activityLogs.action,
-      timestamp: activityLogs.timestamp,
-      ipAddress: activityLogs.ipAddress,
-      userName: users.name,
-    })
-    .from(activityLogs)
-    .leftJoin(users, eq(activityLogs.userId, users.id))
-    .where(eq(activityLogs.userId, user.id))
-    .orderBy(desc(activityLogs.timestamp))
-    .limit(10);
-}
-
-export async function getTeamForUser(userId: number) {
-  const result = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    with: {
-      teamMembers: {
-        with: {
-          team: {
-            with: {
-              teamMembers: {
-                with: {
-                  user: {
-                    columns: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
+export async function getActivityLogs(userId: string) {
+  return await prisma.activityLog.findMany({
+    where: {
+      userId: userId,
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
         },
       },
     },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+  });
+}
+
+export async function getTeamForUser(userId: string) {
+  const result = await prisma.user.findFirst({
+    where: {
+      id: userId
+    },
+    include: {
+      teams: {
+        include: {
+          team: {
+            include: {
+              members: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   });
 
-  return result?.teamMembers[0]?.team || null;
+  return result?.teams[0]?.team || null;
 }

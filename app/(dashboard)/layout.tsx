@@ -1,7 +1,7 @@
 'use client';
 
-import Link from  'next/link';
-import { use, useState } from 'react';
+import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
 import {
@@ -21,25 +21,54 @@ import {
   Settings,
   Link as LinkIcon,
   Bell,
-  User
+  User,
+  ChevronLeft,
+  ChevronRight,
+  Activity
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user, setUser } = useUser();
   const router = useRouter();
 
-  async function handleSignOut() {
-    await signOut();
-    router.refresh();
-    router.push('/');
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      setUser(null);
+      console.log('Header: ログアウト成功');
+      router.refresh();
+      router.push('/');
+    } catch (error) {
+      console.error('Header: ログアウトエラー:', error);
+    }
+  }, [setUser, router]);
+
+  useEffect(() => {
+    if (!user) {
+      console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
+      router.push('/login');
+      return;
+    }
+  }, [user, router]);
+
+  if (!user) {
+    console.log('Header: ローディング表示を返します');
+    return (
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+          <div className="animate-pulse h-8 w-32 bg-gray-200 rounded"></div>
+          <div className="animate-pulse h-8 w-8 bg-gray-200 rounded-full"></div>
+        </div>
+      </header>
+    );
   }
 
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/" className="flex items-center">
+        <Link href="/translate" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
           <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
         </Link>
@@ -52,41 +81,30 @@ function Header() {
           >
             料金プラン
           </Link>
-          {user ? (
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger>
-                <Avatar className="cursor-pointer size-8">
+          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
                   <AvatarImage alt={user.name || ''} />
                   <AvatarFallback>
-                    {user.email[0].toUpperCase()}
+                    {user.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <Link href="/profile" passHref legacyBehavior>
                 <DropdownMenuItem className="cursor-pointer">
-                  <Link href="/" className="flex w-full items-center">
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>マイページ</span>
-                  </Link>
+                  <Home className="mr-2 h-4 w-4" />
+                  <span>マイページ</span>
                 </DropdownMenuItem>
-                <form action={handleSignOut} className="w-full">
-                  <button type="submit" className="flex w-full">
-                    <DropdownMenuItem className="w-full cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>ログアウト</span>
-                    </DropdownMenuItem>
-                  </button>
-                </form>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              asChild
-              className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-4 py-2 rounded-md"
-            >
-              <Link href="/sign-up">新規登録</Link>
-            </Button>
-          )}
+              </Link>
+              <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>ログアウト</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
@@ -95,53 +113,96 @@ function Header() {
 
 function Sidebar() {
   const pathname = usePathname();
+  const [isExpanded, setIsExpanded] = useState(false);
   
+  const handleToggle = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
   const navigation = [
-    { name: 'ダッシュボード', href: '/', icon: LayoutDashboard },
     { name: '翻訳', href: '/translate', icon: Settings },
     { name: '履歴', href: '/history', icon: History },
+    { name: 'アクティビティ', href: '/activity', icon: Activity },
     { name: 'プロフィール', href: '/profile', icon: User },
     { name: '設定', href: '/settings', icon: Settings },
     { name: 'API連携', href: '/integrations', icon: LinkIcon },
   ];
 
   return (
-    <nav className="flex-1 space-y-1 px-2 py-4">
-      {navigation.map((item) => {
-        const isActive = pathname === item.href;
-        return (
-          <Link
-            key={item.name}
-            href={item.href}
-            className={`${
-              isActive
-                ? 'bg-orange-50 text-orange-600'
-                : 'text-gray-600 hover:bg-gray-50'
-            } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
-          >
-            <item.icon
-              className={`${
-                isActive ? 'text-orange-600' : 'text-gray-400'
-              } mr-3 flex-shrink-0 h-5 w-5`}
-              aria-hidden="true"
-            />
-            {item.name}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="relative h-full">
+      <button
+        onClick={handleToggle}
+        className="absolute -right-4 top-2 bg-white rounded-full p-1.5 shadow-md hover:bg-gray-50 z-50 cursor-pointer border border-gray-200"
+      >
+        {isExpanded ? (
+          <ChevronLeft className="h-4 w-4 text-gray-600" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-600" />
+        )}
+      </button>
+      <nav className={cn(
+        "flex flex-col space-y-1 p-4 transition-all duration-300 ease-in-out",
+        isExpanded ? "w-64" : "w-16"
+      )}>
+        {navigation.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              passHref
+              legacyBehavior
+            >
+              <a
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative",
+                  isActive
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                  !isExpanded && "justify-center"
+                )}
+                title={!isExpanded ? item.name : undefined}
+              >
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0",
+                    isExpanded ? "mr-3" : "mr-0",
+                    isActive ? "text-orange-600" : "text-gray-400"
+                  )}
+                  aria-hidden="true"
+                />
+                {isExpanded && <span className="whitespace-nowrap">{item.name}</span>}
+              </a>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      console.log('DashboardLayout: 初期化');
+      setIsInitialized(true);
+    }
+    return () => {
+      console.log('DashboardLayout: クリーンアップ');
+      setIsInitialized(false);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
-          <div className="w-64 bg-white shadow-sm rounded-lg">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8 h-full">
+          <aside className="bg-white shadow-sm rounded-lg h-full">
             <Sidebar />
-          </div>
+          </aside>
           <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
             {children}
           </main>

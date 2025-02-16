@@ -1,23 +1,44 @@
-# Frontend Documentation
+# フロントエンド仕様
 
-## Technology Stack
-- Next.js 13+
-- React
-- Tailwind CSS
-- shadcn/ui
+## 使用技術
+- Next.js 14.0
+- React 18.0
+- TypeScript 5.0
+- Tailwind CSS 3.3
+- shadcn/ui 1.0
+- SWR 2.0
 
-## Key Features
-- サインアップ/ログインフロー
-- ダッシュボード
-- サブスクリプション管理UI
-- 支払い管理インターフェース
+## コンポーネント構造
+### レイアウト
+- マーケティングレイアウト
+- ダッシュボードレイアウト
+- 認証レイアウト
 
-## State Management
-- React Context
-- SWR for data fetching
+### 共通コンポーネント
+- ヘッダー
+- サイドバー
+- フッター
+- ローディング
+- エラー表示
+- トースト通知
 
-## Components
-- Layout components
-- Authentication components
-- Subscription components
-- Payment forms
+### 機能コンポーネント
+- ファイルアップロード
+- スライドビューワー
+- 翻訳エディター
+- プランセレクター
+- チーム管理
+- 設定パネル
+
+## 状態管理
+- SWRによるデータフェッチ
+- Reactコンテキスト
+- ローカルステート
+- フォーム状態
+
+## UI/UX
+- レスポンシブデザイン
+- ダークモード対応（予定）
+- アクセシビリティ対応
+- アニメーション・トランジション
+- エラーハンドリング

@@ -1,12 +1,23 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('Missing ANTHROPIC_API_KEY environment variable');
-}
+let anthropicClient: Anthropic | null = null;
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+export function getAnthropicClient() {
+  if (anthropicClient) {
+    return anthropicClient;
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing ANTHROPIC_API_KEY environment variable');
+  }
+
+  anthropicClient = new Anthropic({
+    apiKey,
+  });
+
+  return anthropicClient;
+}
 
 export type TranslationResult = {
   success: boolean;
@@ -16,7 +27,8 @@ export type TranslationResult = {
 
 export async function translateText(text: string, fromLang: string, toLang: string): Promise<TranslationResult> {
   try {
-    const message = await anthropic.messages.create({
+    const client = getAnthropicClient();
+    const message = await client.messages.create({
       model: 'claude-3-sonnet-20240229',
       max_tokens: 1024,
       messages: [{
@@ -25,9 +37,13 @@ export async function translateText(text: string, fromLang: string, toLang: stri
       }]
     });
 
+    if (!message.content[0] || message.content[0].type !== 'text') {
+      throw new Error('Unexpected response format from Anthropic API');
+    }
+
     return {
       success: true,
-      translatedText: message.content[0].type === 'text' ? message.content[0].text : ''
+      translatedText: message.content[0].text
     };
   } catch (error) {
     console.error('Translation error:', error);

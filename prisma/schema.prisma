@@ -1,22 +1,98 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String?
+  role         String        @default("user")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+  activityLogs ActivityLog[]
+  teams        TeamMember[]
+  invitationsSent Invitation[] @relation("inviter")
+}
+
+model Team {
+  id                   String        @id @default(cuid())
+  name                 String
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  stripeCustomerId     String?      @unique
+  stripeSubscriptionId String?      @unique
+  stripeProductId      String?
+  planName            String?       @db.VarChar(50)
+  subscriptionStatus  String?       @db.VarChar(20)
+  members              TeamMember[]
+  activityLogs         ActivityLog[]
+  invitations          Invitation[]
+}
+
+model TeamMember {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  teamId    String
+  userId    String
+  role      String   @default("member")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
 }
+
+model ActivityLog {
+  id         String         @id @default(uuid())
+  teamId     String
+  userId     String
+  action     ActivityAction
+  ipAddress  String
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  
+  team       Team          @relation(fields: [teamId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
+
+  @@index([teamId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  teamId    String
+  email     String
+  role      String
+  invitedBy String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id])
+  inviter   User     @relation("inviter", fields: [invitedBy], references: [id])
+}
+
+enum ActivityAction {
+  sign_in
+  sign_up
+  sign_out
+  create_team
+  accept_invitation
+  invite_team_member
+  remove_team_member
+  update_account
+  update_password
+  delete_account
+  file_upload
+  translation
+  download
+  settings_change
+  member_invite
+} 

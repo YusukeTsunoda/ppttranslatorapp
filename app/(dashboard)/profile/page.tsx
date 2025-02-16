@@ -1,15 +1,35 @@
 'use client';
 
-import { use } from 'react';
 import { useUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function ProfilePage() {
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { user } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!user) {
+      console.error('ユーザーが見つかりません');
+      router.push('/login');
+    }
+  }, [user, router]);
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-200 rounded"></div>
+          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -49,11 +69,7 @@ export default function ProfilePage() {
                 メールアドレスの変更はサポートまでお問い合わせください。
               </p>
             </div>
-            <div className="pt-4">
-              <Button type="submit">
-                変更を保存
-              </Button>
-            </div>
+            <Button type="submit">保存</Button>
           </form>
         </CardContent>
       </Card>

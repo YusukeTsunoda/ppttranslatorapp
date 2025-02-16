@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
-import { getTeamForUser, getUser } from '@/lib/db/queries';
+import { TeamDataWithMembers } from '@/lib/types';
+import { getUserWithTeam, getUser, getTeamForUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
+import type { User } from '@prisma/client';
 
 export type ActionState = {
   error?: string;
   success?: string;
-  [key: string]: any; // This allows for additional properties
+  [key: string]: any;
 };
 
 type ValidatedActionFunction<S extends z.ZodType<any, any>, T> = (
@@ -70,6 +71,18 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
       throw new Error('Team not found');
     }
 
-    return action(formData, team);
+    return action(formData, team as unknown as TeamDataWithMembers);
+  };
+}
+
+export function withAuth<T>(
+  action: (data: T, formData: FormData, user: User) => Promise<Response>
+) {
+  return async (data: T, formData: FormData, user: User) => {
+    if (!user) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    return action(data, formData, user);
   };
 }

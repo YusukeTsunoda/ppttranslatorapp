@@ -1,20 +1,60 @@
-# Database Documentation
+# データベース仕様
 
-## Overview
-- PostgreSQLを使用
-- PrismaをORMとして採用
+## データベース
+- PostgreSQL 15.0
+- Prisma ORM 5.0
 
-## Database Schema
-- User: ユーザー情報管理
-- Subscription: サブスクリプション状態管理
-- Product: 製品情報管理
-- Price: 価格情報管理
+## テーブル構造
+
+### users
+- ユーザー情報を管理
+- メール認証とGoogle認証に対応
+- パスワードはbcryptでハッシュ化
+
+### teams
+- チーム情報を管理
+- サブスクリプション情報と紐付け
+- メンバー管理機能
+
+### team_members
+- チームメンバーシップを管理
+- ロールベースのアクセス制御
+- 招待・承認フロー
+
+### subscriptions
+- Stripeサブスクリプション情報
+- 支払い状態の管理
+- プラン情報の管理
+
+### files
+- アップロードされたPPTXファイルの管理
+- S3ストレージとの連携
+- ファイルメタデータの保存
+
+### slides
+- PPTXの各スライド情報
+- 画像パスの管理
+- メタデータの保存
+
+### texts
+- スライド内のテキスト情報
+- 位置情報の保存
+- 原文の管理
+
+### translations
+- 翻訳テキストの管理
+- 翻訳モデルの情報
+- 翻訳履歴の保存
+
+### activity_logs
+- ユーザーアクティビティの記録
+- 監査ログの管理
+- セキュリティ監視
+
+### invitations
+- チーム招待の管理
+- 招待状態の追跡
+- 有効期限の管理
 
 ## Prisma Setup
-- `schema.prisma`でデータモデルを定義
-- マイグレーション管理
-- シードデータの設定
-
-## Connection
-- 環境変数`DATABASE_URL`で接続設定
-- 開発/本番環境の分離
+- `schema.prisma`

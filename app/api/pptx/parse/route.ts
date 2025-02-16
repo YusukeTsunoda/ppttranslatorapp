@@ -1,3 +1,7 @@
+// Node.jsランタイムを明示的に指定
+// PPTXパーサーの処理を含むため、Edge Runtimeでは動作しません
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { PPTXParser } from '@/lib/pptx/parser';
 import { auth } from '@/lib/auth/auth';
