@@ -18,6 +18,7 @@ model User {
   deletedAt    DateTime?
   activityLogs ActivityLog[]
   teams        TeamMember[]
+  invitationsSent Invitation[] @relation("inviter")
 }
 
 model Team {
@@ -32,6 +33,7 @@ model Team {
   subscriptionStatus  String?       @db.VarChar(20)
   members              TeamMember[]
   activityLogs         ActivityLog[]
+  invitations          Invitation[]
 }
 
 model TeamMember {
@@ -57,17 +59,35 @@ model ActivityLog {
   createdAt  DateTime      @default(now())
   
   team       Team          @relation(fields: [teamId], references: [id])
-  user       User          @relation(fields: [userId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
 
   @@index([teamId])
   @@index([userId])
   @@index([createdAt])
 }
 
+model Invitation {
+  id        String   @id @default(cuid())
+  teamId    String
+  email     String
+  role      String
+  invitedBy String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id])
+  inviter   User     @relation("inviter", fields: [invitedBy], references: [id])
+}
+
 enum ActivityAction {
-  file_upload
-  translation
-  download
-  settings_change
-  member_invite
+  sign_in
+  sign_up
+  sign_out
+  create_team
+  accept_invitation
+  invite_team_member
+  remove_team_member
+  update_account
+  update_password
+  delete_account
 } 
