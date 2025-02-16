@@ -62,7 +62,7 @@ export default function HomePage() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-2">
-              <Link href="#pricing">料金プランを見る</Link>
+              <a href="#pricing">料金プランを見る</a>
             </Button>
           </div>
         </div>
@@ -84,6 +84,48 @@ export default function HomePage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* 料金プランセクション */}
+      <div id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 bg-white">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-4xl font-bold text-gray-900 mb-8">
+            <span className="bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">料金プラン</span>
+          </h2>
+          <p className="text-xl text-gray-600">
+            ニーズに合わせて選べる2つのプラン。<br />
+            いつでも変更可能です。
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {pricingPlans.map((plan) => (
+            <div key={plan.name} className="rounded-3xl border p-8 shadow-lg hover:shadow-xl transition-shadow bg-white">
+              <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
+              <p className="mt-2 text-gray-600">{plan.description}</p>
+              <div className="mt-4 text-3xl font-bold text-gray-900">
+                {plan.price}
+                <span className="text-base font-normal text-gray-600"> /{plan.period}</span>
+              </div>
+              <ul className="mt-6 space-y-3 text-gray-600">
+                {plan.features.map((feature, index) => (
+                  <li key={index} className="flex items-center">
+                    <CheckCircle className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button asChild className="mt-8 w-full bg-orange-600 hover:bg-orange-700">
+                <Link href="/sign-up">
+                  無料で始める
+                </Link>
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-12 text-center text-gray-600">
+          <p>すべてのプランに14日間の無料トライアル期間が付いています。</p>
+          <p>クレジットカードの登録は不要です。</p>
         </div>
       </div>
     </div>

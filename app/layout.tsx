@@ -12,7 +12,13 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const initialUser = await getUser();
+  let initialUser = null;
+  try {
+    initialUser = await getUser();
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    // エラーが発生しても、アプリケーションは続行
+  }
 
   return (
     <html lang="ja" className={inter.className}>

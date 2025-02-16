@@ -3,37 +3,42 @@ import { db } from './drizzle';
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
+import { prisma } from '@/lib/db';
 
 export async function getUser() {
-  const sessionCookie = (await cookies()).get('session');
-  if (!sessionCookie || !sessionCookie.value) {
+  try {
+    const sessionCookie = cookies().get('session');
+    if (!sessionCookie?.value) {
+      return null;
+    }
+
+    const sessionData = await verifyToken(sessionCookie.value);
+    if (!sessionData?.user?.id) {
+      return null;
+    }
+
+    if (new Date(sessionData.expires) < new Date()) {
+      return null;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: sessionData.user.id.toString(),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return user;
+  } catch (error) {
+    console.error('Error in getUser:', error);
     return null;
   }
-
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
-
-  if (new Date(sessionData.expires) < new Date()) {
-    return null;
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
-    .limit(1);
-
-  if (user.length === 0) {
-    return null;
-  }
-
-  return user[0];
 }
 
 export async function getTeamByStripeCustomerId(customerId: string) {
@@ -78,25 +83,23 @@ export async function getUserWithTeam(userId: number) {
   return result[0];
 }
 
-export async function getActivityLogs() {
-  const user = await getUser();
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-
-  return await db
-    .select({
-      id: activityLogs.id,
-      action: activityLogs.action,
-      timestamp: activityLogs.timestamp,
-      ipAddress: activityLogs.ipAddress,
-      userName: users.name,
-    })
-    .from(activityLogs)
-    .leftJoin(users, eq(activityLogs.userId, users.id))
-    .where(eq(activityLogs.userId, user.id))
-    .orderBy(desc(activityLogs.timestamp))
-    .limit(10);
+export async function getActivityLogs(userId: string) {
+  return await prisma.activityLog.findMany({
+    where: {
+      userId: userId,
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+  });
 }
 
 export async function getTeamForUser(userId: number) {
