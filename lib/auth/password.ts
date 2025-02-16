@@ -1,29 +1,13 @@
-import { compare, hash } from 'bcryptjs';
-
-// Node.jsランタイムを明示的に指定
-export const config = {
-  runtime: 'nodejs'
-};
-
-const SALT_ROUNDS = 10;
+import bcrypt from 'bcryptjs';
 
 export async function hashPassword(password: string): Promise<string> {
-  try {
-    return await hash(password, SALT_ROUNDS);
-  } catch (error) {
-    console.error('Password hashing error:', error);
-    throw new Error('パスワードのハッシュ化に失敗しました');
-  }
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
 }
 
 export async function comparePasswords(
-  plainTextPassword: string,
+  password: string,
   hashedPassword: string
 ): Promise<boolean> {
-  try {
-    return await compare(plainTextPassword, hashedPassword);
-  } catch (error) {
-    console.error('Password comparison error:', error);
-    throw new Error('パスワードの比較に失敗しました');
-  }
-} 
+  return bcrypt.compare(password, hashedPassword);
+}

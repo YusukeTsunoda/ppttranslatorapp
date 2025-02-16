@@ -25,7 +25,48 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
     setError('');
     setLoading(true);
 
+    // 入力値のバリデーション
+    if (!email.trim()) {
+      setError('メールアドレスを入力してください');
+      setLoading(false);
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setError('有効なメールアドレスを入力してください');
+      setLoading(false);
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('パスワードを入力してください');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('パスワードは8文字以上で入力してください');
+      setLoading(false);
+      return;
+    }
+
     try {
+      if (mode === 'signup') {
+        // アカウント作成
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, inviteId }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          setError(data.error || 'アカウントの作成に失敗しました');
+          return;
+        }
+      }
+
+      // サインイン処理
       const result = await signIn('credentials', {
         email,
         password,
@@ -34,10 +75,14 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       });
 
       if (result?.error) {
-        setError(result.error);
+        if (result.error === 'このメールアドレスのユーザーが見つかりません' || 
+            result.error === 'パスワードが正しくありません') {
+          setError('メールアドレスまたはパスワードが正しくありません');
+        } else {
+          setError(result.error);
+        }
         console.error('Sign in error:', result.error);
       } else if (result?.ok) {
-        await new Promise(resolve => setTimeout(resolve, 500));
         router.push(redirect || '/translate');
       }
     } catch (error) {
@@ -60,12 +105,17 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form 
+          className="space-y-6" 
+          onSubmit={handleSubmit}
+          data-testid={mode === 'signin' ? 'signin-form' : 'signup-form'}
+          data-cy={mode === 'signin' ? 'signin-form' : 'signup-form'}
+        >
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
           <input type="hidden" name="inviteId" value={inviteId || ''} />
           {error && (
-            <div className="rounded-md bg-red-50 p-4 mt-4">
+            <div className="rounded-md bg-red-50 p-4 mt-4" role="alert">
               <div className="flex">
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">

@@ -1,13 +1,15 @@
 import './globals.css';
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { UserProvider } from '@/lib/auth';
 import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const metadata: Metadata = {
+  title: 'PPT Translator',
+  description: 'Translate your PowerPoint presentations with AI',
+};
 
 export default function RootLayout({
   children,
@@ -15,26 +17,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" className={inter.className}>
-      <body>
+    <html lang="ja">
+      <body className={`${inter.className} min-h-screen bg-background`}>
         <UserProvider>
-          <div className="min-h-screen">
-            <main className="flex-1">
-              {children}
-            </main>
-            <Toaster />
-          </div>
+          {children}
+          <Toaster />
         </UserProvider>
       </body>
     </html>
   );
 }
-
-export const metadata: Metadata = {
-  title: 'PPT翻訳アプリ',
-  description: 'PowerPointファイルを簡単に翻訳',
-};
-
-export const viewport: Viewport = {
-  maximumScale: 1,
-};
