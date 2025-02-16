@@ -4,20 +4,27 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// 開発環境でのホットリロード時の重複インスタンス化を防ぐ
-const prisma = global.prisma || new PrismaClient({
-  log: [
-    {
-      emit: 'event',
-      level: 'query',
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+const prismaClientSingleton = () => {
+  return new PrismaClient({
+    log: [
+      {
+        emit: 'event',
+        level: 'query',
+      },
+    ],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
     },
-  ],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
+  });
+};
+
+const prisma = global.prisma ?? prismaClientSingleton();
 
 // クエリログのイベントリスナーを設定
 (prisma.$on as any)('query', (e: Prisma.QueryEvent) => {
