@@ -3,7 +3,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth/session";
+// import { verifyToken } from "@/lib/auth/session"; ← 不要なら削除
 import Anthropic from "@anthropic-ai/sdk";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';

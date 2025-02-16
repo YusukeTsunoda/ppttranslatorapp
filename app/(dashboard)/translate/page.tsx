@@ -394,43 +394,55 @@ export default function TranslatePage() {
   };
 
   // 画像のサイズと位置を管理するための状態を追加
-  const [imageSize, setImageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 720, height: 405 });
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  // 画像がロードされた時のサイズ計算
-  const calculateImageDisplaySize = (naturalWidth: number, naturalHeight: number) => {
-    const containerWidth = containerSize.width;
-    const containerHeight = containerSize.height;
-    
-    const aspectRatio = naturalWidth / naturalHeight;
-    let displayWidth = containerWidth;
-    let displayHeight = containerWidth / aspectRatio;
-    
-    if (displayHeight > containerHeight) {
-      displayHeight = containerHeight;
-      displayWidth = containerHeight * aspectRatio;
-    }
-    
-    return { width: displayWidth, height: displayHeight };
-  };
-
-  // コンテナのリサイズを監視
+  // コンテナサイズの監視
   useEffect(() => {
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        setContainerSize({ width, height });
-      }
-    });
+    if (!containerRef.current) return;
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+    const updateContainerSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        });
+      }
+    };
+
+    // 初期サイズを設定
+    updateContainerSize();
+
+    // リサイズ監視
+    const observer = new ResizeObserver(updateContainerSize);
+    observer.observe(containerRef.current);
 
     return () => observer.disconnect();
   }, []);
+
+  // 画像サイズの更新
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.target as HTMLImageElement;
+    const containerWidth = containerRef.current?.offsetWidth || 720;
+    const containerHeight = containerRef.current?.offsetHeight || 405;
+
+    // アスペクト比を維持しながらサイズを計算
+    const imageAspect = img.naturalWidth / img.naturalHeight;
+    const containerAspect = containerWidth / containerHeight;
+
+    let width, height;
+    if (imageAspect > containerAspect) {
+      width = containerWidth;
+      height = containerWidth / imageAspect;
+    } else {
+      height = containerHeight;
+      width = containerHeight * imageAspect;
+    }
+
+    setImageSize({ width, height });
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -574,26 +586,25 @@ export default function TranslatePage() {
                           position: 'absolute',
                           top: '50%',
                           left: '50%',
-                          transform: 'translate(-50%, -50%)',
+                          transform: `translate(-50%, -50%) scale(${scale})`,
+                          transformOrigin: 'center',
                           pointerEvents: 'none'
                         }}
                         draggable={false}
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          const displaySize = calculateImageDisplaySize(img.naturalWidth, img.naturalHeight);
-                          setImageSize(displaySize);
-                        }}
+                        onLoad={handleImageLoad}
                       />
                       {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
                         const position = textObj.position;
-                        const slideMetadata = slides[currentSlide]?.metadata?.dimensions || { width: 1225, height: 690 };
                         
-                        const scaleX = imageSize.width / slideMetadata.width;
-                        const scaleY = imageSize.height / slideMetadata.height;
+                        // スケーリング係数を計算
+                        const scaleX = imageSize.width / 1920; // 標準的なスライドの幅
+                        const scaleY = imageSize.height / 1080; // 標準的なスライドの高さ
                         
+                        // 画像の実際の表示位置を考慮してオフセットを計算
                         const offsetX = (containerSize.width - imageSize.width) / 2;
                         const offsetY = (containerSize.height - imageSize.height) / 2;
                         
+                        // 最終的な位置を計算
                         const left = offsetX + position.x * scaleX;
                         const top = offsetY + position.y * scaleY;
                         const width = position.width * scaleX;
@@ -608,8 +619,11 @@ export default function TranslatePage() {
                               top: `${top}px`,
                               width: `${width}px`,
                               height: `${height}px`,
-                              border: '2px solid orange',
-                              pointerEvents: 'none'
+                              border: selectedTextIndex === index ? '2px solid orange' : '2px solid rgba(255, 165, 0, 0.5)',
+                              backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
+                              pointerEvents: 'none',
+                              transform: `scale(${scale})`,
+                              transformOrigin: 'top left'
                             }}
                           />
                         );
