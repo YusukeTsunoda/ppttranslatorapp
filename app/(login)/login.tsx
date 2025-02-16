@@ -1,43 +1,52 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CircleIcon, Loader2 } from 'lucide-react';
-import { signIn, signUp } from './actions';
+import { signIn } from 'next-auth/react';
 
 export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/translate';
   const priceId = searchParams.get('priceId');
   const inviteId = searchParams.get('inviteId');
-  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
+    setLoading(true);
+
     try {
-      const formData = new FormData(e.currentTarget);
-      const action = mode === 'signin' ? signIn : signUp;
-      const result = await action({ 
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
-        inviteId: formData.get('inviteId') as string | undefined
-      }, formData);
+      const result = await signIn('credentials', {
+        email,
+        password,
+        callbackUrl: redirect || '/translate',
+        redirect: false,
+      });
+
       if (result?.error) {
         setError(result.error);
+        console.error('Sign in error:', result.error);
+      } else if (result?.ok) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        router.push(redirect || '/translate');
       }
-    } catch (e) {
-      setError('An error occurred. Please try again.');
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError(error instanceof Error ? error.message : 'サインインに失敗しました');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
@@ -46,9 +55,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           <CircleIcon className="h-12 w-12 text-orange-500" />
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-          {mode === 'signin'
-            ? 'ログイン'
-            : '新規アカウント作成'}
+          {mode === 'signin' ? 'サインイン' : 'アカウント作成'}
         </h2>
       </div>
 
@@ -57,6 +64,17 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
           <input type="hidden" name="inviteId" value={inviteId || ''} />
+          {error && (
+            <div className="rounded-md bg-red-50 p-4 mt-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    {error}
+                  </h3>
+                </div>
+              </div>
+            </div>
+          )}
           <div>
             <Label
               htmlFor="email"
@@ -71,7 +89,8 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 type="email"
                 autoComplete="email"
                 required
-                maxLength={50}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                 placeholder="メールアドレスを入力"
               />
@@ -90,45 +109,29 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete={
-                  mode === 'signin' ? 'current-password' : 'new-password'
-                }
+                autoComplete="current-password"
                 required
-                minLength={8}
-                maxLength={100}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                 placeholder="パスワードを入力"
               />
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mt-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {error === 'An error occurred. Please try again.'
-                      ? 'エラーが発生しました。もう一度お試しください。'
-                      : error}
-                  </h3>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div>
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
             >
-              {isLoading ? (
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   処理中...
                 </>
               ) : mode === 'signin' ? (
-                'ログイン'
+                'サインイン'
               ) : (
                 'アカウント作成'
               )}

@@ -8,11 +8,24 @@
 // bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
 export const runtime = 'nodejs';
 
-import NextAuth from "next-auth";
+import NextAuth, { DefaultSession, User as NextAuthUser } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
 import { comparePasswords } from "@/lib/auth/password";
+import { JWT } from "next-auth/jwt";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    id: string;
+  }
+}
 
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -24,52 +37,78 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("メールアドレスとパスワードが必要です");
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error("メールアドレスとパスワードが必要です");
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email }
+          });
+
+          if (!user) {
+            throw new Error("このメールアドレスのユーザーが見つかりません");
+          }
+
+          if (!user.passwordHash) {
+            throw new Error("パスワードが設定されていません");
+          }
+
+          const isValid = await comparePasswords(credentials.password, user.passwordHash);
+          if (!isValid) {
+            throw new Error("パスワードが正しくありません");
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          };
+        } catch (error) {
+          console.error('Authorization error:', error);
+          throw error;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
-        });
-
-        if (!user || !user.passwordHash) {
-          throw new Error("ユーザーが見つかりません");
-        }
-
-        const isValid = await comparePasswords(credentials.password, user.passwordHash);
-        if (!isValid) {
-          throw new Error("パスワードが正しくありません");
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
       }
     })
   ],
   pages: {
-    signIn: "/sign-in",
-    error: "/sign-in",
+    signIn: "/login",
+    error: "/login",
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30日
   },
   callbacks: {
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.userId = user.id as string;
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.userId as string;
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string | null;
       }
       return session;
     }
-  }
+  },
+  debug: process.env.NODE_ENV === 'development',
+  logger: {
+    error(code, metadata) {
+      console.error('NextAuth error:', code, metadata);
+    },
+    warn(code) {
+      console.warn('NextAuth warning:', code);
+    },
+    debug(code, metadata) {
+      console.log('NextAuth debug:', code, metadata);
+    },
+  },
 });
 
 export { handler as GET, handler as POST };

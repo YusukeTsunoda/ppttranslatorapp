@@ -1,58 +1,47 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
+import { getToken } from 'next-auth/jwt';
 
 // Node.jsランタイムを使用することを明示
 export const runtime = 'nodejs';
 
-// 保護されたルートのパターン
-const protectedPaths = ['/dashboard', '/translate', '/profile', '/settings', '/history', '/integrations'];
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
+
+  // 保護されたルートのパターン
+  const protectedPaths = ['/translate', '/profile', '/settings', '/history', '/integrations'];
   const isProtectedRoute = protectedPaths.some(path => pathname.startsWith(path));
 
-  // 保護されたルートへのアクセスで未認証の場合
-  if (isProtectedRoute && !sessionCookie) {
-    const signInUrl = new URL('/sign-in', request.url);
-    signInUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(signInUrl);
-  }
+  // 認証関連のパス
+  const authPaths = ['/login', '/signup'];
+  const isAuthPath = authPaths.some(path => pathname.startsWith(path));
 
-  let res = NextResponse.next();
+  if (isProtectedRoute) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-  // セッションの更新処理
-  if (sessionCookie) {
-    try {
-      const parsed = await verifyToken(sessionCookie.value);
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      // セッションの更新
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString(),
-        }),
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        expires: expiresInOneDay,
-        path: '/',
-      });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute) {
-        const signInUrl = new URL('/sign-in', request.url);
-        signInUrl.searchParams.set('callbackUrl', pathname);
-        return NextResponse.redirect(signInUrl);
-      }
+    if (!token) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
     }
   }
 
-  return res;
+  // 認証済みユーザーが認証ページにアクセスした場合
+  if (isAuthPath) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    if (token) {
+      return NextResponse.redirect(new URL('/translate', request.url));
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

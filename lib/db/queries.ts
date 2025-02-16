@@ -32,8 +32,6 @@ export async function getUser() {
         passwordHash: true,
         createdAt: true,
         updatedAt: true,
-        role: true,
-        deletedAt: true,
       },
     });
 
