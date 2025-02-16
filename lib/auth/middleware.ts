@@ -2,17 +2,7 @@ import { z } from 'zod';
 import { TeamDataWithMembers } from '@/lib/types';
 import { getUserWithTeam, getUser, getTeamForUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string | null;
-  passwordHash: string | null;
-  role?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date | null;
-}
+import type { User } from '@prisma/client';
 
 export type ActionState = {
   error?: string;

@@ -1,9 +1,6 @@
-import { desc, and, eq, isNull } from 'drizzle-orm';
-import { db } from './drizzle';
-import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
-import { prisma, Prisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function getUser() {
   try {
