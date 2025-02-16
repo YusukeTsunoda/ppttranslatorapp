@@ -9,7 +9,6 @@
 export const runtime = 'nodejs';
 
 import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
@@ -18,10 +17,6 @@ import { comparePasswords } from "@/lib/auth/password";
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -62,9 +57,8 @@ const handler = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (account && user) {
-        token.accessToken = account.access_token;
+    async jwt({ token, user }: { token: any; user: any }) {
+      if (user) {
         token.userId = user.id as string;
       }
       return token;
