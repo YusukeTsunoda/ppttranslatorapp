@@ -29,10 +29,10 @@ import { prisma } from '@/lib/db';
 import { ActivityAction } from '@/lib/utils/activity-logger';
 import { verifyToken } from '@/lib/auth/session';
 
-async function logActivity(teamId: string, userId: string, action: ActivityAction) {
+async function logActivity(teamId: string | number, userId: string, action: ActivityAction) {
   await prisma.activityLog.create({
     data: {
-      teamId,
+      teamId: String(teamId),
       userId,
       action,
       ipAddress: '127.0.0.1'
@@ -84,7 +84,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 
   await Promise.all([
     setSession(foundUser),
-    logActivity(foundTeam?.id, foundUser.id, ActivityType.SIGN_IN),
+    foundTeam ? logActivity(foundTeam.id.toString(), foundUser.id, ActivityType.SIGN_IN) : Promise.resolve(),
   ]);
 
   const redirectTo = formData.get('redirect') as string | null;
@@ -164,7 +164,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
         .set({ status: 'accepted' })
         .where(eq(invitations.id, invitation.id));
 
-      await logActivity(teamId, createdUser.id, ActivityType.ACCEPT_INVITATION);
+      await logActivity(teamId.toString(), createdUser.id, ActivityType.ACCEPT_INVITATION);
 
       [createdTeam] = await db
         .select()
@@ -193,7 +193,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
     teamId = createdTeam.id;
     userRole = 'owner';
 
-    await logActivity(teamId, createdUser.id, ActivityType.CREATE_TEAM);
+    await logActivity(teamId.toString(), createdUser.id, ActivityType.CREATE_TEAM);
   }
 
   const newTeamMember: NewTeamMember = {
@@ -204,7 +204,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
   await Promise.all([
     db.insert(teamMembers).values(newTeamMember),
-    logActivity(teamId, createdUser.id, ActivityType.SIGN_UP),
+    logActivity(teamId.toString(), createdUser.id, ActivityType.SIGN_UP),
     setSession(createdUser),
   ]);
 
@@ -223,7 +223,7 @@ export async function signOut() {
   
   const userWithTeam = await getUserWithTeam(user.id);
   if (userWithTeam) {
-    await logActivity(userWithTeam.teamId, user.id, 'sign_out' as ActivityAction);
+    await logActivity(userWithTeam.teamId.toString(), user.id, 'sign_out' as ActivityAction);
   }
   (await cookies()).delete('session');
 }
@@ -274,7 +274,7 @@ export const updatePassword = validatedActionWithUser(
         .update(users)
         .set({ passwordHash: newPasswordHash })
         .where(eq(users.id, user.id)),
-      logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_PASSWORD),
+      logActivity(userWithTeam?.teamId?.toString(), user.id, ActivityType.UPDATE_PASSWORD),
     ]);
 
     return { success: 'Password updated successfully.' };
@@ -298,7 +298,7 @@ export const deleteAccount = validatedActionWithUser(
     const userWithTeam = await getUserWithTeam(user.id);
 
     await logActivity(
-      userWithTeam?.teamId,
+      userWithTeam?.teamId?.toString(),
       user.id,
       ActivityType.DELETE_ACCOUNT,
     );
@@ -341,7 +341,7 @@ export const updateAccount = validatedActionWithUser(
 
     await Promise.all([
       db.update(users).set({ name, email }).where(eq(users.id, user.id)),
-      logActivity(userWithTeam?.teamId, user.id, ActivityType.UPDATE_ACCOUNT),
+      logActivity(userWithTeam?.teamId?.toString(), user.id, ActivityType.UPDATE_ACCOUNT),
     ]);
 
     return { success: 'Account updated successfully.' };
@@ -372,7 +372,7 @@ export const removeTeamMember = validatedActionWithUser(
       );
 
     await logActivity(
-      userWithTeam.teamId,
+      userWithTeam.teamId.toString(),
       user.id,
       ActivityType.REMOVE_TEAM_MEMBER,
     );
@@ -439,7 +439,7 @@ export const inviteTeamMember = validatedActionWithUser(
     });
 
     await logActivity(
-      userWithTeam.teamId,
+      userWithTeam.teamId.toString(),
       user.id,
       ActivityType.INVITE_TEAM_MEMBER,
     );

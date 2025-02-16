@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { TeamDataWithMembers } from '@/lib/db/schema';
-import { getTeamForUser, getUser } from '@/lib/db/queries';
+import { TeamDataWithMembers } from '@/lib/types';
+import { getUserWithTeam, getUser, getTeamForUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
 
 export interface User {
@@ -8,10 +8,10 @@ export interface User {
   email: string;
   name: string | null;
   passwordHash: string | null;
-  role: string;
+  role?: string;
   createdAt: Date;
   updatedAt: Date;
-  deletedAt: Date | null;
+  deletedAt?: Date | null;
 }
 
 export type ActionState = {
@@ -81,7 +81,7 @@ export function withTeam<T>(action: ActionWithTeamFunction<T>) {
       throw new Error('Team not found');
     }
 
-    return action(formData, team);
+    return action(formData, team as unknown as TeamDataWithMembers);
   };
 }
 

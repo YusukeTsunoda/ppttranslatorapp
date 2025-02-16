@@ -37,17 +37,17 @@ export async function getUser() {
 }
 
 export async function getTeamByStripeCustomerId(customerId: string) {
-  const result = await db
-    .select()
-    .from(teams)
-    .where(eq(teams.stripeCustomerId, customerId))
-    .limit(1);
+  const team = await prisma.team.findFirst({
+    where: {
+      stripeCustomerId: customerId
+    }
+  });
 
-  return result.length > 0 ? result[0] : null;
+  return team;
 }
 
 export async function updateTeamSubscription(
-  teamId: number,
+  teamId: string,
   subscriptionData: {
     stripeSubscriptionId: string | null;
     stripeProductId: string | null;
@@ -55,13 +55,15 @@ export async function updateTeamSubscription(
     subscriptionStatus: string;
   }
 ) {
-  await db
-    .update(teams)
-    .set({
+  await prisma.team.update({
+    where: {
+      id: teamId
+    },
+    data: {
       ...subscriptionData,
-      updatedAt: new Date(),
-    })
-    .where(eq(teams.id, teamId));
+      updatedAt: new Date()
+    }
+  });
 }
 
 export async function getUserWithTeam(userId: string) {
@@ -107,31 +109,33 @@ export async function getActivityLogs(userId: string) {
   });
 }
 
-export async function getTeamForUser(userId: number) {
-  const result = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    with: {
-      teamMembers: {
-        with: {
+export async function getTeamForUser(userId: string) {
+  const result = await prisma.user.findFirst({
+    where: {
+      id: userId
+    },
+    include: {
+      teams: {
+        include: {
           team: {
-            with: {
-              teamMembers: {
-                with: {
+            include: {
+              members: {
+                include: {
                   user: {
-                    columns: {
+                    select: {
                       id: true,
                       name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+                      email: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   });
 
-  return result?.teamMembers[0]?.team || null;
+  return result?.teams[0]?.team || null;
 }
