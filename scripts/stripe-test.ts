@@ -1,8 +1,9 @@
 import Stripe from 'stripe';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
 
-// 環境変数を読み込む
-dotenv.config();
+// 環境変数を読み込む（プロジェクトルートの.envファイルを指定）
+dotenv.config({ path: resolve(__dirname, '../.env') });
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -18,7 +19,7 @@ if (!stripeSecretKey.startsWith('sk_test_')) {
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-01-27.acacia'
+  apiVersion: '2023-10-16'
 });
 
 async function testStripeConnection() {
