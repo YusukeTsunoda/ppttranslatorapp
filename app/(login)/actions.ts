@@ -267,20 +267,20 @@ export const deleteAccount = validatedActionWithUser(
 
     const userWithTeam = await getUserWithTeam(user.id);
 
-    await logActivity(
-      userWithTeam?.teamId,
-      user.id,
-      ActivityAction.DELETE_ACCOUNT,
-    );
+    if (userWithTeam?.teamId) {
+      await logActivity(
+        userWithTeam.teamId,
+        user.id,
+        ActivityAction.DELETE_ACCOUNT,
+      );
+    }
 
     // Soft delete
     await prisma.user.update({
       where: { id: user.id },
       data: {
         deletedAt: new Date(),
-        email: {
-          concat: [user.email, '-', user.id, '-deleted']
-        }
+        email: `${user.email}-${user.id}-deleted`
       }
     });
 
@@ -309,20 +309,25 @@ export const updateAccount = validatedActionWithUser(
     const { name, email } = data;
     const userWithTeam = await getUserWithTeam(user.id);
 
-    await Promise.all([
-      prisma.user.update({
-        where: { id: user.id },
-        data: { name, email }
-      }),
-      logActivity(userWithTeam?.teamId, user.id, ActivityAction.UPDATE_ACCOUNT),
-    ]);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { name, email }
+    });
+
+    if (userWithTeam?.teamId) {
+      await logActivity(
+        userWithTeam.teamId,
+        user.id,
+        ActivityAction.UPDATE_ACCOUNT,
+      );
+    }
 
     return { success: 'Account updated successfully.' };
   },
 );
 
 const removeTeamMemberSchema = z.object({
-  memberId: z.number(),
+  memberId: z.string(),
 });
 
 export const removeTeamMember = validatedActionWithUser(

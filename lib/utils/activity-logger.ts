@@ -1,25 +1,12 @@
 import { prisma } from '@/lib/db';
-import { Prisma } from '@prisma/client';
+import { Prisma, ActivityAction } from '@prisma/client';
 import {
   createDatabaseError,
   createValidationError,
   createNotFoundError,
 } from '@/lib/utils/error-handler';
 
-export const ActivityAction = {
-  SIGN_IN: 'sign_in',
-  SIGN_UP: 'sign_up',
-  SIGN_OUT: 'sign_out',
-  CREATE_TEAM: 'create_team',
-  ACCEPT_INVITATION: 'accept_invitation',
-  INVITE_TEAM_MEMBER: 'invite_team_member',
-  REMOVE_TEAM_MEMBER: 'remove_team_member',
-  UPDATE_ACCOUNT: 'update_account',
-  UPDATE_PASSWORD: 'update_password',
-  DELETE_ACCOUNT: 'delete_account',
-} as const;
-
-export type ActivityAction = typeof ActivityAction[keyof typeof ActivityAction];
+export { ActivityAction };
 
 export interface ActivityLogData {
   teamId: string;
