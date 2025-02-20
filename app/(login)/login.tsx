@@ -62,6 +62,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
         const data = await response.json();
         if (!response.ok) {
           setError(data.error || 'アカウントの作成に失敗しました');
+          setLoading(false);
           return;
         }
       }
@@ -70,20 +71,14 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       const result = await signIn('credentials', {
         email,
         password,
-        callbackUrl: redirect || '/translate',
-        redirect: false,
+        redirect: true,
+        callbackUrl: redirect || '/translate'
       });
 
+      // redirect: true の場合、この部分は実行されません
       if (result?.error) {
-        if (result.error === 'このメールアドレスのユーザーが見つかりません' || 
-            result.error === 'パスワードが正しくありません') {
-          setError('メールアドレスまたはパスワードが正しくありません');
-        } else {
-          setError(result.error);
-        }
+        setError('メールアドレスまたはパスワードが正しくありません');
         console.error('Sign in error:', result.error);
-      } else if (result?.ok) {
-        router.push(redirect || '/translate');
       }
     } catch (error) {
       console.error('Sign in error:', error);

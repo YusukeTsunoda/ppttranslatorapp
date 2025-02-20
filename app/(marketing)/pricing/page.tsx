@@ -3,10 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 const plans = [
   {
+    id: "price_H5UGwpxnJVWdmh", // Stripeの価格ID
     name: "ベーシックプラン",
     price: "¥1,000",
     description: "個人向け有料プラン",
@@ -17,9 +20,9 @@ const plans = [
       "年間契約で最大20%割引"
     ],
     buttonText: "無料で始める",
-    href: "/sign-up",
   },
   {
+    id: "price_H5UGxyzABCDefg", // Stripeの価格ID
     name: "プレミアムプラン",
     price: "¥3,000",
     description: "ヘビーユーザー向け",
@@ -31,12 +34,48 @@ const plans = [
       "チーム利用対応（用語集10件まで共有可）"
     ],
     buttonText: "無料で始める",
-    href: "/sign-up",
     featured: true,
   }
 ];
 
 export default function PricingPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const handleSubscribe = async (priceId: string) => {
+    try {
+      setLoading(priceId);
+      
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priceId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'チェックアウトの作成に失敗しました');
+      }
+
+      if (data.url) {
+        router.push(data.url);
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast({
+        title: "エラー",
+        description: error instanceof Error ? error.message : "チェックアウトの作成に失敗しました",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
     <div className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -80,13 +119,14 @@ export default function PricingPage() {
                 </div>
                 <div className="mt-auto">
                   <Button
-                    asChild
+                    onClick={() => handleSubscribe(plan.id)}
+                    disabled={loading === plan.id}
                     className={`w-full ${
                       plan.featured ? "bg-orange-600 hover:bg-orange-500" : ""
                     }`}
                     data-testid={`select-plan-${plan.name.toLowerCase()}`}
                   >
-                    <Link href={plan.href}>{plan.buttonText}</Link>
+                    {loading === plan.id ? "処理中..." : plan.buttonText}
                   </Button>
                 </div>
               </div>

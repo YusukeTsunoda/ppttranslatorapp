@@ -8,8 +8,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
-import { Download } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 import Link from "next/link";
 
 export default function TranslatePage() {
@@ -81,6 +80,8 @@ export default function TranslatePage() {
   }, []); // 依存配列を空にして、マウント時のみ実行
 
   const handleFileUpload = useCallback(async (file: File) => {
+    if (!file) return;
+
     if (!file.name.endsWith(".pptx")) {
       toast({
         title: "エラー",
@@ -91,7 +92,7 @@ export default function TranslatePage() {
     }
 
     setUploading(true);
-    setIsTranslationComplete(false); // 新しいファイルがアップロードされたらリセット
+    setIsTranslationComplete(false);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -108,8 +109,7 @@ export default function TranslatePage() {
           description: "セッションが切れました。再度ログインしてください。",
           variant: "destructive",
         });
-        const currentPath = window.location.pathname;
-        router.push(`/sign-in?redirect=${encodeURIComponent(currentPath)}`);
+        router.push(`/sign-in?redirect=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
 
@@ -120,16 +120,20 @@ export default function TranslatePage() {
 
       const data = await response.json();
       console.log('Upload response:', data);
-      console.log('Slide data:', data.slides[0]);
-      setSlides(data.slides);
-      toast({
-        title: "アップロード成功",
-        description: "ファイルの解析が完了しました",
-      });
+      
+      if (data.slides && Array.isArray(data.slides)) {
+        setSlides(data.slides);
+        toast({
+          title: "アップロード成功",
+          description: "ファイルの解析が完了しました",
+        });
 
-      // アップロード成功後、自動的に翻訳を開始
-      if (data.slides && data.slides.length > 0) {
-        await handleTranslateSlide(data.slides, 0);
+        // アップロード成功後、自動的に翻訳を開始
+        if (data.slides.length > 0) {
+          await handleTranslateSlide(data.slides, 0);
+        }
+      } else {
+        throw new Error('スライドデータの形式が不正です');
       }
 
     } catch (error) {
@@ -143,6 +147,23 @@ export default function TranslatePage() {
       setUploading(false);
     }
   }, [toast, router]);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
 
   // 個別のスライドを翻訳する関数
   const handleTranslateSlide = async (slides: any[], slideIndex: number) => {
@@ -219,39 +240,37 @@ export default function TranslatePage() {
     }
   };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  }, [handleFileUpload]);
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
+    // プレビュー領域内でのみイベントを制御
+    if (e.target === e.currentTarget) {
+      e.preventDefault();
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      });
+    }
   }, [position.x, position.y]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
-    e.preventDefault();
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
+    
+    // ドラッグ中のみイベントを制御
+    if (e.target === e.currentTarget) {
+      e.preventDefault();
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
   }, [isDragging, dragStart.x, dragStart.y]);
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      setIsDragging(false);
+    }
+  }, [isDragging]);
 
   const handleMouseLeave = useCallback(() => {
     setIsDragging(false);
@@ -318,80 +337,48 @@ export default function TranslatePage() {
     }
   }, [currentSlide, slides]); // 必要な依存のみを保持
 
-  const handleDownload = async () => {
+  const handleDownload = useCallback(async () => {
+    if (!isTranslationComplete) return;
+
+    setIsGenerating(true);
     try {
-      setIsGenerating(true);
-      
-      // 翻訳済みデータを準備
-      const fileId = slides[0]?.fileId;  // fileIdを取得
-      if (!fileId) {
-        throw new Error('ファイルIDが見つかりません');
-      }
-
-      const translations = slides.map((slide) => ({
-        index: slide.index,
-        texts: slide.texts.map((text: { text: string; }, idx: number) => {
-          const translation = slide.translations?.[idx];
-          console.log(`Slide ${slide.index}, Text ${idx}:`, {
-            originalText: text.text,
-            translation: translation
-          });
-          return {
-            text: text.text,
-            translation: translation || null,
-          };
-        }),
-      }));
-
-      // デバッグ用のログ出力を追加
-      console.log('Full translation data:', JSON.stringify(translations, null, 2));
-      
-      // PPTXファイル生成をリクエスト
-      const response = await fetch('/api/pptx/generate', {
+      const response = await fetch('/api/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          fileId,
-          translations
-        }),
-        credentials: 'include',  // セッションCookieを含める
+        body: JSON.stringify({ slides }),
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate PPTX');
+        throw new Error('ダウンロードに失敗しました');
       }
-      
-      const data = await response.json();
-      
-      // ダウンロードリンクを生成
-      const link = document.createElement('a');
-      link.href = data.downloadUrl;
-      link.download = 'translated_presentation.pptx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'translated_presentation.pptx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       toast({
-        title: "ダウンロード開始",
-        description: "翻訳済みのPPTXファイルのダウンロードを開始しました。",
-        duration: 3000,
+        title: "成功",
+        description: "ファイルのダウンロードが完了しました",
       });
-      
     } catch (error) {
       console.error('Download error:', error);
       toast({
         title: "エラー",
-        description: error instanceof Error ? error.message : "PPTXファイルの生成に失敗しました。",
+        description: error instanceof Error ? error.message : "ダウンロードに失敗しました",
         variant: "destructive",
-        duration: 3000,
       });
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [isTranslationComplete, slides, toast]);
 
   // 画像のサイズと位置を管理するための状態を追加
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
@@ -405,9 +392,10 @@ export default function TranslatePage() {
 
     const updateContainerSize = () => {
       if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
         setContainerSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
+          width: rect.width,
+          height: rect.height
         });
       }
     };
@@ -423,26 +411,25 @@ export default function TranslatePage() {
   }, []);
 
   // 画像サイズの更新
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.target as HTMLImageElement;
-    const containerWidth = containerRef.current?.offsetWidth || 720;
-    const containerHeight = containerRef.current?.offsetHeight || 405;
+    if (!containerRef.current) return;
 
-    // アスペクト比を維持しながらサイズを計算
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerAspect = containerRect.width / containerRect.height;
     const imageAspect = img.naturalWidth / img.naturalHeight;
-    const containerAspect = containerWidth / containerHeight;
 
     let width, height;
     if (imageAspect > containerAspect) {
-      width = containerWidth;
-      height = containerWidth / imageAspect;
+      width = containerRect.width;
+      height = containerRect.width / imageAspect;
     } else {
-      height = containerHeight;
-      width = containerHeight * imageAspect;
+      height = containerRect.height;
+      width = containerRect.height * imageAspect;
     }
 
     setImageSize({ width, height });
-  };
+  }, []);
 
   return (
     <div className="container mx-auto py-8">
@@ -463,10 +450,7 @@ export default function TranslatePage() {
                   className="hidden"
                   id="file-upload"
                   data-testid="file-upload"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file);
-                  }}
+                  onChange={handleFileSelect}
                 />
                 <div className="flex items-center justify-center gap-2">
                   <svg
@@ -483,7 +467,7 @@ export default function TranslatePage() {
                     />
                   </svg>
                   <span className="text-sm text-gray-600">
-                    {uploading ? "アップロード中..." : "ファイルを選択"}
+                    {uploading ? "アップロード中..." : "ファイルを選択またはドラッグ＆ドロップ"}
                   </span>
                 </div>
               </div>
@@ -564,9 +548,10 @@ export default function TranslatePage() {
                   className="relative overflow-hidden bg-gray-100"
                   style={{ 
                     width: '100%',
-                    paddingTop: '56.25%', // 16:9のアスペクト比を維持
+                    paddingTop: '56.25%',
                     position: 'relative',
-                    cursor: isDragging ? 'grabbing' : 'grab'
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    touchAction: 'none' // タッチデバイスでのスクロールを防止
                   }}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
@@ -583,33 +568,45 @@ export default function TranslatePage() {
                         style={{ 
                           transform: `scale(${scale})`,
                           transformOrigin: 'center',
-                          pointerEvents: 'none'
+                          pointerEvents: isDragging ? 'none' : 'auto' // ドラッグ中は画像のポインターイベントを無効化
                         }}
                         draggable={false}
                         onLoad={handleImageLoad}
                       />
-                      <div className="absolute inset-0" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+                      <div 
+                        className="absolute inset-0" 
+                        style={{ 
+                          transform: `scale(${scale})`, 
+                          transformOrigin: 'center',
+                          width: imageSize.width,
+                          height: imageSize.height,
+                          left: `${(containerSize.width - imageSize.width) / 2}px`,
+                          top: `${(containerSize.height - imageSize.height) / 2}px`,
+                          pointerEvents: isDragging ? 'none' : 'auto' // ドラッグ中はオーバーレイのポインターイベントを無効化
+                        }}
+                      >
                         {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
                           const position = textObj.position;
                           
-                          // パーセンテージに変換
-                          const left = (position.x / 1920) * 100;  // 1920はスライドの標準幅
-                          const top = (position.y / 1080) * 100;   // 1080はスライドの標準高さ
-                          const width = (position.width / 1920) * 100;
-                          const height = (position.height / 1080) * 100;
+                          // 画像の実際のサイズに基づいて位置を計算
+                          const left = (position.x / 1920) * imageSize.width;
+                          const top = (position.y / 1080) * imageSize.height;
+                          const width = (position.width / 1920) * imageSize.width;
+                          const height = (position.height / 1080) * imageSize.height;
                           
                           return (
                             <div
                               key={index}
                               style={{
                                 position: 'absolute',
-                                left: `${left}%`,
-                                top: `${top}%`,
-                                width: `${width}%`,
-                                height: `${height}%`,
+                                left: `${left}px`,
+                                top: `${top}px`,
+                                width: `${width}px`,
+                                height: `${height}px`,
                                 border: selectedTextIndex === index ? '2px solid orange' : '2px solid rgba(255, 165, 0, 0.5)',
                                 backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
-                                pointerEvents: 'none'
+                                pointerEvents: 'none',
+                                transformOrigin: 'top left'
                               }}
                             />
                           );

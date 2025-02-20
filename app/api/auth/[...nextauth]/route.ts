@@ -9,9 +9,27 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import NextAuth from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
+import NextAuth from "next-auth";
 
-const handler = NextAuth(authOptions);
+const handler = NextAuth({
+  ...authOptions,
+  secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30日
+  },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true
+      }
+    }
+  }
+});
 
 export { handler as GET, handler as POST };
