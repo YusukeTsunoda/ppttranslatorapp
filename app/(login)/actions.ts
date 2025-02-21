@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { comparePasswords, hashPassword, setSession } from '@/lib/auth/session';
+import { comparePasswords, hashPassword, setSession, getSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createCheckoutSession } from '@/lib/payments/stripe';
@@ -9,7 +9,6 @@ import { getUser, getUserWithTeam } from '@/lib/db/queries';
 import { validatedAction, validatedActionWithUser } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/db';
 import { ActivityAction } from '@/lib/utils/activity-logger';
-import { verifyToken } from '@/lib/auth/session';
 
 async function logActivity(teamId: string, userId: string, action: ActivityAction) {
   await prisma.activityLog.create({

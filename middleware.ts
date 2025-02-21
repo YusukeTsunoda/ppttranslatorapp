@@ -1,91 +1,66 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
-import type { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-// Node.jsランタイムを使用することを明示
-export const runtime = 'nodejs';
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-export default withAuth(
-  async function middleware(req) {
-    try {
-      const token = await getToken({ req: req as any })
-      const path = req.nextUrl.pathname;
+  // 認証が不要なパスのリスト
+  const publicPaths = [
+    '/sign-in',
+    '/sign-up',
+    '/api/auth',
+    '/api/health',
+    '/_next',
+    '/favicon.ico',
+  ];
 
-      // APIルートの保護
-      if (path.startsWith('/api/') && !token) {
-        return new NextResponse(
-          JSON.stringify({ error: "認証が必要です" }),
-          { 
-            status: 401, 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-store, max-age=0',
-            } 
-          }
-        );
-      }
+  // 認証が不要なパスかチェック
+  const isPublicPath = publicPaths.some(path => 
+    pathname.startsWith(path) || pathname === '/'
+  );
 
-      // HTMLレスポンスの場合はContent-Typeを設定
-      if (path.endsWith('/')) {
-        const response = NextResponse.next()
-        response.headers.set('Content-Type', 'text/html; charset=utf-8')
-        return response
-      }
-
-      return NextResponse.next({
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      });
-    } catch (error) {
-      console.error('Middleware error:', error);
-      return new NextResponse(
-        JSON.stringify({ error: "サーバーエラーが発生しました" }),
-        { 
-          status: 500, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store, max-age=0',
-          } 
-        }
-      );
-    }
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        try {
-          const path = req.nextUrl.pathname;
-          
-          // 認証が不要なパス
-          if (
-            path === '/' ||
-            path === '/sign-in' ||
-            path === '/sign-up' ||
-            path === '/api/auth/signin' ||
-            path === '/api/auth/signup' ||
-            path.startsWith('/api/auth/')
-          ) {
-            return true;
-          }
-
-          // その他のパスは認証が必要
-          return !!token;
-        } catch (error) {
-          console.error('Authorization error:', error);
-          return false;
-        }
-      },
-    },
+  // APIルートの場合は処理をスキップ
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth')) {
+    return NextResponse.next();
   }
-);
 
+  try {
+    // JWTトークンを取得
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    // 認証済みユーザーがログインページにアクセスした場合
+    if (token && (pathname === '/sign-in' || pathname === '/sign-up')) {
+      return NextResponse.redirect(new URL('/translate', request.url));
+    }
+
+    // 未認証ユーザーが保護されたページにアクセスした場合
+    if (!token && !isPublicPath) {
+      const signInUrl = new URL('/sign-in', request.url);
+      signInUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error('Middleware error:', error);
+    return NextResponse.next();
+  }
+}
+
+// ミドルウェアを適用するパスを設定
 export const config = {
   matcher: [
-    '/translate/:path*',
-    '/teams/:path*',
-    '/settings/:path*',
-    '/api/:path*',
+    /*
+     * Match all request paths except:
+     * 1. /api/health/* (health check endpoints)
+     * 2. /_next/static (static files)
+     * 3. /_next/image (image optimization files)
+     * 4. /favicon.ico (favicon file)
+     */
+    '/((?!api/health|_next/static|_next/image|favicon.ico).*)',
   ],
 };

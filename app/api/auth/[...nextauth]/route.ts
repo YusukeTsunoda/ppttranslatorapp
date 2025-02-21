@@ -12,24 +12,46 @@ export const dynamic = 'force-dynamic';
 import { authOptions } from "@/lib/auth/auth-options";
 import NextAuth from "next-auth";
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const handler = NextAuth({
   ...authOptions,
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30日
+    updateAge: 24 * 60 * 60, // 24時間ごとにセッションを更新
   },
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: isDevelopment ? 'next-auth.session-token' : '__Secure-next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: true
+        secure: !isDevelopment,
+        domain: isDevelopment ? 'localhost' : undefined // ドメイン設定を追加
+      }
+    },
+    callbackUrl: {
+      name: isDevelopment ? 'next-auth.callback-url' : '__Secure-next-auth.callback-url',
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: !isDevelopment
+      }
+    },
+    csrfToken: {
+      name: isDevelopment ? 'next-auth.csrf-token' : '__Host-next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: !isDevelopment
       }
     }
-  }
+  },
+  debug: process.env.NODE_ENV === 'development',
 });
 
 export { handler as GET, handler as POST };

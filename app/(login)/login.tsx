@@ -71,14 +71,17 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       const result = await signIn('credentials', {
         email,
         password,
-        redirect: true,
-        callbackUrl: redirect || '/translate'
+        redirect: false,
       });
 
-      // redirect: true の場合、この部分は実行されません
       if (result?.error) {
         setError('メールアドレスまたはパスワードが正しくありません');
         console.error('Sign in error:', result.error);
+      } else {
+        // 認証成功時の処理
+        const destination = redirect || '/translate';
+        console.log('Redirecting to:', destination);
+        router.push(destination);
       }
     } catch (error) {
       console.error('Sign in error:', error);

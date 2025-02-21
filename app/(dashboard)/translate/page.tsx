@@ -240,37 +240,49 @@ export default function TranslatePage() {
     }
   };
 
+  // プレビューコンテナのスタイル
+  const previewContainerStyle = {
+    width: '100%',
+    paddingTop: '56.25%', // 16:9のアスペクト比
+    position: 'relative' as const,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+    cursor: isDragging ? 'grabbing' : 'grab',
+    touchAction: 'none' // タッチデバイスでのスクロールを防止
+  };
+
+  // 共通のtransformスタイル
+  const getTransformStyle = (x: number, y: number, scale: number) => ({
+    transform: `translate(${x}px, ${y}px) scale(${scale})`,
+    transformOrigin: 'center',
+  });
+
+  // ドラッグ処理の更新
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // プレビュー領域内でのみイベントを制御
-    if (e.target === e.currentTarget) {
-      e.preventDefault();
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      });
-    }
-  }, [position.x, position.y]);
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  }, [position]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
+    e.preventDefault();
     
-    // ドラッグ中のみイベントを制御
-    if (e.target === e.currentTarget) {
-      e.preventDefault();
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  }, [isDragging, dragStart.x, dragStart.y]);
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    
+    setPosition({
+      x: newX,
+      y: newY
+    });
+  }, [isDragging, dragStart]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (isDragging) {
-      e.preventDefault();
-      setIsDragging(false);
-    }
-  }, [isDragging]);
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     setIsDragging(false);
@@ -545,74 +557,71 @@ export default function TranslatePage() {
               <div className="flex flex-col gap-4">
                 <div
                   ref={containerRef}
-                  className="relative overflow-hidden bg-gray-100"
-                  style={{ 
-                    width: '100%',
-                    paddingTop: '56.25%',
-                    position: 'relative',
-                    cursor: isDragging ? 'grabbing' : 'grab',
-                    touchAction: 'none' // タッチデバイスでのスクロールを防止
-                  }}
+                  style={previewContainerStyle}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseLeave}
+                  onMouseLeave={handleMouseUp}
                 >
                   {slides[currentSlide] && (
-                    <>
-                      <img
-                        ref={imageRef}
-                        src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
-                        alt={`Slide ${currentSlide + 1}`}
-                        className="absolute inset-0 w-full h-full object-contain"
-                        style={{ 
-                          transform: `scale(${scale})`,
-                          transformOrigin: 'center',
-                          pointerEvents: isDragging ? 'none' : 'auto' // ドラッグ中は画像のポインターイベントを無効化
-                        }}
-                        draggable={false}
-                        onLoad={handleImageLoad}
-                      />
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <div 
-                        className="absolute inset-0" 
-                        style={{ 
-                          transform: `scale(${scale})`, 
-                          transformOrigin: 'center',
+                        className="relative"
+                        style={{
                           width: imageSize.width,
                           height: imageSize.height,
-                          left: `${(containerSize.width - imageSize.width) / 2}px`,
-                          top: `${(containerSize.height - imageSize.height) / 2}px`,
-                          pointerEvents: isDragging ? 'none' : 'auto' // ドラッグ中はオーバーレイのポインターイベントを無効化
+                          ...getTransformStyle(position.x, position.y, scale)
                         }}
                       >
-                        {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                          const position = textObj.position;
-                          
-                          // 画像の実際のサイズに基づいて位置を計算
-                          const left = (position.x / 1920) * imageSize.width;
-                          const top = (position.y / 1080) * imageSize.height;
-                          const width = (position.width / 1920) * imageSize.width;
-                          const height = (position.height / 1080) * imageSize.height;
-                          
-                          return (
-                            <div
-                              key={index}
-                              style={{
-                                position: 'absolute',
-                                left: `${left}px`,
-                                top: `${top}px`,
-                                width: `${width}px`,
-                                height: `${height}px`,
-                                border: selectedTextIndex === index ? '2px solid orange' : '2px solid rgba(255, 165, 0, 0.5)',
-                                backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
-                                pointerEvents: 'none',
-                                transformOrigin: 'top left'
-                              }}
-                            />
-                          );
-                        })}
+                        <img
+                          ref={imageRef}
+                          src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
+                          alt={`Slide ${currentSlide + 1}`}
+                          className="absolute inset-0 w-full h-full object-contain"
+                          style={{ 
+                            pointerEvents: isDragging ? 'none' : 'auto'
+                          }}
+                          draggable={false}
+                          onLoad={handleImageLoad}
+                        />
+                        <div 
+                          className="absolute inset-0"
+                          style={{ 
+                            pointerEvents: isDragging ? 'none' : 'auto',
+                            zIndex: 10
+                          }}
+                        >
+                          {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
+                            const textPosition = textObj.position;
+                            
+                            // 画像の実際のサイズに基づいて位置を計算
+                            const left = (textPosition.x / 1920) * 100;
+                            const top = (textPosition.y / 1080) * 100;
+                            const width = (textPosition.width / 1920) * 100;
+                            const height = (textPosition.height / 1080) * 100;
+                            
+                            return (
+                              <div
+                                key={index}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${left}%`,
+                                  top: `${top}%`,
+                                  width: `${width}%`,
+                                  height: `${height}%`,
+                                  border: selectedTextIndex === index ? '3px solid orange' : '2px solid rgba(255, 165, 0, 0.7)',
+                                  backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.2)' : 'rgba(255, 165, 0, 0.1)',
+                                  pointerEvents: 'none',
+                                  zIndex: selectedTextIndex === index ? 20 : 10,
+                                  boxShadow: selectedTextIndex === index ? '0 0 0 1px rgba(255, 165, 0, 0.5)' : 'none',
+                                  transition: 'all 0.2s ease-in-out'
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>

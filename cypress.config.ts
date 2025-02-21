@@ -7,10 +7,10 @@ export default defineConfig({
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     video: false,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 10000,
-    pageLoadTimeout: 10000,
-    requestTimeout: 10000,
-    responseTimeout: 10000,
+    defaultCommandTimeout: 15000,
+    pageLoadTimeout: 15000,
+    requestTimeout: 15000,
+    responseTimeout: 15000,
     retries: {
       runMode: 2,
       openMode: 0

@@ -76,21 +76,27 @@ export const authOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // 新規ユーザー登録後は/translateにリダイレクト
-      if (url.includes('sign-up') || url.includes('register')) {
-        return `${baseUrl}/translate`;
+      console.log('Redirect callback:', { url, baseUrl });
+      
+      // 内部URLの場合
+      if (url.startsWith(baseUrl)) {
+        // ログインページからの遷移の場合は/translateへ
+        if (url.includes('/sign-in') || url.includes('/sign-up')) {
+          return `${baseUrl}/translate`;
+        }
+        return url;
       }
-      // ログイン後は/translateにリダイレクト
-      if (url.includes('sign-in') || url.includes('login')) {
-        return `${baseUrl}/translate`;
+      
+      // 外部URLの場合
+      if (url.startsWith('http')) {
+        return baseUrl;
       }
-      // ログアウト後は/sign-inにリダイレクト
-      if (url.includes('signout') || url.includes('logout')) {
-        return `${baseUrl}/sign-in`;
+      
+      // 相対パスの場合
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
       }
-      // その他のURLはそのまま
-      if (url.startsWith(baseUrl)) return url;
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      
       return baseUrl;
     }
   },
