@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { exec } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
@@ -16,18 +16,20 @@ const execAsync = promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
-    // セッションチェックを新しい方式に変更
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    // userIdを取得
     const userId = session.user.id;
     const fileId = generateFileId();
 
-    // 古いファイルの削除を実行
-    await cleanupOldFiles(userId);
+    try {
+      await cleanupOldFiles(userId);
+    } catch (error) {
+      console.error("Error cleaning up old files:", error);
+      // エラーがあっても続行
+    }
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -43,18 +45,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ユーザーのディレクトリを作成
-    const { uploadDir, slidesDir } = await createUserDirectories(userId, fileId);
+    let uploadDir: string;
+    let slidesDir: string;
 
-    // ファイル名を生成
+    try {
+      const dirs = await createUserDirectories(userId, fileId);
+      uploadDir = dirs.uploadDir;
+      slidesDir = dirs.slidesDir;
+    } catch (error) {
+      console.error("Error creating directories:", error);
+      return NextResponse.json(
+        { error: "ディレクトリの作成に失敗しました" },
+        { status: 500 }
+      );
+    }
+
     const fileName = `${fileId}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
     const filePath = join(uploadDir, fileName);
 
-    // ファイルを保存
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
-    
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+    } catch (error) {
+      console.error("Error saving file:", error);
+      return NextResponse.json(
+        { error: "ファイルの保存に失敗しました" },
+        { status: 500 }
+      );
+    }
+
     console.log('File saved:', {
       filePath,
       fileId,
@@ -62,18 +82,16 @@ export async function POST(request: NextRequest) {
       uploadDir
     });
 
-    // Pythonスクリプトの実行
     const pythonScript = join(process.cwd(), "lib/python/pptx_parser.py");
-    console.log('Executing Python script with file path:', filePath);
     
-    const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" "${filePath}" "${slidesDir}"`);
-
     try {
-      const slideData = JSON.parse(stdout);
+      const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" "${filePath}" "${slidesDir}"`);
       
       if (stderr) {
         console.log("Python script debug info:", stderr);
       }
+
+      const slideData = JSON.parse(stdout);
 
       if (slideData.error) {
         console.error("Python script error:", slideData.error);
@@ -90,12 +108,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // スライドデータにfileIdを追加
       const slidesWithFileId = slideData.slides.map((slide: any) => ({
         ...slide,
         fileId,
-        image_path: `${fileId}/${slide.image_path}`
+        image_path: `${fileId}/slide_${slide.index + 1}.png`
       }));
+
+      console.log('Debug - Generated slides data:', {
+        fileId,
+        slidesDir,
+        slidesCount: slidesWithFileId.length,
+        samplePath: slidesWithFileId[0]?.image_path,
+        fullPath: join(slidesDir, `slide_${slideData.slides[0].index + 1}.png`)
+      });
 
       return NextResponse.json({
         success: true,
@@ -103,11 +128,9 @@ export async function POST(request: NextRequest) {
         slides: slidesWithFileId,
       });
     } catch (error) {
-      console.error("JSON parse error:", error);
-      console.error("stdout:", stdout);
-      console.error("stderr:", stderr);
+      console.error("Error processing file:", error);
       return NextResponse.json(
-        { error: "解析結果の処理に失敗しました" },
+        { error: "ファイルの処理に失敗しました" },
         { status: 500 }
       );
     }

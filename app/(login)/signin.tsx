@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { CircleIcon, Loader2 } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
-export function SignUp() {
+export default function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/translate';
@@ -17,6 +17,7 @@ export function SignUp() {
   const inviteId = searchParams.get('inviteId');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,17 +27,19 @@ export function SignUp() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, inviteId }),
-      });
+      if (mode === 'signup') {
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name, inviteId }),
+        });
 
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || 'アカウントの作成に失敗しました');
-        setLoading(false);
-        return;
+        const data = await response.json();
+        if (!response.ok) {
+          setError(data.error || 'アカウントの作成に失敗しました');
+          setLoading(false);
+          return;
+        }
       }
 
       // サインイン処理
@@ -70,7 +73,7 @@ export function SignUp() {
           <CircleIcon className="h-12 w-12 text-orange-500" />
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-          アカウント作成
+          {mode === 'signin' ? 'サインイン' : 'アカウント作成'}
         </h2>
       </div>
 
@@ -78,8 +81,8 @@ export function SignUp() {
         <form 
           className="space-y-6" 
           onSubmit={handleSubmit}
-          data-testid="signup-form"
-          data-cy="signup-form"
+          data-testid={mode === 'signin' ? 'signin-form' : 'signup-form'}
+          data-cy={mode === 'signin' ? 'signin-form' : 'signup-form'}
         >
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
@@ -92,6 +95,28 @@ export function SignUp() {
                     {error}
                   </h3>
                 </div>
+              </div>
+            </div>
+          )}
+          {mode === 'signup' && (
+            <div>
+              <Label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700"
+              >
+                名前
+              </Label>
+              <div className="mt-1">
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                  placeholder="名前を入力"
+                />
               </div>
             </div>
           )}
@@ -150,6 +175,8 @@ export function SignUp() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   処理中...
                 </>
+              ) : mode === 'signin' ? (
+                'サインイン'
               ) : (
                 'アカウント作成'
               )}
@@ -159,12 +186,21 @@ export function SignUp() {
 
         <div className="mt-6">
           <div className="text-sm text-center">
-            <p>
-              すでにアカウントをお持ちの方は{' '}
-              <Link href="/sign-in" className="font-medium text-orange-600 hover:text-orange-500">
-                ログイン
-              </Link>
-            </p>
+            {mode === 'signin' ? (
+              <p>
+                アカウントをお持ちでない方は{' '}
+                <Link href="/sign-up" className="font-medium text-orange-600 hover:text-orange-500">
+                  新規登録
+                </Link>
+              </p>
+            ) : (
+              <p>
+                すでにアカウントをお持ちの方は{' '}
+                <Link href="/sign-in" className="font-medium text-orange-600 hover:text-orange-500">
+                  ログイン
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

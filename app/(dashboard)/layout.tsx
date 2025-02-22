@@ -35,11 +35,13 @@ function Header() {
 
   const handleSignOut = useCallback(async () => {
     try {
-      await signOut();
+      const data = new FormData();
+      const options = new FormData();
+      options.append('redirect', 'false');
+      await signOut(data, options);
       setUser(null);
       console.log('Header: ログアウト成功');
-      router.refresh();
-      router.push('/');
+      router.push('/signin');
     } catch (error) {
       console.error('Header: ログアウトエラー:', error);
     }
@@ -48,7 +50,7 @@ function Header() {
   useEffect(() => {
     if (!user) {
       console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
-      router.push('/login');
+      router.push('/signin');
       return;
     }
   }, [user, router]);

@@ -23,6 +23,15 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const getLanguageName = (langCode: string): string => {
+  const languages: Record<string, string> = {
+    'ja': '日本語',
+    'en': '英語',
+    // 必要に応じて他の言語を追加
+  };
+  return languages[langCode] || langCode;
+};
+
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions) as CustomSession;
@@ -74,18 +83,18 @@ export async function POST(req: Request) {
       texts.map(async (textObj) => {
         const prompt = `
 あなたはプレゼンテーション資料の専門翻訳者です。
-以下のテキストを${sourceLang}から${targetLang}に翻訳してください。
+以下のテキストを${getLanguageName(sourceLang)}から${getLanguageName(targetLang)}に翻訳してください。
 
 翻訳の要件：
 1. 原文の構造（見出し、箇条書きなど）を維持すること
 2. 原文のニュアンスと意味を正確に伝えること
 3. 専門用語や固有名詞は適切に処理すること
+4. ${getLanguageName(targetLang)}として自然な表現を使用すること
 
-原文 (${sourceLang}):
+原文:
 ${textObj.text}
 
-翻訳文は${targetLang}で提供してください。
-必ず翻訳文のみを出力し、説明や注釈は含めないでください。
+翻訳文のみを出力してください。説明や注釈は含めないでください。
 `;
 
         const message = await anthropic.messages.create({
@@ -97,13 +106,27 @@ ${textObj.text}
           temperature: 0.7,
         });
 
-        console.log("Translation result:", (message.content[0] as any).text);
-        return (message.content[0] as any).text;
+        // デバッグ用にログを出力
+        console.log("Translation request:", {
+          sourceLang,
+          targetLang,
+          originalText: textObj.text,
+          translatedText: (message.content[0] as any).text.trim()
+        });
+        return (message.content[0] as any).text.trim();
       })
     );
 
     console.log("All translations completed:", translations);
-    return NextResponse.json({ translations });
+    return NextResponse.json({ 
+      success: true,
+      translations,
+      metadata: {
+        sourceLang,
+        targetLang,
+        model: selectedModel
+      }
+    });
   } catch (error) {
     console.error('Translation error:', error)
     return new NextResponse(

@@ -6,18 +6,65 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+  const [name, setName] = useState(user?.name || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) {
       console.error('ユーザーが見つかりません');
-      router.push('/login');
+      router.push('/signin');
     }
   }, [user, router]);
+
+  useEffect(() => {
+    if (user?.name) {
+      setName(user.name);
+    }
+  }, [user?.name]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'プロフィールの更新に失敗しました');
+      }
+
+      setUser(data.user);
+      toast({
+        title: '成功',
+        description: 'プロフィールを更新しました',
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      toast({
+        title: 'エラー',
+        description: error instanceof Error ? error.message : 'プロフィールの更新に失敗しました',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -45,13 +92,14 @@ export default function ProfilePage() {
           <CardTitle>基本情報</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">名前</Label>
               <Input
                 id="name"
                 name="name"
-                defaultValue={user?.name || ''}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="mt-1"
               />
             </div>
@@ -61,7 +109,7 @@ export default function ProfilePage() {
                 id="email"
                 name="email"
                 type="email"
-                defaultValue={user?.email || ''}
+                value={user?.email || ''}
                 disabled
                 className="mt-1 bg-gray-50"
               />
@@ -69,7 +117,16 @@ export default function ProfilePage() {
                 メールアドレスの変更はサポートまでお問い合わせください。
               </p>
             </div>
-            <Button type="submit">保存</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                '保存'
+              )}
+            </Button>
           </form>
         </CardContent>
       </Card>

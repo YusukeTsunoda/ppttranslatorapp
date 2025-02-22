@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
     });
 
     // トークンの有効期限を確認
-    if (token?.exp && Date.now() / 1000 > token.exp) {
+    if (token?.exp && Date.now() / 1000 > Number(token.exp)) {
       // トークンが期限切れの場合、ログインページにリダイレクト
       const signInUrl = new URL('/sign-in', request.url);
       signInUrl.searchParams.set('redirect', pathname);
