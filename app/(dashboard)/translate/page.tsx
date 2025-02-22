@@ -26,7 +26,7 @@ export default function TranslatePage() {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [editedTranslations, setEditedTranslations] = useState<{ [key: number]: string }>({});
+  const [editedTranslations, setEditedTranslations] = useState<{ [key: string]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTranslationComplete, setIsTranslationComplete] = useState(false);
@@ -192,46 +192,34 @@ export default function TranslatePage() {
         }),
       });
 
-      if (response.status === 401) {
-        toast({
-          title: "エラー",
-          description: "セッションが切れました。再度ログインしてください。",
-          variant: "destructive",
-        });
-        const currentPath = window.location.pathname;
-        router.push(`/sign-in?redirect=${encodeURIComponent(currentPath)}`);
-        return;
-      }
-
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '翻訳に失敗しました');
+        throw new Error('翻訳リクエストに失敗しました');
       }
 
       const data = await response.json();
-      console.log('Translation response for slide', slideIndex, ':', data);
+      console.log('Translation response:', data);
 
-      // 翻訳データを保存
+      // 翻訳結果を現在のスライドに適用
       const updatedSlides = [...slides];
-      if (!updatedSlides[slideIndex].translations) {
-        updatedSlides[slideIndex].translations = [];
-      }
-      updatedSlides[slideIndex].translations = data.translations;
-      console.log('Updated translations for slide', slideIndex, ':', updatedSlides[slideIndex].translations);
+      updatedSlides[slideIndex] = {
+        ...updatedSlides[slideIndex],
+        translations: data.translations.map((text: string, index: number) => ({
+          text,
+          type: 'translation',
+          position: slides[slideIndex].texts[index].position
+        }))
+      };
       setSlides(updatedSlides);
 
-      // 次のスライドがある場合は、それも翻訳
-      if (slideIndex < slides.length - 1) {
-        await handleTranslateSlide(updatedSlides, slideIndex + 1);
-      } else {
-        setIsTranslationComplete(true); // すべてのスライドの翻訳が完了
-        toast({
-          title: "翻訳完了",
-          description: "すべてのスライドの翻訳が完了しました",
-        });
-      }
+      // 編集用の翻訳データも更新
+      const newTranslations = { ...editedTranslations };
+      data.translations.forEach((text: string, index: number) => {
+        newTranslations[`${slideIndex}-${index}`] = text;
+      });
+      setEditedTranslations(newTranslations);
+
     } catch (error) {
-      console.error('Translation error for slide', slideIndex, ':', error);
+      console.error('Translation error:', error);
       toast({
         title: "エラー",
         description: error instanceof Error ? error.message : "翻訳に失敗しました",
@@ -315,7 +303,7 @@ export default function TranslatePage() {
   const handleTranslationChange = (index: number, newTranslation: string) => {
     setEditedTranslations(prev => ({
       ...prev,
-      [index]: newTranslation
+      [`${currentSlide}-${index}`]: newTranslation
     }));
 
     // スライドの翻訳を更新
@@ -480,304 +468,260 @@ export default function TranslatePage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <Card className="p-6">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">PPTファイルをアップロード</h2>
-              <div 
-                className="border-2 border-dashed rounded-lg p-2 text-center cursor-pointer"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById('file-upload')?.click()}
-              >
-                <input
-                  type="file"
-                  accept=".pptx"
-                  className="hidden"
-                  id="file-upload"
-                  data-testid="file-upload"
-                  onChange={handleFileSelect}
-                />
-                <div className="flex items-center justify-center gap-2">
-                  <svg
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <span className="text-sm text-gray-600">
-                    {uploading ? "アップロード中..." : "ファイルを選択またはドラッグ＆ドロップ"}
-                  </span>
-                </div>
-              </div>
-              {slides.length > 0 && (
-                <Button
-                  onClick={handleDownload}
-                  disabled={isGenerating || !isTranslationComplete}
-                  className="w-full"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      生成中...
-                    </>
-                  ) : !isTranslationComplete ? (
-                    "翻訳完了までお待ちください..."
-                  ) : (
-                    <>
-                      <Download className="mr-2 h-4 w-4" />
-                      PPTXをダウンロード
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-          </Card>
-
-          {slides.length > 0 && (
-            <Card className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 mr-4">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleZoom(scale - 0.1)}
-                      title="縮小"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={resetZoom}
-                      title="リセット"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleZoom(scale + 0.1)}
-                      title="拡大"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
-                    disabled={currentSlide === 0}
-                  >
-                    前へ
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
-                    disabled={currentSlide === slides.length - 1}
-                  >
-                    次へ
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-4">
-                <div
-                  ref={containerRef}
-                  style={previewContainerStyle}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                >
-                  {slides[currentSlide] && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div 
-                        className="relative"
-                        style={{
-                          width: imageSize.width,
-                          height: imageSize.height,
-                          ...getTransformStyle(position.x, position.y, scale)
-                        }}
-                      >
-                        <img
-                          ref={imageRef}
-                          src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
-                          alt={`Slide ${currentSlide + 1}`}
-                          className="absolute inset-0 w-full h-full object-contain"
-                          style={{ 
-                            pointerEvents: isDragging ? 'none' : 'auto'
-                          }}
-                          draggable={false}
-                          onLoad={handleImageLoad}
-                        />
-                        <div 
-                          className="absolute inset-0"
-                          style={{ 
-                            pointerEvents: isDragging ? 'none' : 'auto',
-                            zIndex: 10
-                          }}
-                        >
-                          {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
-                            const textPosition = textObj.position;
-                            
-                            // 位置とサイズを4倍に拡大
-                            const left = (textPosition.x / 720) * 100;    // 1920 → 480 (1/4に縮小)
-                            const top = (textPosition.y / 480) * 120;     // 1080 → 270 (1/4に縮小)
-                            const width = (textPosition.width  / 720) * 100;
-                            const height = (textPosition.height  / 480) * 120;
-                            
-                            return (
-                              <div
-                                key={index}
-                                style={{
-                                  position: 'absolute',
-                                  left: `${left}%`,
-                                  top: `${top}%`,
-                                  width: `${width}%`,
-                                  height: `${height}%`,
-                                  border: selectedTextIndex === index ? '3px solid orange' : '2px solid rgba(255, 165, 0, 0.7)',
-                                  backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.2)' : 'rgba(255, 165, 0, 0.1)',
-                                  pointerEvents: 'none',
-                                  zIndex: selectedTextIndex === index ? 20 : 10,
-                                  boxShadow: selectedTextIndex === index ? '0 0 0 1px rgba(255, 165, 0, 0.5)' : 'none',
-                                  transition: 'all 0.2s ease-in-out'
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-
-        <div className="space-y-4">
+    <div className="container mx-auto p-4 space-y-4">
+      {!slides.length ? (
+        // ファイルアップロード前の表示
+        <div className="grid grid-cols-2 gap-4">
+          {/* 翻訳言語の選択（左側） */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">翻訳設定</h2>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    翻訳元言語
-                  </label>
-                  <Select value={sourceLang} onValueChange={setSourceLang}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="言語を選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">英語</SelectItem>
-                      <SelectItem value="ja">日本語</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    翻訳先言語
-                  </label>
-                  <Select value={targetLang} onValueChange={setTargetLang}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="言語を選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ja">日本語</SelectItem>
-                      <SelectItem value="en">英語</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  翻訳モデル
-                </label>
-                <Select 
-                  value={selectedModel} 
-                  onValueChange={setSelectedModel}
-                  disabled={!isPremium && selectedModel !== "claude-3-haiku-20240307"}
-                >
+                <label className="block text-sm font-medium mb-2">翻訳元言語</label>
+                <Select value={sourceLang} onValueChange={setSourceLang}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="翻訳元言語" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableModels.map(model => (
-                      <SelectItem
-                        key={model.value}
-                        value={model.value}
-                        disabled={!isPremium && model.premium}
-                      >
-                        <div className="flex flex-col">
-                          <span>{model.label}</span>
-                          <span className="text-xs text-gray-500">{model.description}</span>
-                          {model.premium && !isPremium && (
-                            <span className="text-xs text-orange-500">Premiumプラン限定</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="ja">日本語</SelectItem>
+                    <SelectItem value="en">英語</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">翻訳先言語</label>
+                <Select value={targetLang} onValueChange={setTargetLang}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="翻訳先言語" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">英語</SelectItem>
+                    <SelectItem value="ja">日本語</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </Card>
 
-          <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
-            {slides[currentSlide]?.texts?.map((textObj: any, index: number) => (
-              <Card 
-                key={index} 
-                className={`p-4 transition-all duration-200 ${
-                  selectedTextIndex === index ? 'ring-2 ring-orange-500 bg-orange-100/20' : ''
-                }`}
-                onMouseEnter={() => setSelectedTextIndex(index)}
-                onMouseLeave={() => setSelectedTextIndex(null)}
+          {/* ファイルアップロード（右側） */}
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold mb-4">ファイルのアップロード</h2>
+            <div
+              className="border-2 border-dashed rounded-lg p-6 text-center h-[calc(100%-2rem)]"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+            >
+              <Input
+                type="file"
+                accept=".pptx"
+                className="hidden"
+                onChange={handleFileSelect}
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className="cursor-pointer flex flex-col items-center justify-center gap-2 h-full"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-orange-500">テキスト {index + 1}</span>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    原文
-                  </label>
-                  <div className="p-3 bg-gray-50 rounded-md">{textObj.text}</div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    翻訳文
-                  </label>
-                  <Textarea
-                    value={
-                      editedTranslations[index] !== undefined
-                        ? editedTranslations[index]
-                        : slides[currentSlide]?.translations?.[index] || ""
-                    }
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTranslationChange(index, e.target.value)}
-                    placeholder="翻訳文を入力"
-                    className="min-h-[100px] bg-gray-50"
+                <svg
+                  className="w-12 h-12 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                   />
-                  {editedTranslations[index] !== undefined && (
-                    <p className="text-xs text-orange-500 mt-1">
-                      ※ 編集済み
-                    </p>
-                  )}
+                </svg>
+                <span className="text-lg text-gray-600">
+                  {uploading ? "アップロード中..." : "クリックまたはドラッグ＆ドロップでファイルを選択"}
+                </span>
+                <span className="text-sm text-gray-500">
+                  対応形式: .pptx
+                </span>
+              </label>
+            </div>
+          </Card>
+        </div>
+      ) : (
+        // ファイルアップロード後の表示
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            {/* ファイルアップロード関係の表示 */}
+            <div>
+              <h2 className="text-lg font-semibold mb-2">ファイル情報</h2>
+              <div className="text-sm text-gray-600">
+                {file?.name && <p>ファイル名: {file.name}</p>}
+                <p>スライド数: {slides.length}</p>
+              </div>
+            </div>
+            {/* 翻訳言語の選択の表示 */}
+            <div>
+              <h2 className="text-lg font-semibold mb-2">翻訳設定</h2>
+              <div className="flex gap-4">
+                <Select value={sourceLang} onValueChange={setSourceLang}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="翻訳元言語" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ja">日本語</SelectItem>
+                    <SelectItem value="en">英語</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={targetLang} onValueChange={setTargetLang}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="翻訳先言語" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">英語</SelectItem>
+                    <SelectItem value="ja">日本語</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* プレビュー画面（大きく表示） */}
+          <Card className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleZoom(scale - 0.1)}
+                    title="縮小"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={resetZoom}
+                    title="リセット"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleZoom(scale + 0.1)}
+                    title="拡大"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                  </Button>
                 </div>
-              </Card>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
+                  disabled={currentSlide === 0}
+                >
+                  前へ
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
+                  disabled={currentSlide === slides.length - 1}
+                >
+                  次へ
+                </Button>
+              </div>
+            </div>
+            {/* プレビュー表示エリア */}
+            <div
+              ref={containerRef}
+              className="relative overflow-hidden bg-gray-100 rounded-lg border-2 border-orange-500"
+              style={{
+                height: "calc(100vh - 400px)",
+                minHeight: "400px",
+                cursor: isDragging ? "grabbing" : "grab"
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <div
+                style={{
+                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                  transformOrigin: "center",
+                  transition: isDragging ? "none" : "transform 0.3s ease-out",
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center"
+                }}
+              >
+                {slides[currentSlide]?.image && (
+                  <img
+                    src={slides[currentSlide].image}
+                    alt={`Slide ${currentSlide + 1}`}
+                    className="max-w-full h-auto"
+                    style={{ 
+                      userSelect: "none",
+                      maxHeight: "100%",
+                      objectFit: "contain"
+                    }}
+                    onLoad={handleImageLoad}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* 原文と翻訳文の表示エリア */}
+          <div className="space-y-4">
+            {slides[currentSlide]?.texts?.map((text: any, index: number) => (
+              <div key={index} className="grid grid-cols-2 gap-4">
+                {/* 原文 */}
+                <Card className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium">原文 {index + 1}</h3>
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{text.text}</p>
+                </Card>
+                {/* 翻訳文 */}
+                <Card className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium">翻訳文 {index + 1}</h3>
+                  </div>
+                  <Textarea
+                    value={editedTranslations[`${currentSlide}-${index}`] || ''}
+                    onChange={(e) => {
+                      const newTranslations = { ...editedTranslations };
+                      newTranslations[`${currentSlide}-${index}`] = e.target.value;
+                      setEditedTranslations(newTranslations);
+                    }}
+                    className="min-h-[100px] text-sm"
+                    placeholder="翻訳文を入力"
+                  />
+                </Card>
+              </div>
             ))}
           </div>
+
+          {/* 保存ボタン */}
+          <div className="flex justify-end gap-4">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                '保存'
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
