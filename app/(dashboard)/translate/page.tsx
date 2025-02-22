@@ -443,6 +443,42 @@ export default function TranslatePage() {
     setImageSize({ width, height });
   }, []);
 
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      const response = await fetch('/api/save-translations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slides: slides,
+          translations: editedTranslations,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('保存に失敗しました');
+      }
+
+      toast({
+        title: "成功",
+        description: "翻訳が保存されました",
+      });
+
+    } catch (error) {
+      console.error('Save error:', error);
+      toast({
+        title: "エラー",
+        description: error instanceof Error ? error.message : "保存に失敗しました",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -596,9 +632,9 @@ export default function TranslatePage() {
                             
                             // 位置とサイズを4倍に拡大
                             const left = (textPosition.x / 720) * 100;    // 1920 → 480 (1/4に縮小)
-                            const top = (textPosition.y / 480) * 100;     // 1080 → 270 (1/4に縮小)
+                            const top = (textPosition.y / 480) * 120;     // 1080 → 270 (1/4に縮小)
                             const width = (textPosition.width  / 720) * 100;
-                            const height = (textPosition.height  / 480) * 100;
+                            const height = (textPosition.height  / 480) * 120;
                             
                             return (
                               <div

@@ -7,6 +7,13 @@ const nextConfig = {
   images: {
     domains: ['localhost', process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '')].filter(Boolean),
   },
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // 開発環境でのクライアントサイドキャッシュを無効化
+      config.cache = false;
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;
