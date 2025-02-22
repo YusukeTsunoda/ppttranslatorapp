@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { CircleIcon, Loader2 } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
-export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
+export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/translate';
@@ -209,4 +209,4 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
       </div>
     </div>
   );
-}
+} 

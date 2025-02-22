@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log('Request body received:', { ...body, password: '[REDACTED]' });
     
-    const { email, password, inviteId } = body;
+    const { email, password } = body;
 
     // 入力値の検証
     if (!email || !password) {
@@ -70,65 +70,24 @@ export async function POST(req: Request) {
         email,
         passwordHash,
       },
-    }).catch((error) => {
+    }).catch((error: Error) => {
       console.error('Error creating user:', error);
       throw error;
     });
     
     console.log('User created successfully:', { userId: user.id });
 
-    let teamId = user.id;
-
-    // 招待処理
-    if (inviteId) {
-      console.log('Processing invitation:', inviteId);
-      const invite = await prisma.invitation.findUnique({
-        where: { id: inviteId },
-        include: { team: true }
-      }).catch((error) => {
-        console.error('Error finding invitation:', error);
-        return null;
-      });
-
-      if (invite && invite.status === 'pending') {
-        console.log('Adding user to team:', invite.teamId);
-        await prisma.teamMember.create({
-          data: {
-            userId: user.id,
-            teamId: invite.teamId,
-            role: invite.role
-          }
-        }).catch((error) => {
-          console.error('Error adding user to team:', error);
-          throw error;
-        });
-
-        await prisma.invitation.update({
-          where: { id: inviteId },
-          data: { status: 'accepted' }
-        }).catch((error) => {
-          console.error('Error updating invitation:', error);
-          throw error;
-        });
-
-        teamId = invite.teamId;
-        console.log('User added to team successfully');
-      }
-    }
-
     // アクティビティログの記録
     await prisma.activityLog.create({
       data: {
-        teamId,
         userId: user.id,
         action: 'sign_up',
         ipAddress: req.headers.get('x-forwarded-for') || 'unknown',
         metadata: {
-          email: user.email,
-          inviteId: inviteId || null
+          email: user.email
         }
       }
-    }).catch((error) => {
+    }).catch((error: Error) => {
       console.error('Error creating activity log:', error);
       // アクティビティログの作成に失敗しても、ユーザー作成は成功とする
     });
@@ -137,8 +96,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { 
         success: true,
-        userId: user.id,
-        teamId
+        userId: user.id
       },
       { status: 201 }
     );

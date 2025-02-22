@@ -9,49 +9,63 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { authOptions } from "@/lib/auth/auth-options";
-import NextAuth from "next-auth";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import { compare } from "bcryptjs";
+import NextAuth, { type NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import prisma from "@/lib/prisma";
 
-const isDevelopment = process.env.NODE_ENV === 'development';
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("メールアドレスとパスワードを入力してください");
+        }
 
-const handler = NextAuth({
-  ...authOptions,
-  secret: process.env.NEXTAUTH_SECRET,
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email }
+        });
+
+        if (!user || !user.passwordHash) {
+          throw new Error("メールアドレスまたはパスワードが正しくありません");
+        }
+
+        const isValid = await compare(credentials.password, user.passwordHash);
+
+        if (!isValid) {
+          throw new Error("メールアドレスまたはパスワードが正しくありません");
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
+      }
+    })
+  ],
+  pages: {
+    signIn: '/login',
+  },
   session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30日
-    updateAge: 24 * 60 * 60, // 24時間ごとにセッションを更新
+    strategy: "jwt"
   },
-  cookies: {
-    sessionToken: {
-      name: isDevelopment ? 'next-auth.session-token' : '__Secure-next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: !isDevelopment,
-        domain: isDevelopment ? 'localhost' : undefined // ドメイン設定を追加
+  callbacks: {
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.sub!;
       }
-    },
-    callbackUrl: {
-      name: isDevelopment ? 'next-auth.callback-url' : '__Secure-next-auth.callback-url',
-      options: {
-        sameSite: 'lax',
-        path: '/',
-        secure: !isDevelopment
-      }
-    },
-    csrfToken: {
-      name: isDevelopment ? 'next-auth.csrf-token' : '__Host-next-auth.csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: !isDevelopment
-      }
+      return session;
     }
-  },
-  debug: process.env.NODE_ENV === 'development',
-});
+  }
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };

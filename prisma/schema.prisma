@@ -24,6 +24,7 @@ model User {
   activityLogs    ActivityLog[]
   emailVerified    DateTime?
   image            String?
+  translations    Translation[]
 }
 
 model ActivityLog {
@@ -37,6 +38,19 @@ model ActivityLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model Translation {
+  id          String   @id @default(cuid())
+  slides      Json
+  translations Json
+  currentSlide Int
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
 
 enum ActivityAction {

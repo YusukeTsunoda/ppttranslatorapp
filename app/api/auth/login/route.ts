@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { comparePasswords } from '@/lib/auth/session';
-import { prisma } from '@/lib/db';
+import prisma from '@/lib/db';
 
 // Node.jsランタイムを明示的に指定
 // bcryptjsを使用するため、Edge Runtimeでは動作しません

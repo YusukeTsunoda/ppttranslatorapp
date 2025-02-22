@@ -34,6 +34,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // アクティビティログの記録
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'sign_up',
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        metadata: {
+          email: user.email
+        }
+      }
+    }).catch((error: Error) => {
+      console.error('Error creating activity log:', error);
+    });
+
     return NextResponse.json({ success: true, userId: user.id });
   } catch (error) {
     console.error('Registration error:', error);

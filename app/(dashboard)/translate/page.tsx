@@ -31,6 +31,7 @@ export default function TranslatePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTranslationComplete, setIsTranslationComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [shouldUpdateOverlay, setShouldUpdateOverlay] = useState(true);
 
   // 利用可能なモデルのリスト
   const availableModels = [
@@ -73,6 +74,7 @@ export default function TranslatePage() {
     setIsGenerating(false);
     setIsTranslationComplete(false);
     setIsInitialized(true);
+    setShouldUpdateOverlay(true);
 
     return () => {
       setIsInitialized(false);
@@ -123,6 +125,7 @@ export default function TranslatePage() {
       
       if (data.slides && Array.isArray(data.slides)) {
         setSlides(data.slides);
+        setShouldUpdateOverlay(true);
         toast({
           title: "アップロード成功",
           description: "ファイルの解析が完了しました",
@@ -132,6 +135,8 @@ export default function TranslatePage() {
         if (data.slides.length > 0) {
           await handleTranslateSlide(data.slides, 0);
         }
+
+        console.log('Received slides data:', data.slides);
       } else {
         throw new Error('スライドデータの形式が不正です');
       }
@@ -228,6 +233,29 @@ export default function TranslatePage() {
     }
   };
 
+  // 画像サイズの状態を追加
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  // 画像読み込み時のハンドラーを修正
+  const handleImageLoad = useCallback(() => {
+    if (imageRef.current && containerRef.current) {
+      const imgRect = imageRef.current.getBoundingClientRect();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      
+      setImageSize({
+        width: imgRect.width,
+        height: imgRect.height
+      });
+      setContainerSize({
+        width: containerRect.width,
+        height: containerRect.height
+      });
+    }
+  }, []);
+
   // プレビューコンテナのスタイル
   const previewContainerStyle = {
     width: '100%',
@@ -245,7 +273,7 @@ export default function TranslatePage() {
     transformOrigin: 'center',
   });
 
-  // ドラッグ処理の更新
+  // ドラッグ処理の関数を修正
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -262,9 +290,14 @@ export default function TranslatePage() {
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
     
+    // 移動範囲を制限（オプション）
+    const maxMove = 500; // 最大移動距離
+    const limitedX = Math.max(-maxMove, Math.min(maxMove, newX));
+    const limitedY = Math.max(-maxMove, Math.min(maxMove, newY));
+    
     setPosition({
-      x: newX,
-      y: newY
+      x: limitedX,
+      y: limitedY
     });
   }, [isDragging, dragStart]);
 
@@ -291,12 +324,16 @@ export default function TranslatePage() {
   }, [isDragging]);
 
   const handleZoom = (newScale: number) => {
+    // スケールを更新するだけで、オーバーレイのリペイントは行わない
     setScale(Math.max(0.5, Math.min(3, newScale)));
+    // setShouldUpdateOverlayは呼び出さない
   };
 
+  // リセット時に位置もリセット
   const resetZoom = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+    setShouldUpdateOverlay(true);
   };
 
   // 翻訳の編集を保存する関数
@@ -380,62 +417,11 @@ export default function TranslatePage() {
     }
   }, [isTranslationComplete, slides, toast]);
 
-  // 画像のサイズと位置を管理するための状態を追加
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-
-  // コンテナサイズの監視
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const updateContainerSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setContainerSize({
-          width: rect.width,
-          height: rect.height
-        });
-      }
-    };
-
-    // 初期サイズを設定
-    updateContainerSize();
-
-    // リサイズ監視
-    const observer = new ResizeObserver(updateContainerSize);
-    observer.observe(containerRef.current);
-
-    return () => observer.disconnect();
-  }, []);
-
-  // 画像サイズの更新
-  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.target as HTMLImageElement;
-    if (!containerRef.current) return;
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const containerAspect = containerRect.width / containerRect.height;
-    const imageAspect = img.naturalWidth / img.naturalHeight;
-
-    let width, height;
-    if (imageAspect > containerAspect) {
-      width = containerRect.width;
-      height = containerRect.width / imageAspect;
-    } else {
-      height = containerRect.height;
-      width = containerRect.height * imageAspect;
-    }
-
-    setImageSize({ width, height });
-  }, []);
-
   const handleSave = async () => {
     try {
       setIsSaving(true);
       
-      const response = await fetch('/api/save-translations', {
+      const response = await fetch('/api/translations/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -443,12 +429,18 @@ export default function TranslatePage() {
         body: JSON.stringify({
           slides: slides,
           translations: editedTranslations,
+          currentSlide: currentSlide
         }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('保存に失敗しました');
+        const errorData = await response.json().catch(() => ({ message: '保存に失敗しました' }));
+        throw new Error(errorData.message || '保存に失敗しました');
       }
+
+      const data = await response.json();
+      console.log('Save response:', data);
 
       toast({
         title: "成功",
@@ -466,6 +458,14 @@ export default function TranslatePage() {
       setIsSaving(false);
     }
   };
+
+  // 現在のスライドが変更されたときにデバッグ情報を表示
+  useEffect(() => {
+    if (slides[currentSlide]) {
+      console.log('Current slide data:', slides[currentSlide]);
+      console.log('Image path:', slides[currentSlide].image_path);
+    }
+  }, [currentSlide, slides]);
 
   return (
     <div className="container mx-auto p-4 space-y-4">
@@ -560,165 +560,222 @@ export default function TranslatePage() {
             {/* 翻訳言語の選択の表示 */}
             <div>
               <h2 className="text-lg font-semibold mb-2">翻訳設定</h2>
-              <div className="flex gap-4">
-                <Select value={sourceLang} onValueChange={setSourceLang}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="翻訳元言語" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ja">日本語</SelectItem>
-                    <SelectItem value="en">英語</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={targetLang} onValueChange={setTargetLang}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="翻訳先言語" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">英語</SelectItem>
-                    <SelectItem value="ja">日本語</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* プレビュー画面（大きく表示） */}
-          <Card className="p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleZoom(scale - 0.1)}
-                    title="縮小"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={resetZoom}
-                    title="リセット"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleZoom(scale + 0.1)}
-                    title="拡大"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                  </Button>
+              <div className="flex justify-between items-center">
+                <div className="flex gap-4">
+                  <Select value={sourceLang} onValueChange={setSourceLang}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="翻訳元言語" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ja">日本語</SelectItem>
+                      <SelectItem value="en">英語</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={targetLang} onValueChange={setTargetLang}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="翻訳先言語" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">英語</SelectItem>
+                      <SelectItem value="ja">日本語</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button
-                  variant="outline"
-                  onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
-                  disabled={currentSlide === 0}
+                  onClick={handleSave}
+                  disabled={isSaving}
                 >
-                  前へ
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
-                  disabled={currentSlide === slides.length - 1}
-                >
-                  次へ
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    '保存'
+                  )}
                 </Button>
               </div>
             </div>
-            {/* プレビュー表示エリア */}
-            <div
-              ref={containerRef}
-              className="relative overflow-hidden bg-gray-100 rounded-lg border-2 border-orange-500"
-              style={{
-                height: "calc(100vh - 400px)",
-                minHeight: "400px",
-                cursor: isDragging ? "grabbing" : "grab"
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            >
-              <div
-                style={{
-                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                  transformOrigin: "center",
-                  transition: isDragging ? "none" : "transform 0.3s ease-out",
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center"
-                }}
-              >
-                {slides[currentSlide]?.image && (
-                  <img
-                    src={slides[currentSlide].image}
-                    alt={`Slide ${currentSlide + 1}`}
-                    className="max-w-full h-auto"
-                    style={{ 
-                      userSelect: "none",
-                      maxHeight: "100%",
-                      objectFit: "contain"
-                    }}
-                    onLoad={handleImageLoad}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* 原文と翻訳文の表示エリア */}
-          <div className="space-y-4">
-            {slides[currentSlide]?.texts?.map((text: any, index: number) => (
-              <div key={index} className="grid grid-cols-2 gap-4">
-                {/* 原文 */}
-                <Card className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">原文 {index + 1}</h3>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{text.text}</p>
-                </Card>
-                {/* 翻訳文 */}
-                <Card className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">翻訳文 {index + 1}</h3>
-                  </div>
-                  <Textarea
-                    value={editedTranslations[`${currentSlide}-${index}`] || ''}
-                    onChange={(e) => {
-                      const newTranslations = { ...editedTranslations };
-                      newTranslations[`${currentSlide}-${index}`] = e.target.value;
-                      setEditedTranslations(newTranslations);
-                    }}
-                    className="min-h-[100px] text-sm"
-                    placeholder="翻訳文を入力"
-                  />
-                </Card>
-              </div>
-            ))}
           </div>
 
-          {/* 保存ボタン */}
-          <div className="flex justify-end gap-4">
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  保存中...
-                </>
-              ) : (
-                '保存'
-              )}
-            </Button>
+          {/* プレビュー画面と原文・翻訳文の表示エリアを分割 */}
+          <div className="flex flex-col gap-4">
+            {/* プレビュー画面（大きく表示） */}
+            <Card className="p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">スライド {currentSlide + 1} / {slides.length}</h2>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(scale - 0.25)}
+                      title="縮小"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={resetZoom}
+                      title="リセット"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(scale + 0.25)}
+                      title="拡大"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
+                    disabled={currentSlide === 0}
+                  >
+                    前へ
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
+                    disabled={currentSlide === slides.length - 1}
+                  >
+                    次へ
+                  </Button>
+                </div>
+              </div>
+              {/* プレビュー表示エリア */}
+              <div
+                ref={containerRef}
+                className="relative overflow-hidden bg-gray-100 rounded-lg border-2 border-orange-500"
+                style={{
+                  width: '100%',
+                  paddingTop: '56.25%',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                  }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                      transformOrigin: 'center',
+                      transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+                    }}
+                  >
+                    {slides[currentSlide]?.image_path && (
+                      <div className="relative" style={{ width: '100%', height: '100%' }}>
+                        <img
+                          ref={imageRef}
+                          src={`/api/slides/${encodeURIComponent(slides[currentSlide].image_path)}`}
+                          alt={`Slide ${currentSlide + 1}`}
+                          className="w-full h-full object-contain"
+                          style={{ userSelect: "none" }}
+                          onLoad={handleImageLoad}
+                          draggable={false}
+                        />
+                        {shouldUpdateOverlay && slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
+                          const textPosition = textObj.position;
+                          
+                          // オフセットを計算
+                          const offsetX = (containerSize.width - imageSize.width) / 2;
+                          const offsetY = (containerSize.height - imageSize.height) / 2;
+                          
+                          // PowerPointの標準サイズに対する比率を計算
+                          const baseScaleX = imageSize.width / 1920;
+                          const baseScaleY = imageSize.height / 1080;
+                          
+                          // オーバーレイの位置とサイズを計算
+                          const left = offsetX + (textPosition.x * baseScaleX)*2.65;
+                          const top = offsetY + (textPosition.y * baseScaleY)*2.65;
+                          const width = textPosition.width * baseScaleX*2.65;
+                          const height = textPosition.height * baseScaleY*2.65;
+                          
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                position: 'absolute',
+                                left: `${left}px`,
+                                top: `${top}px`,
+                                width: `${width}px`,
+                                height: `${height}px`,
+                                border: selectedTextIndex === index ? '3px solid orange' : '2px solid rgba(255, 165, 0, 0.7)',
+                                backgroundColor: selectedTextIndex === index ? 'rgba(255, 165, 0, 0.2)' : 'rgba(255, 165, 0, 0.1)',
+                                pointerEvents: 'none',
+                                zIndex: selectedTextIndex === index ? 20 : 10
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* 原文と翻訳文の表示エリア */}
+            <Card className="p-4">
+              <div className="overflow-y-auto" style={{ maxHeight: '400px' }}>
+                {slides[currentSlide]?.texts?.map((textObj: any, index: number) => (
+                  <Card 
+                    key={index}
+                    className={`p-4 mb-4 ${selectedTextIndex === index ? 'ring-2 ring-orange-500' : ''}`}
+                    onMouseEnter={() => setSelectedTextIndex(index)}
+                    onMouseLeave={() => setSelectedTextIndex(null)}
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-700 mb-2">原文</h3>
+                        <div className="p-3 bg-gray-50 rounded-md">
+                          {textObj.text}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-700 mb-2">翻訳文</h3>
+                        <Textarea
+                          value={editedTranslations[`${currentSlide}-${index}`] || slides[currentSlide]?.translations?.[index] || ''}
+                          onChange={(e) => handleTranslationChange(index, e.target.value)}
+                          placeholder="翻訳文を入力"
+                          className="w-full resize-none"
+                          rows={1}
+                          style={{
+                            height: 'auto',
+                            minHeight: '2.5rem',
+                            overflow: 'hidden'
+                          }}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Card>
           </div>
         </div>
       )}
