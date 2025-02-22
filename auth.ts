@@ -27,6 +27,10 @@ const config = {
     signIn: "/sign-in",
     error: "/sign-in",
   },
+  session: {
+    strategy: "jwt" as const,
+    maxAge: 30 * 24 * 60 * 60, // 30日
+  },
   callbacks: {
     async jwt({ token, user, account }: { token: JWT; user?: any; account?: any }) {
       if (account && user) {
@@ -34,9 +38,13 @@ const config = {
       }
       return token;
     },
-    async session({ session, user }: { session: any; user: any }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async session({ session, token }: { session: any; token: any }) {
+      if (session.user && token) {
+        session.user.id = token.userId;
+        // セッションの有効期限を確認
+        if (token.exp && Date.now() / 1000 > token.exp) {
+          throw new Error("Session expired");
+        }
       }
       return session;
     },

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { CircleIcon, Loader2 } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
-export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
+export function SignUp() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/translate';
@@ -25,46 +25,18 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
     setError('');
     setLoading(true);
 
-    // 入力値のバリデーション
-    if (!email.trim()) {
-      setError('メールアドレスを入力してください');
-      setLoading(false);
-      return;
-    }
-
-    if (!email.includes('@')) {
-      setError('有効なメールアドレスを入力してください');
-      setLoading(false);
-      return;
-    }
-
-    if (!password.trim()) {
-      setError('パスワードを入力してください');
-      setLoading(false);
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('パスワードは8文字以上で入力してください');
-      setLoading(false);
-      return;
-    }
-
     try {
-      if (mode === 'signup') {
-        // アカウント作成
-        const response = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, inviteId }),
-        });
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, inviteId }),
+      });
 
-        const data = await response.json();
-        if (!response.ok) {
-          setError(data.error || 'アカウントの作成に失敗しました');
-          setLoading(false);
-          return;
-        }
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || 'アカウントの作成に失敗しました');
+        setLoading(false);
+        return;
       }
 
       // サインイン処理
@@ -84,8 +56,8 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
         router.push(destination);
       }
     } catch (error) {
-      console.error('Sign in error:', error);
-      setError(error instanceof Error ? error.message : 'サインインに失敗しました');
+      console.error('Sign up error:', error);
+      setError(error instanceof Error ? error.message : 'アカウントの作成に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -98,7 +70,7 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           <CircleIcon className="h-12 w-12 text-orange-500" />
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-          {mode === 'signin' ? 'サインイン' : 'アカウント作成'}
+          アカウント作成
         </h2>
       </div>
 
@@ -106,8 +78,8 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
         <form 
           className="space-y-6" 
           onSubmit={handleSubmit}
-          data-testid={mode === 'signin' ? 'signin-form' : 'signup-form'}
-          data-cy={mode === 'signin' ? 'signin-form' : 'signup-form'}
+          data-testid="signup-form"
+          data-cy="signup-form"
         >
           <input type="hidden" name="redirect" value={redirect || ''} />
           <input type="hidden" name="priceId" value={priceId || ''} />
@@ -178,8 +150,6 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   処理中...
                 </>
-              ) : mode === 'signin' ? (
-                'サインイン'
               ) : (
                 'アカウント作成'
               )}
@@ -189,24 +159,15 @@ export function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
 
         <div className="mt-6">
           <div className="text-sm text-center">
-            {mode === 'signin' ? (
-              <p>
-                アカウントをお持ちでない方は{' '}
-                <Link href="/sign-up" className="font-medium text-orange-600 hover:text-orange-500">
-                  新規登録
-                </Link>
-              </p>
-            ) : (
-              <p>
-                すでにアカウントをお持ちの方は{' '}
-                <Link href="/sign-in" className="font-medium text-orange-600 hover:text-orange-500">
-                  ログイン
-                </Link>
-              </p>
-            )}
+            <p>
+              すでにアカウントをお持ちの方は{' '}
+              <Link href="/sign-in" className="font-medium text-orange-600 hover:text-orange-500">
+                ログイン
+              </Link>
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

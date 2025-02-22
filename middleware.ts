@@ -32,6 +32,14 @@ export async function middleware(request: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET,
     });
 
+    // トークンの有効期限を確認
+    if (token?.exp && Date.now() / 1000 > token.exp) {
+      // トークンが期限切れの場合、ログインページにリダイレクト
+      const signInUrl = new URL('/sign-in', request.url);
+      signInUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+
     // 認証済みユーザーがログインページにアクセスした場合
     if (token && (pathname === '/sign-in' || pathname === '/sign-up')) {
       return NextResponse.redirect(new URL('/translate', request.url));
@@ -47,7 +55,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('Middleware error:', error);
-    return NextResponse.next();
+    // エラーが発生した場合、ログインページにリダイレクト
+    const signInUrl = new URL('/sign-in', request.url);
+    signInUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(signInUrl);
   }
 }
 
