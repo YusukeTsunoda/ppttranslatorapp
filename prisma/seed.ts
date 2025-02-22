@@ -13,29 +13,11 @@ async function main() {
         email: 'test@example.com',
         name: 'Test User',
         passwordHash: await hash('password123', 10),
+        role: 'user', // デフォルトロールを設定
       },
     });
 
     console.log('Created test user:', testUser);
-
-    // テストチームの作成
-    const testTeam = await prisma.team.create({
-      data: {
-        name: 'Test Team',
-        members: {
-          create: {
-            user: {
-              connect: {
-                id: testUser.id,
-              },
-            },
-            role: 'OWNER',
-          },
-        },
-      },
-    });
-
-    console.log('Created test team:', testTeam);
 
   } catch (error) {
     console.error('Error seeding database:', error);

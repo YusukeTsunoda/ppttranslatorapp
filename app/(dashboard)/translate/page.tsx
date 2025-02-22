@@ -594,11 +594,11 @@ export default function TranslatePage() {
                           {slides[currentSlide]?.texts?.map((textObj: any, index: number) => {
                             const textPosition = textObj.position;
                             
-                            // 画像の実際のサイズに基づいて位置を計算
-                            const left = (textPosition.x / 1920) * 100;
-                            const top = (textPosition.y / 1080) * 100;
-                            const width = (textPosition.width / 1920) * 100;
-                            const height = (textPosition.height / 1080) * 100;
+                            // 位置とサイズを4倍に拡大
+                            const left = (textPosition.x / 720) * 100;    // 1920 → 480 (1/4に縮小)
+                            const top = (textPosition.y / 480) * 100;     // 1080 → 270 (1/4に縮小)
+                            const width = (textPosition.width  / 720) * 100;
+                            const height = (textPosition.height  / 480) * 100;
                             
                             return (
                               <div
