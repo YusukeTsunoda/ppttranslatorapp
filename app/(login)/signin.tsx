@@ -12,7 +12,7 @@ import { signIn } from 'next-auth/react';
 export default function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/translate';
+  const redirect = mode === 'signup' ? null : (searchParams.get('redirect') || '/translate');
   const priceId = searchParams.get('priceId');
   const inviteId = searchParams.get('inviteId');
   const [email, setEmail] = useState('');
@@ -31,15 +31,33 @@ export default function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup'
         const response = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, inviteId }),
+          body: JSON.stringify({ 
+            email, 
+            password, 
+            name 
+          }),
         });
 
-        const data = await response.json();
         if (!response.ok) {
-          setError(data.error || 'アカウントの作成に失敗しました');
-          setLoading(false);
-          return;
+          const data = await response.json();
+          throw new Error(data.error || 'アカウントの作成に失敗しました');
         }
+
+        // サインアップ成功後、自動的にサインイン
+        const signInResult = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
+
+        if (signInResult?.error) {
+          throw new Error('自動サインインに失敗しました');
+        }
+
+        // リダイレクト先の決定
+        const destination = redirect || '/translate';
+        router.push(destination);
+        return;
       }
 
       // サインイン処理
@@ -50,17 +68,16 @@ export default function SignIn({ mode = 'signin' }: { mode?: 'signin' | 'signup'
       });
 
       if (result?.error) {
-        setError('メールアドレスまたはパスワードが正しくありません');
-        console.error('Sign in error:', result.error);
-      } else {
-        // 認証成功時の処理
-        const destination = redirect || '/translate';
-        console.log('Redirecting to:', destination);
-        router.push(destination);
+        throw new Error('メールアドレスまたはパスワードが正しくありません');
       }
+
+      // 認証成功時の処理
+      const destination = redirect || '/translate';
+      router.push(destination);
+
     } catch (error) {
-      console.error('Sign up error:', error);
-      setError(error instanceof Error ? error.message : 'アカウントの作成に失敗しました');
+      console.error('認証エラー:', error);
+      setError(error instanceof Error ? error.message : 'エラーが発生しました');
     } finally {
       setLoading(false);
     }

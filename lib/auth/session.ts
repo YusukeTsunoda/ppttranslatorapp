@@ -33,3 +33,32 @@ export async function hashPassword(password: string): Promise<string> {
   // パスワードハッシュの実装例
   return password; // 実際は bcrypt などを使用してください
 }
+
+type SessionType = {
+  user: {
+    id: string;
+    // その他のプロパティ
+  };
+  // 他のセッション情報
+};
+
+export async function verifyToken(token: string): Promise<SessionType | null> {
+  // トークンの検証ロジックを実装
+  // 例:
+  if (tokenIsValid(token)) {
+    const session: SessionType = {
+      user: {
+        id: "example-user-id",
+        // 他のプロパティ
+      },
+      // 他のセッション情報
+    };
+    return session;
+  }
+  return null;
+}
+
+function tokenIsValid(token: string): boolean {
+  // トークンの検証ロジック（仮実装）
+  return token === "valid-token";
+}

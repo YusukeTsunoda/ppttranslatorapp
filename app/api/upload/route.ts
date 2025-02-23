@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
       const slidesWithFileId = slideData.slides.map((slide: any) => ({
         ...slide,
         fileId,
+        filePath: filePath,
         image_path: `${fileId}/slide_${slide.index + 1}.png`
       }));
 

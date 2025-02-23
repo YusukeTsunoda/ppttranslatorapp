@@ -2,7 +2,7 @@
 
 import { Metadata } from 'next';
 import { Suspense } from 'react';
-import { Login } from '../login';
+import Signin from '../signin';
 
 export const metadata: Metadata = {
   title: 'アカウント作成',
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export default function SignUpPage() {
   return (
     <Suspense>
-      <Login mode="signup" />
+      <Signin mode="signup" />
     </Suspense>
   );
 }

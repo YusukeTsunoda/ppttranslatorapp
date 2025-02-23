@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useUser } from '@/lib/auth';
-import { signOut } from '@/app/(login)/actions';
+import { signOut as nextAuthSignOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,6 +27,7 @@ import {
   Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -35,17 +36,19 @@ function Header() {
 
   const handleSignOut = useCallback(async () => {
     try {
-      const data = new FormData();
-      const options = new FormData();
-      options.append('redirect', 'false');
-      await signOut(data, options);
-      setUser(null);
-      console.log('Header: ログアウト成功');
-      router.push('/signin');
+      await nextAuthSignOut({
+        redirect: true,
+        callbackUrl: '/signin'
+      });
     } catch (error) {
-      console.error('Header: ログアウトエラー:', error);
+      console.error('ログアウトエラー:', error);
+      toast({
+        title: "エラー",
+        description: "ログアウトに失敗しました",
+        variant: "destructive",
+      });
     }
-  }, [setUser, router]);
+  }, []);
 
   useEffect(() => {
     if (!user) {

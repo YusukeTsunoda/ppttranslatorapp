@@ -11,6 +11,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Download } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import path from 'path';
+
+// ファイル先頭に型定義を追加
+interface CustomSession {
+    user: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+    };
+    expires: string;
+}
+
+type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
+
+function LoadingSpinner() {
+  return <div>Loading...</div>;
+}
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -33,7 +50,10 @@ export default function TranslatePage() {
   const [isTranslationComplete, setIsTranslationComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [shouldUpdateOverlay, setShouldUpdateOverlay] = useState(true);
-  const { data: session, status } = useSession();
+  const { data: session, status } = useSession() as {
+    data: CustomSession | null;
+    status: 'loading' | 'authenticated' | 'unauthenticated';
+  };
   const [isDownloading, setIsDownloading] = useState(false);
 
   // 利用可能なモデルのリスト
@@ -84,16 +104,36 @@ export default function TranslatePage() {
     };
   }, []); // 依存配列を空にして、マウント時のみ実行
 
+  // シンプルな認証チェック
   useEffect(() => {
     if (status === 'unauthenticated') {
+      router.push('/sign-in');
+      return;
+    }
+
+    if (status === 'loading') {
+      return; // ローディング中は何もしない
+    }
+
+    if (!session?.user?.id) {
       toast({
         title: "エラー",
-        description: "ログインが必要です",
+        description: "認証が必要です",
         variant: "destructive",
       });
       router.push('/sign-in');
+      return;
     }
-  }, [status, router, toast]);
+  }, [status, session, router, toast]);
+
+  // ローディング中の表示
+  if (status === 'loading') {
+    return <LoadingSpinner />;
+  }
+
+  if (!session?.user?.id) {
+    return null;
+  }
 
   // まずは handleTranslateSlide を定義
   const handleTranslateSlide = async (slides: any[], slideIndex: number) => {
@@ -428,78 +468,110 @@ export default function TranslatePage() {
   }, [currentSlide, slides]); // 必要な依存のみを保持
 
   const handleDownload = async () => {
+    // スライドの存在チェック
     if (!slides || slides.length === 0) {
-        toast({
-            title: "エラー",
-            description: "スライドが存在しません",
-            variant: "destructive",
-        });
-        return;
+      toast({
+        title: "エラー",
+        description: "スライドが存在しません",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // セッションステータスのチェック
+    if (status !== 'authenticated' || !session?.user?.id) {
+      console.error('セッションエラー:', {
+        status,
+        session,
+        userId: session?.user?.id
+      });
+      toast({
+        title: "エラー",
+        description: "セッションの再認証が必要です",
+        variant: "destructive",
+      });
+      router.push('/sign-in');
+      return;
     }
 
     try {
-        setIsDownloading(true);
+      setIsDownloading(true);
 
-        // デバッグ用にデータを出力
-        const requestData = {
-            originalFilePath: slides[0].filePath || `tmp/users/${session?.user?.id}/uploads/${slides[0].fileId}_original.pptx`,
-            slides: slides.map(slide => ({
-                index: slide.index,
-                texts: slide.texts.map((text: any, index: number) => ({
-                    text: text.text,
-                    translation: (
-                        editedTranslations[`${slide.index}-${index}`] || 
-                        slide.translations?.[index]?.text || 
-                        text.text
-                    ).trim()
-                }))
-            }))
-        };
+      // ファイルパスの構築
+      const originalFilePath = `tmp/users/${session.user.id}/uploads/${slides[0].fileId}_original.pptx`;
 
-        console.log("送信するスライドデータ:", requestData);
-        console.log("翻訳データの確認:", slides.map(slide => slide.translations));
+      // リクエストデータの構築
+      const requestData = {
+        originalFilePath,
+        slides: slides.map(slide => ({
+          index: slide.index,
+          texts: slide.texts.map((text: any, index: number) => ({
+            text: text.text,
+            translation: (
+              editedTranslations[`${slide.index}-${index}`] || 
+              slide.translations?.[index]?.text || 
+              text.text
+            ).trim()
+          }))
+        }))
+      };
 
-        const response = await fetch('/api/download', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify(requestData)
-        });
+      console.log("送信するリクエストデータ:", {
+        requestData,
+        sessionId: session.user.id
+      });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'ダウンロードに失敗しました');
-        }
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestData)
+      });
 
-        const data = await response.json();
-        if (!data.success || !data.filePath) {
-            throw new Error('ファイルの生成に失敗しました');
-        }
+      // レスポンスの詳細なデバッグ情報
+      console.log("ダウンロードAPIレスポンス:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
-        // ダウンロードリンクを作成
-        const downloadUrl = `/${data.filePath}`;
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = 'translated_presentation.pptx';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("ダウンロードAPIエラー:", errorData);
+        throw new Error(errorData.error || errorData.message || 'ダウンロードに失敗しました');
+      }
 
-        toast({
-            title: "成功",
-            description: "翻訳済みPPTXのダウンロードを開始しました",
-        });
+      const data = await response.json();
+      console.log("ダウンロード成功:", data);
+
+      if (!data.success || !data.filePath) {
+        throw new Error('ファイルの生成に失敗しました');
+      }
+
+      // ダウンロードリンクの作成と実行
+      const downloadUrl = `/${data.filePath}`;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'translated_presentation.pptx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "成功",
+        description: "翻訳済みPPTXのダウンロードを開始しました",
+      });
     } catch (error) {
-        console.error('Download error:', error);
-        toast({
-            title: "エラー",
-            description: error instanceof Error ? error.message : "ダウンロードに失敗しました",
-            variant: "destructive",
-        });
+      console.error('ダウンロードエラー:', error);
+      toast({
+        title: "エラー",
+        description: error instanceof Error ? error.message : "ダウンロードに失敗しました",
+        variant: "destructive",
+      });
     } finally {
-        setIsDownloading(false);
+      setIsDownloading(false);
     }
   };
 
@@ -574,24 +646,6 @@ export default function TranslatePage() {
     }
   }, [currentSlide, slides, editedTranslations]);
 
-  // ローディング中の表示
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-200 rounded"></div>
-          <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // 未認証の場合は何も表示しない（useEffectでリダイレクト）
-  if (status === 'unauthenticated') {
-    return null;
-  }
-
   return (
     <div className="container mx-auto p-4 space-y-4">
       {!slides.length ? (
@@ -603,7 +657,13 @@ export default function TranslatePage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">翻訳元言語</label>
-                <Select value={sourceLang} onValueChange={setSourceLang}>
+                <Select value={sourceLang} onValueChange={(value) => {
+                  setSourceLang(value);
+                  // 翻訳元言語が変更された時、翻訳先言語が同じ場合は別の言語を自動選択
+                  if (value === targetLang) {
+                    setTargetLang(value === 'en' ? 'ja' : 'en');
+                  }
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="翻訳元言語" />
                   </SelectTrigger>
@@ -618,16 +678,20 @@ export default function TranslatePage() {
                 <Select 
                   value={targetLang} 
                   onValueChange={setTargetLang}
-                  disabled={sourceLang === targetLang} // 同じ言語への翻訳を防止
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="翻訳先言語" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en" disabled={sourceLang === "en"}>英語</SelectItem>
-                    <SelectItem value="ja" disabled={sourceLang === "ja"}>日本語</SelectItem>
+                    {/* 翻訳元言語と異なる言語のみを表示 */}
+                    {sourceLang !== 'en' && <SelectItem value="en">英語</SelectItem>}
+                    {sourceLang !== 'ja' && <SelectItem value="ja">日本語</SelectItem>}
                   </SelectContent>
                 </Select>
+                {/* デバッグ用の情報表示 */}
+                <p className="mt-1 text-sm text-gray-500">
+                  現在の設定: {sourceLang} → {targetLang}
+                </p>
               </div>
             </div>
           </Card>
@@ -691,7 +755,13 @@ export default function TranslatePage() {
               <h2 className="text-lg font-semibold mb-2">翻訳設定</h2>
               <div className="flex justify-between items-center">
                 <div className="flex gap-4">
-                  <Select value={sourceLang} onValueChange={setSourceLang}>
+                  <Select value={sourceLang} onValueChange={(value) => {
+                    setSourceLang(value);
+                    // 翻訳元言語が変更された時、翻訳先言語が同じ場合は別の言語を自動選択
+                    if (value === targetLang) {
+                      setTargetLang(value === 'en' ? 'ja' : 'en');
+                    }
+                  }}>
                     <SelectTrigger>
                       <SelectValue placeholder="翻訳元言語" />
                     </SelectTrigger>
@@ -703,14 +773,14 @@ export default function TranslatePage() {
                   <Select 
                     value={targetLang} 
                     onValueChange={setTargetLang}
-                    disabled={sourceLang === targetLang} // 同じ言語への翻訳を防止
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="翻訳先言語" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="en" disabled={sourceLang === "en"}>英語</SelectItem>
-                      <SelectItem value="ja" disabled={sourceLang === "ja"}>日本語</SelectItem>
+                      {/* 翻訳元言語と異なる言語のみを表示 */}
+                      {sourceLang !== 'en' && <SelectItem value="en">英語</SelectItem>}
+                      {sourceLang !== 'ja' && <SelectItem value="ja">日本語</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
