@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import { authOptions } from "@/lib/auth/auth-options";
 import type { DefaultSession } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
@@ -24,8 +25,8 @@ const config = {
     }),
   ],
   pages: {
-    signIn: "/sign-in",
-    error: "/sign-in",
+    signIn: '/signin',
+    error: '/error'
   },
   session: {
     strategy: "jwt" as const,
@@ -52,4 +53,4 @@ const config = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export default NextAuth(config); 
+export default NextAuth(authOptions); 

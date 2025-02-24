@@ -1,6 +1,22 @@
 /// <reference types="cypress" />
 /// <reference types="cypress-file-upload" />
 
+// ***********************************************
+// This example commands.ts shows you how to
+// create various custom commands and overwrite
+// existing commands.
+//
+// For more comprehensive examples of custom
+// commands please read more here:
+// https://on.cypress.io/custom-commands
+// ***********************************************
+
+Cypress.Commands.add('clearLocalStorage', () => {
+  cy.window().then((win) => {
+    win.localStorage.clear();
+  });
+});
+
 declare global {
   namespace Cypress {
     interface Chainable {
@@ -8,6 +24,7 @@ declare global {
       attachFile(filePath: string): Chainable<void>;
       createTeam(name: string): Chainable<void>;
       inviteMember(email: string): Chainable<void>;
+      clearLocalStorage(): Chainable<void>;
     }
   }
 }

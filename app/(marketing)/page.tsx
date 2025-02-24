@@ -137,7 +137,7 @@ export default function HomePage() {
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full bg-orange-600 hover:bg-orange-700">
-                <Link href="/signup">
+                <Link href="/signin">
                   無料で始める
                 </Link>
               </Button>

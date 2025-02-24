@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import prisma from '@/lib/prisma';
+import { authOptions } from '@/lib/auth/auth-options';
+import { prisma } from '@/lib/db/prisma';
+import { PrismaTranslation } from '@/types/prisma';
 
 export async function POST(request: Request) {
   try {
-    // Prisma接続確認を追加
+    // データベース接続確認
     try {
       await prisma.$connect();
       console.log('Database connection successful');
@@ -15,54 +16,62 @@ export async function POST(request: Request) {
     }
 
     const session = await getServerSession(authOptions);
-    console.log('Session data:', session);
+    const userEmail = session?.user?.email;
 
-    if (!session?.user?.email) {
+    if (!userEmail) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
-    // ユーザー検索前にクエリをログ出力
-    console.log('Searching for user with email:', session.user.email);
-    
-    // ユーザー検索のクエリを詳細に
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        email: true,
-        role: true
-      }
-    });
-    console.log('User search result:', user);
-
-    if (!user) {
-      return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
-    }
-
-    // ここでリクエストボディをパースしてbody変数を定義
-    const body = await request.json();
-
+    // トランザクションを使用して保存処理を実行
     try {
-      // 保存処理の前にデータ構造を確認
-      const saveData = {
-        slides: body.slides,
-        translations: body.translations,
-        currentSlide: body.currentSlide,
-        userId: user.id
-      };
-      console.log('Attempting to save with data:', saveData);
+      const body = await request.json();
+      const { slides, translations, currentSlide } = body;
 
-      const savedTranslation = await prisma.translation.create({
-        data: saveData
+      const result = await prisma.$transaction(async (tx) => {
+        // ユーザーの存在確認
+        const user = await tx.user.findUnique({
+          where: { email: userEmail },
+          select: { id: true }
+        });
+
+        if (!user) {
+          throw new Error('ユーザーが見つかりません');
+        }
+
+        // 翻訳データの保存
+        const translation = await tx.translation.create({
+          data: {
+            slides,
+            translations,
+            currentSlide,
+            userId: user.id
+          }
+        });
+
+        // アクティビティログの記録
+        await tx.activityLog.create({
+          data: {
+            userId: user.id,
+            action: 'translation',
+            ipAddress: 'unknown',
+            metadata: {
+              translationId: translation.id,
+              timestamp: new Date().toISOString()
+            }
+          }
+        });
+
+        return translation;
       });
-      console.log('Save successful:', savedTranslation);
 
-      return NextResponse.json({ success: true, data: savedTranslation });
-    } catch (saveError) {
-      console.error('Save operation failed:', saveError);
-      throw saveError;
+      return NextResponse.json({ 
+        success: true, 
+        data: result 
+      });
+    } catch (txError) {
+      console.error('Transaction error:', txError);
+      throw txError;
     }
-
   } catch (error) {
     console.error('Save translation error:', error);
     return NextResponse.json(
@@ -72,5 +81,7 @@ export async function POST(request: Request) {
       },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 } 

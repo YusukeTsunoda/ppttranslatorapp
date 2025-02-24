@@ -11,8 +11,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useUser } from '@/lib/auth';
-import { signOut as nextAuthSignOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import {
@@ -28,17 +27,23 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, setUser } = useUser();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   const handleSignOut = useCallback(async () => {
     try {
-      await nextAuthSignOut({
+      await signOut({
         redirect: true,
         callbackUrl: '/signin'
+      });
+      toast({
+        title: "ログアウト成功",
+        description: "ログアウトしました",
       });
     } catch (error) {
       console.error('ログアウトエラー:', error);
@@ -51,20 +56,34 @@ function Header() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      console.log('Header: ユーザーが見つかりません - ログインページへリダイレクト');
+    if (status === 'unauthenticated') {
+      console.log('Header: 未認証状態 - ログインページへリダイレクト');
+      toast({
+        title: "セッションエラー",
+        description: "再度ログインしてください",
+        variant: "destructive",
+      });
       router.push('/signin');
       return;
     }
-  }, [user, router]);
 
-  if (!user) {
-    console.log('Header: ローディング表示を返します');
+    if (status === 'loading') {
+      console.log('Header: セッション読み込み中');
+      return;
+    }
+
+    if (!session?.user) {
+      console.log('Header: ユーザー情報なし - ログインページへリダイレクト');
+      router.push('/signin');
+      return;
+    }
+  }, [status, session, router]);
+
+  if (status === 'loading' || !session?.user) {
     return (
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <div className="animate-pulse h-8 w-32 bg-gray-200 rounded"></div>
-          <div className="animate-pulse h-8 w-8 bg-gray-200 rounded-full"></div>
+          <LoadingSpinner text="読み込み中..." />
         </div>
       </header>
     );
@@ -90,9 +109,9 @@ function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage alt={user.name || ''} />
+                  <AvatarImage alt={session.user.name || ''} />
                   <AvatarFallback>
-                    {user.email?.[0]?.toUpperCase() || 'U'}
+                    {session.user.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -191,31 +210,45 @@ function Sidebar() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { status } = useSession();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isInitialized) {
-      console.log('DashboardLayout: 初期化');
-      setIsInitialized(true);
+    if (status === 'unauthenticated') {
+      setError('セッションが無効です。再度ログインしてください。');
+    } else {
+      setError(null);
     }
-    return () => {
-      console.log('DashboardLayout: クリーンアップ');
-      setIsInitialized(false);
-    };
-  }, []);
+  }, [status]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" text="セッション確認中..." />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8 h-full">
-          <aside className="bg-white shadow-sm rounded-lg h-full">
-            <Sidebar />
-          </aside>
-          <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
-            {children}
-          </main>
-        </div>
+        {error ? (
+          <ErrorMessage 
+            message={error}
+            variant="destructive"
+            className="mb-4"
+          />
+        ) : (
+          <div className="flex gap-8 h-full">
+            <aside className="bg-white shadow-sm rounded-lg h-full">
+              <Sidebar />
+            </aside>
+            <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
+              {children}
+            </main>
+          </div>
+        )}
       </div>
     </div>
   );

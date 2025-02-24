@@ -1,36 +1,16 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 declare global {
   var prisma: PrismaClient | undefined;
 }
 
-if (!process.env.DATABASE_URL) {
-  console.error('Warning: DATABASE_URL environment variable is not set');
-  // デフォルトの接続文字列を設定するか、エラーハンドリングを追加
-}
-
-const prismaClientSingleton = () => {
-  return new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL
-      }
-    }
-  });
-};
-
-const prisma = global.prisma ?? prismaClientSingleton();
-
-// クエリログのイベントリスナーを設定
-(prisma.$on as any)('query', (e: Prisma.QueryEvent) => {
-  console.log('Query:', e.query);
-  console.log('Params:', e.params);
-  console.log('Duration:', e.duration + 'ms');
+const prisma = global.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;
 }
 
-export default prisma;
+export { prisma };
 export * from '@prisma/client'; 

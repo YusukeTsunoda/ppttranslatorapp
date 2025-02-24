@@ -1,77 +1,49 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { withAuth } from 'next-auth/middleware';
+import type { NextRequestWithAuth } from 'next-auth/middleware';
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default withAuth(
+  function middleware(request: NextRequestWithAuth) {
+    const token = request.nextauth.token;
 
-  // 認証が不要なパスのリスト
-  const publicPaths = [
-    '/sign-in',
-    '/sign-up',
-    '/api/auth',
-    '/api/health',
-    '/_next',
-    '/favicon.ico',
-  ];
-
-  // 認証が不要なパスかチェック
-  const isPublicPath = publicPaths.some(path => 
-    pathname.startsWith(path) || pathname === '/'
-  );
-
-  // APIルートの場合は処理をスキップ
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth')) {
-    return NextResponse.next();
-  }
-
-  try {
-    // JWTトークンを取得
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-
-    // トークンの有効期限を確認
-    if (token?.exp && Date.now() / 1000 > Number(token.exp)) {
-      // トークンが期限切れの場合、ログインページにリダイレクト
-      const signInUrl = new URL('/sign-in', request.url);
-      signInUrl.searchParams.set('redirect', pathname);
+    // セッションエラーがある場合はサインインページにリダイレクト
+    if (token?.error) {
+      const signInUrl = new URL('/signin', request.url);
+      signInUrl.searchParams.set('error', token.error as string);
+      signInUrl.searchParams.set('callbackUrl', request.url);
       return NextResponse.redirect(signInUrl);
     }
 
-    // 認証済みユーザーがログインページにアクセスした場合
-    if (token && (pathname === '/sign-in' || pathname === '/sign-up')) {
-      return NextResponse.redirect(new URL('/translate', request.url));
-    }
-
-    // 未認証ユーザーが保護されたページにアクセスした場合
-    if (!token && !isPublicPath) {
-      const signInUrl = new URL('/sign-in', request.url);
-      signInUrl.searchParams.set('redirect', pathname);
+    // セッション有効期限切れの場合はサインインページにリダイレクト
+    if (token?.sessionExpires && new Date(token.sessionExpires as string | number | Date) < new Date()) {
+      const signInUrl = new URL('/signin', request.url);
+      signInUrl.searchParams.set('error', 'SessionExpiredError');
+      signInUrl.searchParams.set('callbackUrl', request.url);
       return NextResponse.redirect(signInUrl);
     }
 
     return NextResponse.next();
-  } catch (error) {
-    console.error('Middleware error:', error);
-    // エラーが発生した場合、ログインページにリダイレクト
-    const signInUrl = new URL('/sign-in', request.url);
-    signInUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(signInUrl);
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token
+    },
+    pages: {
+      signIn: '/signin'
+    }
   }
-}
+);
 
-// ミドルウェアを適用するパスを設定
+// 保護するパスを指定
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * 1. /api/health/* (health check endpoints)
-     * 2. /_next/static (static files)
-     * 3. /_next/image (image optimization files)
-     * 4. /favicon.ico (favicon file)
-     */
-    '/((?!api/health|_next/static|_next/image|favicon.ico).*)',
-  ],
+    '/translate/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/history/:path*',
+    '/activity/:path*',
+    '/integrations/:path*',
+    '/dashboard/:path*',
+    '/api/protected/:path*'
+  ]
 };

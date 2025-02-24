@@ -26,7 +26,11 @@ interface CustomSession {
 type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
 
 function LoadingSpinner() {
-  return <div>Loading...</div>;
+  return (
+    <div className="flex justify-center items-center h-full">
+      <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+    </div>
+  );
 }
 
 export default function TranslatePage() {
@@ -50,10 +54,7 @@ export default function TranslatePage() {
   const [isTranslationComplete, setIsTranslationComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [shouldUpdateOverlay, setShouldUpdateOverlay] = useState(true);
-  const { data: session, status } = useSession() as {
-    data: CustomSession | null;
-    status: 'loading' | 'authenticated' | 'unauthenticated';
-  };
+  const { data: session, status } = useSession();
   const [isDownloading, setIsDownloading] = useState(false);
 
   // 利用可能なモデルのリスト
@@ -104,24 +105,24 @@ export default function TranslatePage() {
     };
   }, []); // 依存配列を空にして、マウント時のみ実行
 
-  // シンプルな認証チェック
+  // セッション状態の監視
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/sign-in');
+      router.push('/signin');
       return;
     }
 
     if (status === 'loading') {
-      return; // ローディング中は何もしない
+      return;
     }
 
-    if (!session?.user?.id) {
+    if (!session?.user) {
       toast({
         title: "エラー",
         description: "認証が必要です",
         variant: "destructive",
       });
-      router.push('/sign-in');
+      router.push('/signin');
       return;
     }
   }, [status, session, router, toast]);
@@ -131,7 +132,8 @@ export default function TranslatePage() {
     return <LoadingSpinner />;
   }
 
-  if (!session?.user?.id) {
+  // 未認証の場合は何も表示しない
+  if (!session?.user) {
     return null;
   }
 
@@ -252,7 +254,7 @@ export default function TranslatePage() {
           description: "セッションが切れました。再度ログインしてください。",
           variant: "destructive",
         });
-        router.push(`/sign-in?redirect=${encodeURIComponent(window.location.pathname)}`);
+        router.push(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
 
@@ -490,7 +492,7 @@ export default function TranslatePage() {
         description: "セッションの再認証が必要です",
         variant: "destructive",
       });
-      router.push('/sign-in');
+      router.push('/signin');
       return;
     }
 

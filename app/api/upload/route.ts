@@ -6,23 +6,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import { exec } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
-import { generateFileId, createUserDirectories, cleanupOldFiles } from '@/lib/utils/file-utils';
+import { 
+  generateFileId, 
+  createUserDirectories, 
+  cleanupOldFiles,
+  createFilePath,
+  getAbsolutePath,
+  ensureFilePath,
+  logFileOperation
+} from '@/lib/utils/file-utils';
 
 const execAsync = promisify(exec);
 
+// ファイルサイズ制限
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+// 許可するファイルタイプ
+const ALLOWED_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+];
+
 export async function POST(request: NextRequest) {
+  let fileId: string | null = null;
+  let userId: string | null = null;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    const userId = session.user.id;
-    const fileId = generateFileId();
+    userId = session.user.id;
+    fileId = generateFileId();
 
     try {
       await cleanupOldFiles(userId);
@@ -38,7 +57,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ファイルが必要です" }, { status: 400 });
     }
 
-    if (!file.name.endsWith(".pptx")) {
+    // ファイルサイズの検証
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "ファイルサイズは20MB以下にしてください" },
+        { status: 400 }
+      );
+    }
+
+    // ファイルタイプの検証
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "PPTXファイルのみ対応しています" },
         { status: 400 }
@@ -54,6 +82,7 @@ export async function POST(request: NextRequest) {
       slidesDir = dirs.slidesDir;
     } catch (error) {
       console.error("Error creating directories:", error);
+      await logFileOperation(userId, 'create', fileId, false, 'ディレクトリの作成に失敗しました');
       return NextResponse.json(
         { error: "ディレクトリの作成に失敗しました" },
         { status: 500 }
@@ -67,8 +96,10 @@ export async function POST(request: NextRequest) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       await writeFile(filePath, buffer);
+      await logFileOperation(userId, 'create', fileId, true);
     } catch (error) {
       console.error("Error saving file:", error);
+      await logFileOperation(userId, 'create', fileId, false, 'ファイルの保存に失敗しました');
       return NextResponse.json(
         { error: "ファイルの保存に失敗しました" },
         { status: 500 }
@@ -95,6 +126,7 @@ export async function POST(request: NextRequest) {
 
       if (slideData.error) {
         console.error("Python script error:", slideData.error);
+        await logFileOperation(userId, 'access', fileId, false, slideData.error);
         return NextResponse.json(
           { error: slideData.error },
           { status: 500 }
@@ -102,6 +134,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!slideData.slides || !Array.isArray(slideData.slides)) {
+        await logFileOperation(userId, 'access', fileId, false, 'スライドデータの形式が不正です');
         return NextResponse.json(
           { error: "スライドデータの形式が不正です" },
           { status: 500 }
@@ -123,6 +156,7 @@ export async function POST(request: NextRequest) {
         fullPath: join(slidesDir, `slide_${slideData.slides[0].index + 1}.png`)
       });
 
+      await logFileOperation(userId, 'access', fileId, true);
       return NextResponse.json({
         success: true,
         filePath: filePath,
@@ -130,6 +164,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       console.error("Error processing file:", error);
+      await logFileOperation(userId, 'access', fileId, false, 'ファイルの処理に失敗しました');
       return NextResponse.json(
         { error: "ファイルの処理に失敗しました" },
         { status: 500 }
@@ -137,6 +172,9 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("Upload error:", error);
+    if (userId && fileId) {
+      await logFileOperation(userId, 'create', fileId, false, 'ファイルのアップロードに失敗しました');
+    }
     return NextResponse.json(
       { error: "ファイルのアップロードに失敗しました" },
       { status: 500 }

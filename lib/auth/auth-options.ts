@@ -1,62 +1,72 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { AuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@/lib/db/prisma";
-import { comparePasswords } from "@/lib/auth/password";
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { type NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { prisma } from '@/lib/db/prisma';
+import { comparePasswords } from '@/lib/auth/password';
+import { User } from '@prisma/client';
 
-export const authOptions = {
+/**
+ * セッション有効期限の設定
+ */
+const SESSION_MAXAGE = 15 * 60; // 15分
+const SESSION_UPDATE_AGE = 5 * 60; // 5分
+
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: 'credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        email: { label: "メールアドレス", type: "email" },
+        password: { label: "パスワード", type: "password" }
       },
-      async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            throw new Error("メールアドレスとパスワードが必要です");
-          }
-
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email }
-          });
-
-          if (!user) {
-            throw new Error("このメールアドレスのユーザーが見つかりません");
-          }
-
-          if (!user.passwordHash) {
-            throw new Error("パスワードが設定されていません");
-          }
-
-          const isValid = await comparePasswords(credentials.password, user.passwordHash);
-          if (!isValid) {
-            throw new Error("パスワードが正しくありません");
-          }
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-          };
-        } catch (error) {
-          console.error('Authorization error:', error);
-          throw error;
+      async authorize(credentials): Promise<any> {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('メールアドレスとパスワードは必須です');
         }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email }
+        });
+
+        if (!user || !user.passwordHash) {
+          throw new Error('メールアドレスまたはパスワードが正しくありません');
+        }
+
+        const isValid = await comparePasswords(credentials.password, user.passwordHash);
+        if (!isValid) {
+          throw new Error('メールアドレスまたはパスワードが正しくありません');
+        }
+
+        // ログイン成功時の処理
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLogin: new Date(),
+            sessionExpires: new Date(Date.now() + SESSION_MAXAGE * 1000)
+          }
+        });
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          lastLogin: user.lastLogin,
+          sessionExpires: user.sessionExpires
+        };
       }
     })
   ],
-  pages: {
-    signIn: "/sign-in",
-    error: "/sign-in",
-    newUser: "/translate",
-  },
   session: {
-    strategy: "jwt" as const,
-    maxAge: 30 * 24 * 60 * 60, // 30日
-    updateAge: 24 * 60 * 60, // 24時間ごとに更新
+    strategy: 'jwt',
+    maxAge: SESSION_MAXAGE,
+    updateAge: SESSION_UPDATE_AGE,
+  },
+  pages: {
+    signIn: '/signin',
+    error: '/error',
+    newUser: '/signup'
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -64,52 +74,24 @@ export const authOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.role = user.role;
+        token.lastLogin = user.lastLogin;
+        token.sessionExpires = user.sessionExpires;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (token) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
+        (session.user as any).role = token.role as string;
+        (session.user as any).lastLogin = token.lastLogin as Date | null;
+        (session.user as any).sessionExpires = token.sessionExpires as Date | null;
       }
       return session;
-    },
-    async redirect({ url, baseUrl }) {
-      console.log('Redirect callback:', { url, baseUrl });
-      
-      // 内部URLの場合
-      if (url.startsWith(baseUrl)) {
-        // ログインページからの遷移の場合は/translateへ
-        if (url.includes('/sign-in') || url.includes('/sign-up')) {
-          return `${baseUrl}/translate`;
-        }
-        return url;
-      }
-      
-      // 外部URLの場合
-      if (url.startsWith('http')) {
-        return baseUrl;
-      }
-      
-      // 相対パスの場合
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      
-      return baseUrl;
     }
   },
-  debug: process.env.NODE_ENV === 'development',
-  logger: {
-    error(code, metadata) {
-      console.error('NextAuth error:', code, metadata);
-    },
-    warn(code) {
-      console.warn('NextAuth warning:', code);
-    },
-    debug(code, metadata) {
-      console.log('NextAuth debug:', code, metadata);
-    },
-  },
-} satisfies AuthOptions; 
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development'
+}; 

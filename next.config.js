@@ -14,6 +14,40 @@ const nextConfig = {
     }
     return config;
   },
+  async redirects() {
+    return [
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
+        source: '/login',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/register',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/auth/signin',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
+        source: '/auth/signup',
+        destination: '/signup',
+        permanent: true,
+      }
+    ]
+  }
 };
 
 module.exports = nextConfig;

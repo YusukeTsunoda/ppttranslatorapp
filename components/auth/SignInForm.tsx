@@ -100,7 +100,7 @@ export default function SignInForm() {
 
       <p className="text-sm text-center text-gray-600">
         アカウントをお持ちでない方は{' '}
-        <Link href="/sign-up" className="text-orange-600 hover:text-orange-500">
+        <Link href="/signup" className="text-orange-600 hover:text-orange-500">
           新規登録
         </Link>
       </p>

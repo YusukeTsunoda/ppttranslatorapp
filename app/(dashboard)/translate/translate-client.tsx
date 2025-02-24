@@ -24,7 +24,7 @@ export function TranslateClient(): ReactNode {
         description: "ログインが必要です",
         variant: "destructive",
       });
-      router.push('/sign-in');
+      router.push('/signin');
     }
   }, [status, router, toast]);
 

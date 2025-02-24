@@ -3,8 +3,9 @@ import { PythonShell } from 'python-shell';
 import path from 'path';
 import fs from 'fs/promises';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import { v4 as uuidv4 } from 'uuid';
+import { createFilePath, getAbsolutePath, ensureFilePath, logFileOperation } from '@/lib/utils/file-utils';
 
 // セッション型の定義
 interface CustomSession {
@@ -14,6 +15,35 @@ interface CustomSession {
         email?: string | null;
     };
     expires: string;
+}
+
+// リトライ設定
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1秒
+
+async function wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function verifyAndGetFile(filePath: string, userId: string, fileId: string): Promise<Buffer> {
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+        try {
+            await fs.access(filePath);
+            await logFileOperation(userId, 'access', fileId, true);
+            return await fs.readFile(filePath);
+        } catch (error) {
+            retries++;
+            if (retries === MAX_RETRIES) {
+                if (error instanceof Error) {
+                    await logFileOperation(userId, 'access', fileId, false, error.message);
+                }
+                throw error;
+            }
+            await wait(RETRY_DELAY * retries);
+        }
+    }
+    throw new Error('Maximum retries exceeded');
 }
 
 export async function POST(req: NextRequest) {
@@ -65,48 +95,14 @@ export async function POST(req: NextRequest) {
         }
 
         // ファイルパスの正規化と検証
-        const normalizedPath = originalFilePath.replace(/^tmp\/users\/[^/]+/, `tmp/users/${session.user.id}`);
-        const fullOriginalPath = path.isAbsolute(normalizedPath)
-            ? normalizedPath
-            : path.join(process.cwd(), normalizedPath);
-
-        // ファイルパスのデバッグ情報
-        console.log("ファイルパス情報:", {
-            originalPath: originalFilePath,
-            normalizedPath,
-            fullPath: fullOriginalPath,
-            userId: session.user.id,
-            timestamp: new Date().toISOString()
-        });
-
-        // ファイルの存在確認
-        let fileExists = false;
-        try {
-            await fs.access(fullOriginalPath);
-            fileExists = true;
-            console.log("ファイルが存在します:", fullOriginalPath);
-        } catch (error) {
-            console.error("ファイルアクセスエラー:", {
-                error,
-                path: fullOriginalPath,
-                exists: fileExists,
-                userId: session.user.id,
-                timestamp: new Date().toISOString()
-            });
-            return NextResponse.json({
-                error: 'File not found',
-                details: 'ファイルが見つかりません',
-                path: fullOriginalPath,
-                timestamp: new Date().toISOString()
-            }, { status: 404 });
-        }
+        const fileId = path.basename(originalFilePath).split('_')[0];
+        const outputFileName = `translated_${fileId}.pptx`;
+        const userDir = path.join('public', 'uploads', session.user.id);
+        const outputFilePath = path.join(userDir, outputFileName);
+        const fullOutputPath = getAbsolutePath(outputFilePath);
 
         // 出力ディレクトリの準備
-        const userDir = path.join(process.cwd(), 'public', 'uploads', session.user.id);
-        await fs.mkdir(userDir, { recursive: true });
-
-        const outputFileName = `translated_${uuidv4()}.pptx`;
-        const outputFilePath = path.join(userDir, outputFileName);
+        await ensureFilePath(userDir);
 
         // Pythonスクリプトの実行
         const pythonScriptPath = path.join(process.cwd(), 'lib', 'python', 'pptx_translator.py');
@@ -116,8 +112,8 @@ export async function POST(req: NextRequest) {
             pythonOptions: ['-u'],
             scriptPath: path.dirname(pythonScriptPath),
             args: [
-                fullOriginalPath,
-                outputFilePath,
+                getAbsolutePath(originalFilePath),
+                fullOutputPath,
                 JSON.stringify(slides)
             ]
         };
@@ -126,17 +122,20 @@ export async function POST(req: NextRequest) {
         const results = await PythonShell.run(path.basename(pythonScriptPath), options);
         const result = results ? results[results.length - 1] : null;
 
-        // 生成されたファイルの確認
+        // 生成されたファイルの確認とリトライ処理
         try {
-            await fs.access(outputFilePath);
-            console.log("出力ファイルが正常に生成されました:", outputFilePath);
+            await verifyAndGetFile(fullOutputPath, session.user.id, fileId);
+            console.log("出力ファイルが正常に生成されました:", fullOutputPath);
         } catch (error) {
             console.error("出力ファイル生成エラー:", {
                 error,
-                outputPath: outputFilePath,
+                outputPath: fullOutputPath,
                 userId: session.user.id,
                 timestamp: new Date().toISOString()
             });
+            if (error instanceof Error) {
+                await logFileOperation(session.user.id, 'create', fileId, false, error.message);
+            }
             throw new Error('ファイルの生成に失敗しました');
         }
 
@@ -145,7 +144,7 @@ export async function POST(req: NextRequest) {
         
         console.log("ダウンロード処理成功:", {
             relativePath,
-            outputFilePath,
+            outputFilePath: fullOutputPath,
             userId: session.user.id,
             timestamp: new Date().toISOString()
         });
@@ -170,4 +169,4 @@ export async function POST(req: NextRequest) {
             timestamp: new Date().toISOString()
         }, { status: 500 });
     }
-} 
+}
