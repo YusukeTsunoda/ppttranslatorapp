@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { signJwtAccessToken } from '@/lib/auth/jwt';
 
+// Node.jsランタイムを明示的に指定
+export const runtime = 'nodejs';
+
 const requestSchema = z.object({
   token: z.string(),
 });
@@ -25,6 +28,14 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid or expired token' },
+        { status: 400 }
+      );
+    }
+
+    // メールアドレスがnullの場合はエラーを返す
+    if (!user.email) {
+      return NextResponse.json(
+        { error: 'User email is missing' },
         { status: 400 }
       );
     }
