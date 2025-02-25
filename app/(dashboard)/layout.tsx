@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleIcon, Home, LogOut } from 'lucide-react';
 import {
@@ -11,85 +11,245 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useUser } from '@/lib/auth';
-import { signOut } from '@/app/(login)/actions';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  History,
+  Settings,
+  Link as LinkIcon,
+  Bell,
+  User,
+  ChevronLeft,
+  ChevronRight,
+  Activity
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { userPromise } = useUser();
-  const user = use(userPromise);
+  const { data: session, status } = useSession();
   const router = useRouter();
 
-  async function handleSignOut() {
-    await signOut();
-    router.refresh();
-    router.push('/');
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut({
+        redirect: true,
+        callbackUrl: '/signin'
+      });
+      toast({
+        title: "ログアウト成功",
+        description: "ログアウトしました",
+      });
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      toast({
+        title: "エラー",
+        description: "ログアウトに失敗しました",
+        variant: "destructive",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      console.log('Header: 未認証状態 - ログインページへリダイレクト');
+      toast({
+        title: "セッションエラー",
+        description: "再度ログインしてください",
+        variant: "destructive",
+      });
+      router.push('/signin');
+      return;
+    }
+
+    if (status === 'loading') {
+      console.log('Header: セッション読み込み中');
+      return;
+    }
+
+    if (!session?.user) {
+      console.log('Header: ユーザー情報なし - ログインページへリダイレクト');
+      router.push('/signin');
+      return;
+    }
+  }, [status, session, router]);
+
+  if (status === 'loading' || !session?.user) {
+    return (
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+          <LoadingSpinner text="読み込み中..." />
+        </div>
+      </header>
+    );
   }
 
   return (
-    <header className="border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-        <Link href="/" className="flex items-center">
+    <header className="bg-white shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+        <Link href="/translate" className="flex items-center">
           <CircleIcon className="h-6 w-6 text-orange-500" />
-          <span className="ml-2 text-xl font-semibold text-gray-900">ACME</span>
+          <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
         </Link>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-6">
           <Link
             href="/pricing"
-            className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            className="text-sm text-gray-600 hover:text-gray-900"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Pricing
+            料金プラン
           </Link>
-          {user ? (
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger>
-                <Avatar className="cursor-pointer size-9">
-                  <AvatarImage alt={user.name || ''} />
+          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage alt={session.user.name || ''} />
                   <AvatarFallback>
-                    {user.email
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
+                    {session.user.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="flex flex-col gap-1">
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <Link href="/profile" passHref legacyBehavior>
                 <DropdownMenuItem className="cursor-pointer">
-                  <Link href="/dashboard" className="flex w-full items-center">
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
+                  <Home className="mr-2 h-4 w-4" />
+                  <span>マイページ</span>
                 </DropdownMenuItem>
-                <form action={handleSignOut} className="w-full">
-                  <button type="submit" className="flex w-full">
-                    <DropdownMenuItem className="w-full flex-1 cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Sign out</span>
-                    </DropdownMenuItem>
-                  </button>
-                </form>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              asChild
-              className="bg-black hover:bg-gray-800 text-white text-sm px-4 py-2 rounded-full"
-            >
-              <Link href="/sign-up">Sign Up</Link>
-            </Button>
-          )}
+              </Link>
+              <DropdownMenuItem
+                className="cursor-pointer flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
+                onSelect={handleSignOut}
+                data-testid="logout-button"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>ログアウト</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+function Sidebar() {
+  const pathname = usePathname();
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const handleToggle = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  const navigation = [
+    { name: '翻訳', href: '/translate', icon: Settings },
+    { name: '履歴', href: '/history', icon: History },
+    { name: 'アクティビティ', href: '/activity', icon: Activity },
+    { name: 'プロフィール', href: '/profile', icon: User },
+    { name: '設定', href: '/settings', icon: Settings },
+    { name: 'API連携', href: '/integrations', icon: LinkIcon },
+  ];
+
   return (
-    <section className="flex flex-col min-h-screen">
+    <div className="relative h-full">
+      <button
+        onClick={handleToggle}
+        className="absolute -right-4 top-2 bg-white rounded-full p-1.5 shadow-md hover:bg-gray-50 z-50 cursor-pointer border border-gray-200"
+      >
+        {isExpanded ? (
+          <ChevronLeft className="h-4 w-4 text-gray-600" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-600" />
+        )}
+      </button>
+      <nav className={cn(
+        "flex flex-col space-y-1 p-4 transition-all duration-300 ease-in-out",
+        isExpanded ? "w-64" : "w-16"
+      )}>
+        {navigation.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              passHref
+              legacyBehavior
+            >
+              <a
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative",
+                  isActive
+                    ? "bg-orange-50 text-orange-600"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                  !isExpanded && "justify-center"
+                )}
+                title={!isExpanded ? item.name : undefined}
+              >
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0",
+                    isExpanded ? "mr-3" : "mr-0",
+                    isActive ? "text-orange-600" : "text-gray-400"
+                  )}
+                  aria-hidden="true"
+                />
+                {isExpanded && <span className="whitespace-nowrap">{item.name}</span>}
+              </a>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { status } = useSession();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      setError('セッションが無効です。再度ログインしてください。');
+    } else {
+      setError(null);
+    }
+  }, [status]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" text="セッション確認中..." />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      {children}
-    </section>
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        {error ? (
+          <ErrorMessage 
+            message={error}
+            variant="destructive"
+            className="mb-4"
+          />
+        ) : (
+          <div className="flex gap-8 h-full">
+            <aside className="bg-white shadow-sm rounded-lg h-full">
+              <Sidebar />
+            </aside>
+            <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
+              {children}
+            </main>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

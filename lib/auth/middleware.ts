@@ -1,12 +1,20 @@
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
-import { getTeamForUser, getUser } from '@/lib/db/queries';
+import { TeamDataWithMembers } from '@/lib/types';
 import { redirect } from 'next/navigation';
+import type { User } from '@prisma/client';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import prisma from '@/lib/prisma';
+
+async function getUser() {
+  const session = await getServerSession(authOptions);
+  return session?.user;
+}
 
 export type ActionState = {
   error?: string;
   success?: string;
-  [key: string]: any; // This allows for additional properties
+  [key: string]: any;
 };
 
 type ValidatedActionFunction<S extends z.ZodType<any, any>, T> = (
@@ -49,7 +57,7 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
       return { error: result.error.errors[0].message } as T;
     }
 
-    return action(result.data, formData, user);
+    return action(result.data, formData, user as User);
   };
 }
 
@@ -58,18 +66,18 @@ type ActionWithTeamFunction<T> = (
   team: TeamDataWithMembers
 ) => Promise<T>;
 
-export function withTeam<T>(action: ActionWithTeamFunction<T>) {
-  return async (formData: FormData): Promise<T> => {
-    const user = await getUser();
+
+
+
+
+export function withAuth<T>(
+  action: (data: T, formData: FormData, user: User) => Promise<Response>
+) {
+  return async (data: T, formData: FormData, user: User) => {
     if (!user) {
-      redirect('/sign-in');
+      return new Response('Unauthorized', { status: 401 });
     }
 
-    const team = await getTeamForUser(user.id);
-    if (!team) {
-      throw new Error('Team not found');
-    }
-
-    return action(formData, team);
+    return action(data, formData, user);
   };
 }

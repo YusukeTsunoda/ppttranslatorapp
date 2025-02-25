@@ -1,48 +1,51 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { signToken, verifyToken } from '@/lib/auth/session';
+import { withAuth } from 'next-auth/middleware';
+import type { NextRequestWithAuth } from 'next-auth/middleware';
 
-const protectedRoutes = '/dashboard';
+export default withAuth(
+  function middleware(request: NextRequestWithAuth) {
+    const token = request.nextauth.token;
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('session');
-  const isProtectedRoute = pathname.startsWith(protectedRoutes);
+    // セッションエラーがある場合はサインインページにリダイレクト
+    if (token?.error) {
+      console.log('Auth error detected:', token.error);
+      const signInUrl = new URL('/signin', request.url);
+      signInUrl.searchParams.set('error', token.error as string);
+      signInUrl.searchParams.set('callbackUrl', request.url);
+      return NextResponse.redirect(signInUrl);
+    }
 
-  if (isProtectedRoute && !sessionCookie) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
-  }
+    // セッション有効期限切れの場合はサインインページにリダイレクト
+    if (token?.sessionExpires && new Date(token.sessionExpires as string | number | Date) < new Date()) {
+      console.log('Session expired. Current time:', new Date().toISOString(), 'Session expires:', new Date(token.sessionExpires as string | number | Date).toISOString());
+      const signInUrl = new URL('/signin', request.url);
+      signInUrl.searchParams.set('error', 'SessionExpiredError');
+      signInUrl.searchParams.set('callbackUrl', request.url);
+      return NextResponse.redirect(signInUrl);
+    }
 
-  let res = NextResponse.next();
-
-  if (sessionCookie) {
-    try {
-      const parsed = await verifyToken(sessionCookie.value);
-      const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      res.cookies.set({
-        name: 'session',
-        value: await signToken({
-          ...parsed,
-          expires: expiresInOneDay.toISOString(),
-        }),
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        expires: expiresInOneDay,
-      });
-    } catch (error) {
-      console.error('Error updating session:', error);
-      res.cookies.delete('session');
-      if (isProtectedRoute) {
-        return NextResponse.redirect(new URL('/sign-in', request.url));
-      }
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token
+    },
+    pages: {
+      signIn: '/signin'
     }
   }
+);
 
-  return res;
-}
-
+// 保護するパスを指定
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/translate/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/history/:path*',
+    '/activity/:path*',
+    '/integrations/:path*',
+    '/dashboard/:path*',
+    '/api/protected/:path*'
+  ]
 };

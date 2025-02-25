@@ -1,49 +1,86 @@
 import Stripe from 'stripe';
-import { redirect } from 'next/navigation';
-import { Team } from '@/lib/db/schema';
-import {
-  getTeamByStripeCustomerId,
-  getUser,
-  updateTeamSubscription
-} from '@/lib/db/queries';
+import { prisma } from '@/lib/db/prisma';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia'
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+}
+
+if (!process.env.BASE_URL) {
+  throw new Error('BASE_URL environment variable is not set');
+}
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16',
+  typescript: true,
 });
 
 export async function createCheckoutSession({
-  team,
-  priceId
+  userId,
+  priceId,
+  email,
+  successUrl,
+  cancelUrl
 }: {
-  team: Team | null;
+  userId: string;
   priceId: string;
+  email: string;
+  successUrl: string;
+  cancelUrl: string;
 }) {
-  const user = await getUser();
+  try {
+    const existingCustomers = await stripe.customers.list({
+      email: email,
+      limit: 1
+    });
 
-  if (!team || !user) {
-    redirect(`/sign-up?redirect=checkout&priceId=${priceId}`);
-  }
+    let customerId: string;
 
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1
-      }
-    ],
-    mode: 'subscription',
-    success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.BASE_URL}/pricing`,
-    customer: team.stripeCustomerId || undefined,
-    client_reference_id: user.id.toString(),
-    allow_promotion_codes: true,
-    subscription_data: {
-      trial_period_days: 14
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: email,
+        metadata: {
+          userId: userId
+        }
+      });
+      customerId = customer.id;
     }
-  });
 
-  redirect(session.url!);
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1
+        }
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: userId,
+      allow_promotion_codes: true,
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: {
+          userId: userId
+        }
+      },
+      metadata: {
+        userId: userId
+      }
+    });
+
+    if (!session.url) {
+      throw new Error('セッションURLの作成に失敗しました');
+    }
+
+    return session;
+  } catch (error) {
+    console.error('Stripe checkout session creation error:', error);
+    throw new Error('決済セッションの作成に失敗しました');
+  }
 }
 
 export async function createCustomerPortalSession(team: Team) {
@@ -111,35 +148,74 @@ export async function createCustomerPortalSession(team: Team) {
   });
 }
 
-export async function handleSubscriptionChange(
-  subscription: Stripe.Subscription
-) {
-  const customerId = subscription.customer as string;
-  const subscriptionId = subscription.id;
-  const status = subscription.status;
+export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  try {
+    const userId = subscription.metadata.userId;
+    if (!userId) {
+      throw new Error('Subscription metadata does not contain userId');
+    }
 
-  const team = await getTeamByStripeCustomerId(customerId);
+    const status = subscription.status;
+    const priceId = subscription.items.data[0]?.price.id;
+    const productName = subscription.items.data[0]?.price.product.toString();
 
-  if (!team) {
-    console.error('Team not found for Stripe customer:', customerId);
-    return;
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        stripeSubscriptionId: subscription.id,
+        stripeProductId: priceId,
+        planName: productName,
+        subscriptionStatus: status
+      }
+    });
+
+    return {
+      userId,
+      status,
+      priceId
+    };
+  } catch (error) {
+    console.error('Subscription update handling error:', error);
+    throw error;
   }
+}
 
-  if (status === 'active' || status === 'trialing') {
-    const plan = subscription.items.data[0]?.plan;
-    await updateTeamSubscription(team.id, {
-      stripeSubscriptionId: subscriptionId,
-      stripeProductId: plan?.product as string,
-      planName: (plan?.product as Stripe.Product).name,
-      subscriptionStatus: status
+export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  try {
+    const userId = subscription.metadata.userId;
+    if (!userId) {
+      throw new Error('Subscription metadata does not contain userId');
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        stripeSubscriptionId: null,
+        stripeProductId: null,
+        planName: null,
+        subscriptionStatus: 'canceled'
+      }
     });
-  } else if (status === 'canceled' || status === 'unpaid') {
-    await updateTeamSubscription(team.id, {
-      stripeSubscriptionId: null,
-      stripeProductId: null,
-      planName: null,
-      subscriptionStatus: status
-    });
+  } catch (error) {
+    console.error('Subscription deletion handling error:', error);
+    throw error;
+  }
+}
+
+export async function validateStripeSignature(
+  payload: string | Buffer,
+  signature: string,
+  webhookSecret: string
+): Promise<Stripe.Event> {
+  try {
+    return stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      webhookSecret
+    );
+  } catch (error) {
+    console.error('Stripe signature validation error:', error);
+    throw error;
   }
 }
 
