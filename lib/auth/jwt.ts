@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 interface TokenPayload {
   sub: string;
-  email: string;
+  email: string | null;
   role: string;
 }
 
@@ -12,7 +12,13 @@ export function signJwtAccessToken(payload: TokenPayload) {
     throw new Error('JWT_SECRET is not defined');
   }
 
-  const token = jwt.sign(payload, secret, {
+  // emailがnullの場合は空文字列に変換
+  const safePayload = {
+    ...payload,
+    email: payload.email || '',
+  };
+
+  const token = jwt.sign(safePayload, secret, {
     expiresIn: '1d', // 1日で有効期限切れ
   });
 

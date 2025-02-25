@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { withAuth } from 'next-auth/middleware';
 import type { NextRequestWithAuth } from 'next-auth/middleware';
 
+// Node.jsランタイムを明示的に指定
+export const runtime = 'nodejs';
+
 export default withAuth(
   function middleware(request: NextRequestWithAuth) {
     const token = request.nextauth.token;

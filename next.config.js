@@ -16,6 +16,7 @@ const nextConfig = {
         'node_modules/@esbuild/linux-x64',
       ],
     },
+    serverComponentsExternalPackages: ['bcryptjs'],
   },
   // 静的ファイルの配信設定を追加
   async rewrites() {
