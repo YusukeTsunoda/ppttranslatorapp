@@ -48,8 +48,8 @@ export default function SignInPage() {
         description: 'リダイレクトします...',
       });
 
-      // リダイレクト
-      router.push(callbackUrl);
+      // リダイレクト - router.pushの代わりにwindow.location.hrefを使用
+      window.location.href = callbackUrl;
     } catch (error) {
       console.error('Sign in error:', error);
       setError(error instanceof Error ? error.message : 'サインインに失敗しました');

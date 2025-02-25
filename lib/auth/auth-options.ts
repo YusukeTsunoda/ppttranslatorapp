@@ -8,8 +8,8 @@ import { User } from '@prisma/client';
 /**
  * セッション有効期限の設定
  */
-const SESSION_MAXAGE = 15 * 60; // 15分
-const SESSION_UPDATE_AGE = 5 * 60; // 5分
+const SESSION_MAXAGE = 24 * 60 * 60; // 24時間（1日）
+const SESSION_UPDATE_AGE = 60 * 60; // 1時間
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),

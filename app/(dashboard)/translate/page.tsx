@@ -499,12 +499,12 @@ export default function TranslatePage() {
     try {
       setIsDownloading(true);
 
-      // ファイルパスの構築
-      const originalFilePath = `tmp/users/${session.user.id}/uploads/${slides[0].fileId}_original.pptx`;
-
+      // ファイルパスの構築 - fileIdのみを送信し、サーバー側で実際のファイルを検索
+      const fileId = slides[0].fileId;
+      
       // リクエストデータの構築
       const requestData = {
-        originalFilePath,
+        fileId, // ファイルIDのみを送信
         slides: slides.map(slide => ({
           index: slide.index,
           texts: slide.texts.map((text: any, index: number) => ({
@@ -520,7 +520,8 @@ export default function TranslatePage() {
 
       console.log("送信するリクエストデータ:", {
         requestData,
-        sessionId: session.user.id
+        sessionId: session.user.id,
+        fileId
       });
 
       const response = await fetch('/api/download', {
@@ -542,7 +543,7 @@ export default function TranslatePage() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("ダウンロードAPIエラー:", errorData);
-        throw new Error(errorData.error || errorData.message || 'ダウンロードに失敗しました');
+        throw new Error(errorData.details || errorData.error || 'ダウンロードに失敗しました');
       }
 
       const data = await response.json();
@@ -554,9 +555,11 @@ export default function TranslatePage() {
 
       // ダウンロードリンクの作成と実行
       const downloadUrl = `/${data.filePath}`;
+      console.log("ダウンロードURL:", downloadUrl);
+      
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'translated_presentation.pptx';
+      link.download = `translated_${fileId}.pptx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
