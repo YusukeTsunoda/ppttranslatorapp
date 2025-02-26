@@ -1,26 +1,17 @@
 import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/session';
+import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
 
 export async function getUser() {
   try {
-    const sessionCookie = cookies().get('session');
-    if (!sessionCookie?.value) {
-      return null;
-    }
-
-    const sessionData = await verifyToken(sessionCookie.value);
-    if (!sessionData?.user?.id) {
-      return null;
-    }
-
-    if (new Date(sessionData.expires) < new Date()) {
+    const session = await getSession();
+    if (!session?.user?.email) {
       return null;
     }
 
     const user = await prisma.user.findUnique({
       where: {
-        id: sessionData.user.id
+        email: session.user.email
       }
     });
 
@@ -33,106 +24,14 @@ export async function getUser() {
   }
 }
 
-export async function getTeamByStripeCustomerId(customerId: string) {
-  const team = await prisma.team.findFirst({
-    where: {
-      stripeCustomerId: customerId
-    }
-  });
-
-  return team;
-}
-
-export async function updateTeamSubscription(
-  teamId: string,
-  subscriptionData: {
-    stripeSubscriptionId: string | null;
-    stripeProductId: string | null;
-    planName: string | null;
-    subscriptionStatus: string;
-  }
-) {
-  await prisma.team.update({
-    where: {
-      id: teamId
-    },
-    data: {
-      ...subscriptionData,
-      updatedAt: new Date()
-    }
-  });
-}
-
-export async function getUserWithTeam(userId: string) {
-  const userWithTeam = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      teams: {
-        include: {
-          team: true
-        }
-      }
-    }
-  });
-
-  if (!userWithTeam) return null;
-
-  const teamMember = userWithTeam.teams[0];
-  if (!teamMember) return null;
-
-  return {
-    ...userWithTeam,
-    teamId: teamMember.teamId,
-    team: teamMember.team
-  };
-}
-
 export async function getActivityLogs(userId: string) {
-  return await prisma.activityLog.findMany({
+  return prisma.activityLog.findMany({
     where: {
-      userId: userId,
-    },
-    include: {
-      user: {
-        select: {
-          name: true,
-        },
-      },
+      userId
     },
     orderBy: {
-      createdAt: 'desc',
+      createdAt: 'desc'
     },
-    take: 10,
+    take: 50
   });
-}
-
-export async function getTeamForUser(userId: string) {
-  const result = await prisma.user.findFirst({
-    where: {
-      id: userId
-    },
-    include: {
-      teams: {
-        include: {
-          team: {
-            include: {
-              members: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-
-  return result?.teams[0]?.team || null;
 }

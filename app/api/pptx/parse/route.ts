@@ -5,6 +5,9 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { PPTXParser } from '@/lib/pptx/parser';
 import { auth } from '@/lib/auth/auth';
+import path from 'path';
+import fs from 'fs/promises';
+import { v4 as uuidv4 } from 'uuid';
 
 // アップロードされるファイルの最大サイズ（20MB）
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -15,6 +18,9 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 export async function POST(req: NextRequest) {
+  let tempDir: string | undefined;
+  let tempFilePath: string | undefined;
+
   try {
     // 認証チェック
     const session = await auth();
@@ -53,14 +59,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ファイルをバッファーに変換
+    // 一時ディレクトリの作成
+    tempDir = path.join(process.cwd(), 'tmp', uuidv4());
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // 一時ファイルの作成
     const buffer = Buffer.from(await file.arrayBuffer());
+    tempFilePath = path.join(tempDir, 'input.pptx');
+    await fs.writeFile(tempFilePath, buffer);
 
     // PPTXパーサーのインスタンスを取得
     const parser = PPTXParser.getInstance();
 
     // ファイルを解析
-    const result = await parser.parsePPTX(buffer);
+    const result = await parser.parsePPTX(tempFilePath, tempDir);
 
     // 結果を返す
     return NextResponse.json(result);
@@ -74,6 +86,22 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    // 一時ファイルとディレクトリの削除
+    if (tempFilePath) {
+      try {
+        await fs.unlink(tempFilePath);
+      } catch (error) {
+        console.error('一時ファイルの削除に失敗しました:', error);
+      }
+    }
+    if (tempDir) {
+      try {
+        await fs.rm(tempDir, { recursive: true });
+      } catch (error) {
+        console.error('一時ディレクトリの削除に失敗しました:', error);
+      }
+    }
   }
 }
 

@@ -8,6 +8,7 @@ import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { verifyToken } from "@/lib/auth/session";
+import { filePathManager } from "@/lib/utils/file-utils";
 
 const execAsync = promisify(exec);
 
@@ -52,17 +53,24 @@ export async function POST(req: NextRequest) {
       }
     });
     
-    // アップロードされたファイル名を使用
-    const files = await fs.readdir(uploadsDir);
-    console.log('Available files:', files);
-    
-    const originalFile = files.find(file => file.startsWith(`${fileId}_`) && file.endsWith('.pptx'));
-    console.log('Found original file:', originalFile);
-    
-    if (!originalFile) {
-      throw new Error('Original PPTX file not found');
+    // filePathManagerを使用して実際のファイルを検索 - 修正部分
+    const actualOriginalFilePath = await filePathManager.findActualFilePath(userId, fileId, 'original');
+    if (!actualOriginalFilePath) {
+      console.error('Original PPTX file not found for fileId:', fileId);
+      try {
+        const files = await fs.readdir(uploadsDir);
+        console.log('Available files in uploads directory:', files);
+      } catch (e) {
+        console.error('Failed to read uploads directory:', e);
+      }
+      return NextResponse.json(
+        { error: 'Original PPTX file not found' },
+        { status: 404 }
+      );
     }
-    const originalPptxPath = path.join(uploadsDir, originalFile);
+    
+    console.log('Found original file:', actualOriginalFilePath);
+    
     const translationsJsonPath = path.join(uploadsDir, `${fileId}_translations.json`);
     const outputPath = path.join(uploadsDir, `${fileId}_translated.pptx`);
 
@@ -71,10 +79,10 @@ export async function POST(req: NextRequest) {
 
     // ファイルの存在確認
     try {
-      await fs.access(originalPptxPath);
-      console.log('Found original PPTX at:', originalPptxPath);
+      await fs.access(actualOriginalFilePath);
+      console.log('Found original PPTX at:', actualOriginalFilePath);
     } catch (error) {
-      console.error('Original PPTX not found:', originalPptxPath);
+      console.error('Original PPTX not found:', actualOriginalFilePath);
       try {
         const files = await fs.readdir(uploadsDir);
         console.log('Available files in uploads directory:', files);
@@ -114,10 +122,10 @@ export async function POST(req: NextRequest) {
       const uploadDir = path.join(process.cwd(), 'tmp', 'users', userId, 'uploads');
       await fs.mkdir(uploadDir, { recursive: true });
 
-      // Pythonスクリプトの実行（既に確認済みのoriginalPptxPathを使用）
+      // Pythonスクリプトの実行（実際のファイルパスを使用）
       console.log('Executing Python script with paths:', {
         pythonScript,
-        originalPptxPath,
+        actualOriginalFilePath, // 実際のファイルパスを使用
         translationsJsonPath,
         outputPath
       });
@@ -127,7 +135,7 @@ export async function POST(req: NextRequest) {
       console.log('Sample translation from first slide:', translations[0]?.texts?.[0]);
 
       const { stdout, stderr } = await execAsync(
-        `python3 "${pythonScript}" "${originalPptxPath}" "${translationsJsonPath}" "${outputPath}"`
+        `python3 "${pythonScript}" "${actualOriginalFilePath}" "${translationsJsonPath}" "${outputPath}"`
       );
       
       if (stderr) {

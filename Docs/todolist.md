@@ -168,3 +168,164 @@
   - [ ] テスト自動化
   - [ ] デプロイ自動化
   - [ ] マイグレーション自動化
+
+# PPTXファイル処理エラーの原因と解決策
+
+## 現在のエラー
+
+```
+Error: Loading presentation from: /Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/tmp/users/cm7j3hlru0000q9p52ircao6q/uploads/1740485731542_q09harqiie_original.pptx
+Error: Package not found at '/Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/tmp/users/cm7j3hlru0000q9p52ircao6q/uploads/1740485731542_q09harqiie_original.pptx'
+```
+
+このエラーは、Python の `python-pptx` ライブラリが指定されたパスにあるPPTXファイルを開けないことを示しています。「Package not found」というエラーは、ファイルが見つからないか、ファイル形式が正しくないことを意味します。
+
+## エラーの根本原因
+
+このエラーが発生している根本的な原因は、**クライアントとサーバー間のリクエストデータの不一致**です。具体的には以下の問題があります：
+
+1. **クライアント側の変更**: `app/(dashboard)/translate/page.tsx` の `handleDownload` 関数で、リクエストデータの形式が変更されました。
+   ```javascript
+   // 変更後のリクエストデータ
+   const requestData = {
+     fileId, // ファイルIDのみを送信
+     slides: slides.map(slide => ({
+       index: slide.index,
+       texts: slide.texts.map((text: any, index: number) => ({
+         text: text.text,
+         translation: (
+           editedTranslations[`${slide.index}-${index}`] || 
+           slide.translations?.[index]?.text || 
+           text.text
+         ).trim()
+       }))
+     }))
+   };
+   ```
+
+2. **サーバー側の期待**: `app/api/download/route.ts` では、異なる形式のリクエストデータを期待しています。
+   ```javascript
+   const { originalFilePath, slides } = body;
+   
+   // リクエストデータの検証
+   if (!originalFilePath || !slides || !Array.isArray(slides)) {
+     console.error("無効なリクエストデータ:", {
+       hasOriginalFilePath: !!originalFilePath,
+       hasSlides: !!slides,
+       slidesIsArray: Array.isArray(slides),
+       userId: session.user.id,
+       timestamp: new Date().toISOString()
+     });
+     return NextResponse.json({
+       error: 'Invalid request data',
+       details: 'リクエストデータが不正です',
+       timestamp: new Date().toISOString()
+     }, { status: 400 });
+   }
+   ```
+
+3. **不一致の結果**: クライアントは `fileId` を送信していますが、サーバーは `originalFilePath` を期待しているため、サーバー側の検証で「リクエストデータが不正です」というエラーが発生しています。
+
+## 処理フロー図
+
+```
+【現在の問題のあるフロー】
+1. クライアント側: fileIdとslidesを含むリクエストデータを送信
+   ↓
+2. サーバー側: originalFilePathとslidesを期待
+   ↓
+3. サーバー側: originalFilePathが存在しないため検証エラー
+   ↓
+4. サーバー側: 「リクエストデータが不正です」エラーを返す
+```
+
+```
+【修正後のあるべきフロー】
+1. クライアント側: fileIdとslidesを含むリクエストデータを送信
+   ↓
+2. サーバー側: fileIdからoriginalFilePathを構築
+   ↓
+3. サーバー側: 実際のファイルパスを検索
+   ↓
+4. サーバー側: Pythonスクリプトを実行して翻訳済みPPTXを生成
+   ↓
+5. クライアント側: 生成されたファイルをダウンロード
+```
+
+## 修正できていない理由（ステップバイステップ）
+
+1. **部分的な修正**: 
+   - クライアント側（`app/(dashboard)/translate/page.tsx`）のリクエスト形式を変更しましたが、サーバー側（`app/api/download/route.ts`）の対応する変更が行われていません。
+   - クライアント側は `fileId` を送信するように変更されましたが、サーバー側は依然として `originalFilePath` を期待しています。
+
+2. **不完全な同期**:
+   - 前回の修正で `FilePathManager` クラスを更新し、`findActualFilePath` メソッドを追加しましたが、サーバー側のAPIエンドポイントがこの変更に対応していません。
+   - サーバー側のコードは、クライアントから送信される `originalFilePath` を直接使用する前提で書かれています。
+
+3. **テスト不足**:
+   - クライアント側とサーバー側の変更が同時に行われなかったため、互換性の問題が発生しています。
+   - エンドツーエンドのテストが行われていないため、この不一致が検出されませんでした。
+
+## 必要な修正
+
+### 1. サーバー側の修正 (`app/api/download/route.ts`)
+
+```javascript
+// リクエストボディを取得
+const body = await req.json();
+const { fileId, slides } = body; // originalFilePathの代わりにfileIdを受け取る
+
+// リクエストデータの検証
+if (!fileId || !slides || !Array.isArray(slides)) {
+  console.error("無効なリクエストデータ:", {
+    hasFileId: !!fileId,
+    hasSlides: !!slides,
+    slidesIsArray: Array.isArray(slides),
+    userId: session.user.id,
+    timestamp: new Date().toISOString()
+  });
+  return NextResponse.json({
+    error: 'Invalid request data',
+    details: 'リクエストデータが不正です',
+    timestamp: new Date().toISOString()
+  }, { status: 400 });
+}
+
+// fileIdから元のファイルパスを構築
+const originalFilePath = filePathManager.getTempPath(session.user.id, fileId, 'original');
+```
+
+### 2. クライアント側とサーバー側の整合性確保
+
+クライアント側とサーバー側で一貫したデータ形式を使用するために、以下の点に注意する必要があります：
+
+1. リクエストとレスポンスの形式を明確に文書化する
+2. 変更を行う場合は、クライアント側とサーバー側を同時に更新する
+3. APIエンドポイントのテストを実施して、互換性を確認する
+
+### 3. エラーハンドリングの強化
+
+サーバー側でより詳細なエラーメッセージを提供し、クライアント側でそれを適切に表示することで、問題の診断と解決を容易にします：
+
+```javascript
+// サーバー側
+return NextResponse.json({
+  error: 'Invalid request data',
+  details: `リクエストデータが不正です。必要なフィールド: fileId=${!!fileId}, slides=${!!slides}`,
+  expectedFormat: { fileId: "string", slides: "array" },
+  receivedFormat: { fileId: typeof fileId, slides: typeof slides },
+  timestamp: new Date().toISOString()
+}, { status: 400 });
+
+// クライアント側
+if (!response.ok) {
+  const errorData = await response.json();
+  console.error("詳細なエラー情報:", errorData);
+  throw new Error(errorData.details || errorData.error || 'ダウンロードに失敗しました');
+}
+```
+
+## 結論
+
+このエラーは、クライアント側とサーバー側のコードが同期していないことによって発生しています。クライアント側は `fileId` を送信するように変更されましたが、サーバー側は依然として `originalFilePath` を期待しています。この不一致を解決するには、サーバー側のコードを更新して `fileId` を受け取り、それを使用して `originalFilePath` を構築するようにする必要があります。
+

@@ -3,68 +3,52 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { join } from "path";
-import { verifyToken } from "@/lib/auth/session";
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
 import { exec } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
+import { 
+  generateFileId, 
+  createUserDirectories, 
+  cleanupOldFiles,
+  createFilePath,
+  getAbsolutePath,
+  ensureFilePath,
+  logFileOperation
+} from '@/lib/utils/file-utils';
 
 const execAsync = promisify(exec);
 
-// ファイル名を生成する関数
-const generateFileId = () => {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  return `${timestamp}_${random}`;
-};
+// ファイルサイズ制限
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-// ユーザーのディレクトリを作成する関数
-const createUserDirectories = async (userId: string, fileId: string) => {
-  const baseDir = join(process.cwd(), "tmp", "users", userId);
-  const uploadDir = join(baseDir, "uploads");
-  const slidesDir = join(baseDir, "slides", fileId);
-
-  await mkdir(uploadDir, { recursive: true });
-  await mkdir(slidesDir, { recursive: true });
-
-  return { uploadDir, slidesDir };
-};
-
-// 古いファイルを削除する関数（24時間以上経過したファイル）
-const cleanupOldFiles = async (userId: string) => {
-  const baseDir = join(process.cwd(), "tmp", "users", userId);
-  if (!existsSync(baseDir)) return;
-
-  // 7日以上経過したファイルを削除するように変更
-  const { stdout } = await execAsync(`find "${baseDir}" -type f -mtime +7 -delete`);
-  console.log('Cleanup results:', stdout);
-};
+// 許可するファイルタイプ
+const ALLOWED_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+];
 
 export async function POST(request: NextRequest) {
+  let fileId: string | null = null;
+  let userId: string | null = null;
+
   try {
-    // セッションチェック
-    const sessionCookie = request.cookies.get('session');
-    if (!sessionCookie) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    let session;
+    userId = session.user.id;
+    fileId = generateFileId();
+
     try {
-      session = await verifyToken(sessionCookie.value);
-      if (!session) {
-        return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-      }
+      await cleanupOldFiles(userId);
     } catch (error) {
-      return NextResponse.json({ error: "認証が無効です" }, { status: 401 });
+      console.error("Error cleaning up old files:", error);
+      // エラーがあっても続行
     }
-
-    // userIdを文字列に変換
-    const userId = session.user.id.toString();
-    const fileId = generateFileId();
-
-    // 古いファイルの削除を実行
-    await cleanupOldFiles(userId);
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -73,25 +57,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ファイルが必要です" }, { status: 400 });
     }
 
-    if (!file.name.endsWith(".pptx")) {
+    // ファイルサイズの検証
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "ファイルサイズは20MB以下にしてください" },
+        { status: 400 }
+      );
+    }
+
+    // ファイルタイプの検証
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "PPTXファイルのみ対応しています" },
         { status: 400 }
       );
     }
 
-    // ユーザーのディレクトリを作成
-    const { uploadDir, slidesDir } = await createUserDirectories(userId, fileId);
+    let uploadDir: string;
+    let slidesDir: string;
 
-    // ファイル名を生成
+    try {
+      const dirs = await createUserDirectories(userId, fileId);
+      uploadDir = dirs.uploadDir;
+      slidesDir = dirs.slidesDir;
+    } catch (error) {
+      console.error("Error creating directories:", error);
+      await logFileOperation(userId, 'create', fileId, false, 'ディレクトリの作成に失敗しました');
+      return NextResponse.json(
+        { error: "ディレクトリの作成に失敗しました" },
+        { status: 500 }
+      );
+    }
+
     const fileName = `${fileId}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
     const filePath = join(uploadDir, fileName);
 
-    // ファイルを保存
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
-    
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+      await logFileOperation(userId, 'create', fileId, true);
+    } catch (error) {
+      console.error("Error saving file:", error);
+      await logFileOperation(userId, 'create', fileId, false, 'ファイルの保存に失敗しました');
+      return NextResponse.json(
+        { error: "ファイルの保存に失敗しました" },
+        { status: 500 }
+      );
+    }
+
     console.log('File saved:', {
       filePath,
       fileId,
@@ -99,21 +113,20 @@ export async function POST(request: NextRequest) {
       uploadDir
     });
 
-    // Pythonスクリプトの実行
     const pythonScript = join(process.cwd(), "lib/python/pptx_parser.py");
-    console.log('Executing Python script with file path:', filePath);
     
-    const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" "${filePath}" "${slidesDir}"`);
-
     try {
-      const slideData = JSON.parse(stdout);
+      const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" "${filePath}" "${slidesDir}"`);
       
       if (stderr) {
         console.log("Python script debug info:", stderr);
       }
 
+      const slideData = JSON.parse(stdout);
+
       if (slideData.error) {
         console.error("Python script error:", slideData.error);
+        await logFileOperation(userId, 'access', fileId, false, slideData.error);
         return NextResponse.json(
           { error: slideData.error },
           { status: 500 }
@@ -121,35 +134,47 @@ export async function POST(request: NextRequest) {
       }
 
       if (!slideData.slides || !Array.isArray(slideData.slides)) {
+        await logFileOperation(userId, 'access', fileId, false, 'スライドデータの形式が不正です');
         return NextResponse.json(
           { error: "スライドデータの形式が不正です" },
           { status: 500 }
         );
       }
 
-      // スライドデータにfileIdを追加
       const slidesWithFileId = slideData.slides.map((slide: any) => ({
         ...slide,
         fileId,
-        image_path: `${fileId}/${slide.image_path}`
+        filePath: filePath,
+        image_path: `${fileId}/slide_${slide.index + 1}.png`
       }));
 
+      console.log('Debug - Generated slides data:', {
+        fileId,
+        slidesDir,
+        slidesCount: slidesWithFileId.length,
+        samplePath: slidesWithFileId[0]?.image_path,
+        fullPath: join(slidesDir, `slide_${slideData.slides[0].index + 1}.png`)
+      });
+
+      await logFileOperation(userId, 'access', fileId, true);
       return NextResponse.json({
         success: true,
         filePath: filePath,
         slides: slidesWithFileId,
       });
     } catch (error) {
-      console.error("JSON parse error:", error);
-      console.error("stdout:", stdout);
-      console.error("stderr:", stderr);
+      console.error("Error processing file:", error);
+      await logFileOperation(userId, 'access', fileId, false, 'ファイルの処理に失敗しました');
       return NextResponse.json(
-        { error: "解析結果の処理に失敗しました" },
+        { error: "ファイルの処理に失敗しました" },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error("Upload error:", error);
+    if (userId && fileId) {
+      await logFileOperation(userId, 'create', fileId, false, 'ファイルのアップロードに失敗しました');
+    }
     return NextResponse.json(
       { error: "ファイルのアップロードに失敗しました" },
       { status: 500 }

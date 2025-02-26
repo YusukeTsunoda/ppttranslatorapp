@@ -41,6 +41,27 @@ const pricingPlans = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-orange-50">
+      {/* ヘッダー */}
+      <header className="bg-white shadow-sm fixed w-full top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <Link href="/" className="text-2xl font-bold text-orange-600">
+                PPT翻訳アプリ
+              </Link>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link href="/pricing" className="text-gray-600 hover:text-gray-900">
+                料金プラン
+              </Link>
+              <Link href="/signin">
+                <Button variant="ghost">ログイン</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* ヒーローセクション */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
         <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -56,7 +77,7 @@ export default function HomePage() {
           </p>
           <div className="flex justify-center gap-6">
             <Button asChild size="lg" className="bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20 px-8">
-              <Link href="/sign-up" className="flex items-center">
+              <Link href="/signin" className="flex items-center">
                 無料で始める
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
@@ -116,7 +137,7 @@ export default function HomePage() {
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full bg-orange-600 hover:bg-orange-700">
-                <Link href="/sign-up">
+                <Link href="/signin">
                   無料で始める
                 </Link>
               </Button>

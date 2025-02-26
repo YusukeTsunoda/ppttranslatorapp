@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import { authOptions } from "@/lib/auth/auth-options";
 import type { DefaultSession } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
@@ -24,8 +25,12 @@ const config = {
     }),
   ],
   pages: {
-    signIn: "/sign-in",
-    error: "/sign-in",
+    signIn: '/signin',
+    error: '/error'
+  },
+  session: {
+    strategy: "jwt" as const,
+    maxAge: 30 * 24 * 60 * 60, // 30日
   },
   callbacks: {
     async jwt({ token, user, account }: { token: JWT; user?: any; account?: any }) {
@@ -34,9 +39,13 @@ const config = {
       }
       return token;
     },
-    async session({ session, user }: { session: any; user: any }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async session({ session, token }: { session: any; token: any }) {
+      if (session.user && token) {
+        session.user.id = token.userId;
+        // セッションの有効期限を確認
+        if (token.exp && Date.now() / 1000 > token.exp) {
+          throw new Error("Session expired");
+        }
       }
       return session;
     },
@@ -44,4 +53,4 @@ const config = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export default NextAuth(config); 
+export default NextAuth(authOptions); 

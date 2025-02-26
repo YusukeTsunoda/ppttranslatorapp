@@ -1,8 +1,15 @@
 import { z } from 'zod';
 import { TeamDataWithMembers } from '@/lib/types';
-import { getUserWithTeam, getUser, getTeamForUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
 import type { User } from '@prisma/client';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import prisma from '@/lib/prisma';
+
+async function getUser() {
+  const session = await getServerSession(authOptions);
+  return session?.user;
+}
 
 export type ActionState = {
   error?: string;
@@ -50,7 +57,7 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
       return { error: result.error.errors[0].message } as T;
     }
 
-    return action(result.data, formData, user);
+    return action(result.data, formData, user as User);
   };
 }
 
@@ -59,21 +66,9 @@ type ActionWithTeamFunction<T> = (
   team: TeamDataWithMembers
 ) => Promise<T>;
 
-export function withTeam<T>(action: ActionWithTeamFunction<T>) {
-  return async (formData: FormData): Promise<T> => {
-    const user = await getUser();
-    if (!user) {
-      redirect('/sign-in');
-    }
 
-    const team = await getTeamForUser(user.id);
-    if (!team) {
-      throw new Error('Team not found');
-    }
 
-    return action(formData, team as unknown as TeamDataWithMembers);
-  };
-}
+
 
 export function withAuth<T>(
   action: (data: T, formData: FormData, user: User) => Promise<Response>
