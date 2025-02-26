@@ -1,11 +1,16 @@
-import NextAuth from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
-import { CredentialsProvider } from 'next-auth/providers';
-import { prisma } from '@/lib/prisma';
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { prisma } from '@/lib/prisma'
+import type { NextAuthOptions } from "next-auth"
+import type { User } from "next-auth"
 
-const handler = NextAuth({
+const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
       async authorize(credentials) {
         try {
           // データベース接続情報のデバッグ出力
@@ -15,7 +20,7 @@ const handler = NextAuth({
             urlLength: process.env.DATABASE_URL?.length
           });
 
-          const user = await prisma.user.findUnique({
+          const prismaUser = await prisma.user.findUnique({
             where: {
               email: credentials?.email
             }
@@ -23,9 +28,19 @@ const handler = NextAuth({
 
           // ユーザー検索結果のデバッグ出力
           console.log('User lookup result:', {
-            found: !!user,
+            found: !!prismaUser,
             timestamp: new Date().toISOString()
           });
+
+          if (!prismaUser) {
+            return null;
+          }
+
+          // NextAuth.jsのUser型に変換
+          const user: User = {
+            ...prismaUser,
+            accessTokenExpires: Date.now() + 24 * 60 * 60 * 1000, // 24時間後に期限切れ
+          };
 
           return user;
         } catch (error) {
@@ -34,11 +49,18 @@ const handler = NextAuth({
             message: error.message,
             timestamp: new Date().toISOString()
           });
-          throw error;
+          return null;
         }
       }
     })
-  ]
-});
+  ],
+  session: {
+    strategy: "jwt"
+  },
+  pages: {
+    signIn: '/signin',
+  }
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST }; 
