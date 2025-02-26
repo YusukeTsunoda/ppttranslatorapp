@@ -1,12 +1,12 @@
 import useSWR from 'swr';
-import { getTeamActivityLogs } from '@/lib/utils/activity-logger';
+import { getUserActivityLogs } from '@/lib/utils/activity-logger';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import { useState, useEffect } from 'react';
 
 const CACHE_KEY = 'activity-logs';
 const STALE_TIME = 30000; // 30秒
 
-export function useActivityLogs(teamId?: string) {
+export function useActivityLogs(userId?: string) {
   const [logs, setLogs] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -14,10 +14,10 @@ export function useActivityLogs(teamId?: string) {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   const { data, mutate } = useSWR(
-    teamId ? [CACHE_KEY, teamId] : null,
+    userId ? [CACHE_KEY, userId] : null,
     async ([_, id]) => {
       try {
-        return await getTeamActivityLogs(id);
+        return await getUserActivityLogs(id);
       } catch (err) {
         throw getErrorMessage(err);
       }

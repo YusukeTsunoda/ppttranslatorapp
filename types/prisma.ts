@@ -69,5 +69,4 @@ export type PrismaDB = PrismaClient;
 
 // Prisma型のエクスポート
 export type PrismaUser = Prisma.UserGetPayload<{}>;
-export type PrismaTranslation = Prisma.TranslationGetPayload<{}>;
-export type PrismaSubscription = Prisma.SubscriptionGetPayload<{}>; 
+export type PrismaTranslation = Prisma.TranslationGetPayload<{}>; 

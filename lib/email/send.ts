@@ -48,7 +48,6 @@ export async function sendMagicLinkEmail(email: string, token: string) {
     });
 
     console.log('Magic link email sent successfully:', {
-      id: result.id,
       to: email,
       timestamp: new Date().toISOString()
     });

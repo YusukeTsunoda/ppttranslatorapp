@@ -14,9 +14,7 @@ import {
   generateFileId, 
   createUserDirectories, 
   cleanupOldFiles,
-  createFilePath,
-  getAbsolutePath,
-  ensureFilePath,
+  filePathManager,
   logFileOperation
 } from '@/lib/utils/file-utils';
 

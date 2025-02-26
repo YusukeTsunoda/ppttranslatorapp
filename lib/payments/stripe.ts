@@ -1,5 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db/prisma';
+import { redirect } from 'next/navigation';
+import { User } from '@prisma/client';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY environment variable is not set');
@@ -10,7 +12,7 @@ if (!process.env.BASE_URL) {
 }
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2023-08-16',
   typescript: true,
 });
 
@@ -83,8 +85,17 @@ export async function createCheckoutSession({
   }
 }
 
-export async function createCustomerPortalSession(team: Team) {
-  if (!team.stripeCustomerId || !team.stripeProductId) {
+export async function createCustomerPortalSession(user: User) {
+  // ユーザーのStripe情報を取得
+  const userData = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      stripeCustomerId: true,
+      stripeProductId: true
+    }
+  });
+
+  if (!userData?.stripeCustomerId || !userData?.stripeProductId) {
     redirect('/pricing');
   }
 
@@ -94,9 +105,9 @@ export async function createCustomerPortalSession(team: Team) {
   if (configurations.data.length > 0) {
     configuration = configurations.data[0];
   } else {
-    const product = await stripe.products.retrieve(team.stripeProductId);
+    const product = await stripe.products.retrieve(userData.stripeProductId);
     if (!product.active) {
-      throw new Error("Team's product is not active in Stripe");
+      throw new Error("User's product is not active in Stripe");
     }
 
     const prices = await stripe.prices.list({
@@ -104,7 +115,7 @@ export async function createCustomerPortalSession(team: Team) {
       active: true
     });
     if (prices.data.length === 0) {
-      throw new Error("No active prices found for the team's product");
+      throw new Error("No active prices found for the user's product");
     }
 
     configuration = await stripe.billingPortal.configurations.create({
@@ -142,7 +153,7 @@ export async function createCustomerPortalSession(team: Team) {
   }
 
   return stripe.billingPortal.sessions.create({
-    customer: team.stripeCustomerId,
+    customer: userData.stripeCustomerId,
     return_url: `${process.env.BASE_URL}/dashboard`,
     configuration: configuration.id
   });

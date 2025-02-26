@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { TeamDataWithMembers } from '@/lib/types';
 import { redirect } from 'next/navigation';
 import type { User } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import prisma from '@/lib/prisma';
 
 async function getUser() {
@@ -61,15 +60,6 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
   };
 }
 
-type ActionWithTeamFunction<T> = (
-  formData: FormData,
-  team: TeamDataWithMembers
-) => Promise<T>;
-
-
-
-
-
 export function withAuth<T>(
   action: (data: T, formData: FormData, user: User) => Promise<Response>
 ) {
@@ -79,5 +69,18 @@ export function withAuth<T>(
     }
 
     return action(data, formData, user);
+  };
+}
+
+// チーム関連の処理用のミドルウェア
+// 注意: Teamモデルが削除されたため、この関数はユーザー情報のみを使用するように修正
+export function withTeam(action: (formData: FormData, user: User) => Promise<any>) {
+  return async (formData: FormData) => {
+    const user = await getUser();
+    if (!user) {
+      throw new Error('User is not authenticated');
+    }
+    
+    return action(formData, user as User);
   };
 }

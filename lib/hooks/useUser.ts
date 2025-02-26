@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 interface User {
   id: string;
   name: string;
-  teamId: string;
 }
 
 export function useUser() {
@@ -12,7 +11,7 @@ export function useUser() {
   useEffect(() => {
     // ユーザー情報取得などの処理をここに実装
     // 仮のユーザーデータを設定例:
-    setUser({ id: '1', name: 'Test User', teamId: 'team-1' });
+    setUser({ id: '1', name: 'Test User' });
   }, []);
 
   return { user };
