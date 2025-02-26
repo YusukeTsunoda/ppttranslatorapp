@@ -26,7 +26,6 @@ declare module 'next-auth' {
       name: string | null;
       role: string;
       lastLogin: Date | null;
-    user: User & {
       accessTokenExpires: number;
     };
     error?: SessionError;

@@ -33,7 +33,7 @@ if (!stripeSecretKey.startsWith('sk_test_')) {
 
 console.log('Initializing Stripe client...');
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-01-27.acacia'
+  apiVersion: '2023-08-16'
 });
 
 async function testStripeConnection() {

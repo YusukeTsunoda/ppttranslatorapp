@@ -20,7 +20,7 @@ export default function ActivityPage() {
     hasMore,
     loadMore,
     isLoadingMore
-  } = useActivityLogs(user?.teamId);
+  } = useActivityLogs(user?.id);
 
   const onIntersect = useCallback(async () => {
     if (hasMore && !isLoadingMore) {

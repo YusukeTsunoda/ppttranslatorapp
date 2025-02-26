@@ -1,7 +1,4 @@
-import type { Team, TeamMember, User } from '@prisma/client';
+import type { User } from '@prisma/client';
 
-export type TeamDataWithMembers = Team & {
-  members: (TeamMember & {
-    user: Pick<User, 'id' | 'name' | 'email'>;
-  })[];
-}; 
+// 必要な型定義のみを残す
+// TeamDataWithMembers型は削除しました 

@@ -5,8 +5,4 @@ export interface User {
   // 必要なプロパティを追加
 }
 
-export interface TeamDataWithMembers {
-  id: string;
-  name: string;
-  members: User[];
-} 
+// TeamDataWithMembers型は削除しました 
