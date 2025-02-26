@@ -10,6 +10,15 @@ const requestSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // 環境変数のチェック
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not set in the environment');
+      return NextResponse.json(
+        { error: 'Email service configuration error' },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
     const { email } = requestSchema.parse(body);
 

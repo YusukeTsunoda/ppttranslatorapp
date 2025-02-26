@@ -1,5 +1,10 @@
 import { Resend } from 'resend';
 
+// APIキーが存在するか確認
+if (!process.env.RESEND_API_KEY) {
+  console.error('RESEND_API_KEY is not set in environment variables');
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendMagicLinkEmail(email: string, token: string) {
@@ -8,12 +13,12 @@ export async function sendMagicLinkEmail(email: string, token: string) {
   // 環境変数のチェック
   if (!process.env.RESEND_API_KEY) {
     console.error('RESEND_API_KEY is not set');
-    throw new Error('Email configuration error');
+    throw new Error('Email configuration error: RESEND_API_KEY is missing');
   }
 
   if (!process.env.NEXT_PUBLIC_APP_URL) {
     console.error('NEXT_PUBLIC_APP_URL is not set');
-    throw new Error('Email configuration error');
+    throw new Error('Email configuration error: NEXT_PUBLIC_APP_URL is missing');
   }
 
   console.log('Sending magic link email:', {
