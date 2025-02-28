@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { hashPassword } from '@/lib/auth/password';
+import { v4 as uuidv4 } from 'uuid';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     // メールアドレスの重複チェック
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email },
     });
 
@@ -35,12 +36,14 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
 
     // ユーザーの作成
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
+        id: uuidv4(),
         email,
         name,
         passwordHash: hashedPassword,
         role: 'user',
+        updatedAt: new Date(),
       },
     });
 

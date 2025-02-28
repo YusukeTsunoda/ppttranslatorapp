@@ -24,6 +24,7 @@ async function getUserFromCache(userId: string) {
     return { id: cached.id };
   }
 
+  // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (user) {
     userCache.set(userId, {

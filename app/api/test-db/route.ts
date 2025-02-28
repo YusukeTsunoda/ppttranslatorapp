@@ -8,10 +8,10 @@ export async function GET() {
       success: isConnected,
       timestamp: new Date().toISOString()
     })
-  } catch (error) {
+  } catch (error: unknown) {
     return NextResponse.json({ 
       success: false, 
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }

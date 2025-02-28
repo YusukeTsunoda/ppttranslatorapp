@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const { email } = requestSchema.parse(body);
 
     // レート制限チェック
-    const lastReset = await prisma.user.findUnique({
+    const lastReset = await prisma.users.findUnique({
       where: { email },
       select: { lastPasswordReset: true },
     });
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     }
 
     // ユーザーの存在確認
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email },
     });
 
@@ -53,12 +53,13 @@ export async function POST(req: Request) {
     const expires = new Date(Date.now() + 15 * 60000); // 15分後に有効期限切れ
 
     // ユーザー情報の更新
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: user.id },
       data: {
         resetToken: token,
         resetTokenExpires: expires,
         lastPasswordReset: new Date(),
+        updatedAt: new Date(),
       },
     });
 

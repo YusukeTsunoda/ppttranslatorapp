@@ -15,9 +15,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: '名前は必須です' }, { status: 400 });
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: session.user.id },
-      data: { name },
+      data: { 
+        name,
+        updatedAt: new Date()
+      },
     });
 
     return NextResponse.json({

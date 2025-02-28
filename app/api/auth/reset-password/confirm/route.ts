@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const { token, password } = requestSchema.parse(body);
 
     // トークンの検証
-    const user = await prisma.user.findFirst({
+    const user = await prisma.users.findFirst({
       where: {
         resetToken: token,
         resetTokenExpires: {
@@ -34,12 +34,13 @@ export async function POST(req: Request) {
     const hashedPassword = await hashPassword(password);
 
     // ユーザー情報の更新
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: user.id },
       data: {
         passwordHash: hashedPassword,
         resetToken: null,
         resetTokenExpires: null,
+        updatedAt: new Date(),
       },
     });
 

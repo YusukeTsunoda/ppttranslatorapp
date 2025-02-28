@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         }
 
         // ユーザーのStripe顧客IDを更新
-        await prisma.user.update({
+        await prisma.users.update({
           where: { id: userId },
           data: {
             stripeCustomerId: customerId,
