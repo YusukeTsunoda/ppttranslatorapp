@@ -52,6 +52,55 @@ async function extractTextFromPptx(buffer: Buffer): Promise<string[]> {
   return slideTexts;
 }
 
+// スライドをPNG画像として生成する関数
+async function generateSlideImage(slideNumber: number, slideText: string): Promise<Buffer> {
+  // テキストをエスケープ
+  const escapedText = slideText
+    .substring(0, 300)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  
+  // テキストを複数行に分割
+  const lines: string[] = [];
+  let currentLine = '';
+  const words = escapedText.split(' ');
+  
+  for (const word of words) {
+    if ((currentLine + ' ' + word).length > 40) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = currentLine ? currentLine + ' ' + word : word;
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  // SVGを生成
+  const textElements = lines.map((line, index) => 
+    `<text x="50" y="${120 + index * 30}" font-family="Arial" font-size="18" fill="black">${line}</text>`
+  ).join('\n');
+  
+  const svgContent = `
+    <svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="white"/>
+      <rect x="10" y="10" width="780" height="580" fill="white" stroke="gray" stroke-width="1"/>
+      <text x="50" y="50" font-family="Arial" font-size="24" font-weight="bold" fill="black">スライド ${slideNumber}</text>
+      <line x1="50" y1="70" x2="750" y2="70" stroke="gray" stroke-width="1"/>
+      ${textElements}
+    </svg>
+  `;
+  
+  // SVGをPNGに変換
+  return await sharp(Buffer.from(svgContent))
+    .png()
+    .toBuffer();
+}
+
 export async function parsePptx(filePath: string, outputDir: string) {
   try {
     // PPTXファイルを読み込む
@@ -79,10 +128,11 @@ export async function parsePptx(filePath: string, outputDir: string) {
     });
     
     // 画像ファイルを探す
-    const imageFiles = Object.keys(zip.files).filter(name => 
-      name.startsWith('ppt/media/') && 
-      (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg'))
+    const mediaFiles = Object.keys(zip.files).filter(name => 
+      name.startsWith('ppt/media/')
     );
+    
+    console.log(`Found ${mediaFiles.length} media files in PPTX`);
     
     // 結果を格納する配列
     const slides: Array<{index: number; text: string; image_path: string}> = [];
@@ -91,27 +141,80 @@ export async function parsePptx(filePath: string, outputDir: string) {
     for (let i = 0; i < slideFiles.length; i++) {
       // スライドのテキスト
       const slideText = text[i] || '';
+      const slideNumber = i + 1;
       
-      // 画像ファイルがある場合は使用、なければダミー画像を作成
-      let imageBuffer;
-      if (i < imageFiles.length) {
-        imageBuffer = await zip.files[imageFiles[i]].async('nodebuffer');
-      } else {
-        // ダミー画像を作成（白い背景に黒いテキスト）
-        imageBuffer = await sharp({
-          create: {
-            width: 800,
-            height: 600,
-            channels: 4,
-            background: { r: 255, g: 255, b: 255, alpha: 1 }
+      console.log(`Processing slide ${slideNumber}: ${slideText.substring(0, 30)}...`);
+      
+      // スライドのXMLを取得して画像参照を探す
+      const slideXml = await zip.file(slideFiles[i])?.async('text');
+      let imageBuffer: Buffer | undefined = undefined;
+      
+      if (slideXml && mediaFiles.length > 0) {
+        try {
+          // スライド内の画像参照を探す
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(slideXml, 'text/xml');
+          
+          // すべての画像参照を探す (a:blip要素)
+          const blipElements = xmlDoc.getElementsByTagName('a:blip');
+          console.log(`Found ${blipElements.length} image references in slide ${slideNumber}`);
+          
+          if (blipElements.length > 0) {
+            // 関係ファイルのパスを取得
+            const slideNum = slideFiles[i].match(/slide([0-9]+)\.xml/)?.[1];
+            const relsFile = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+            const relsXml = await zip.file(relsFile)?.async('text');
+            
+            if (relsXml) {
+              const relsDoc = parser.parseFromString(relsXml, 'text/xml');
+              const relationships = relsDoc.getElementsByTagName('Relationship');
+              
+              // 最初の画像参照を使用
+              const embed = blipElements[0].getAttribute('r:embed');
+              
+              if (embed) {
+                // 対応するリレーションシップを探す
+                for (let k = 0; k < relationships.length; k++) {
+                  if (relationships[k].getAttribute('Id') === embed) {
+                    const target = relationships[k].getAttribute('Target');
+                    if (target) {
+                      // メディアファイルのパスを構築
+                      let mediaPath = '';
+                      if (target.startsWith('/')) {
+                        mediaPath = target.substring(1);
+                      } else if (target.startsWith('../')) {
+                        mediaPath = 'ppt/' + target.substring(3);
+                      } else {
+                        mediaPath = 'ppt/slides/' + target;
+                      }
+                      
+                      console.log(`Found image reference: ${mediaPath} for slide ${slideNumber}`);
+                      
+                      // 画像ファイルを取得
+                      const mediaFile = zip.file(mediaPath);
+                      if (mediaFile) {
+                        imageBuffer = await mediaFile.async('nodebuffer');
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
-        })
-        .png()
-        .toBuffer();
+        } catch (err) {
+          console.error(`Error extracting image from slide ${slideNumber}:`, err);
+        }
+      }
+      
+      // 画像が見つからなかった場合はダミー画像を生成
+      if (!imageBuffer) {
+        console.log(`Generating image for slide ${slideNumber}`);
+        imageBuffer = await generateSlideImage(slideNumber, slideText);
       }
       
       // 画像を保存
-      const outputPath = path.join(outputDir, `slide_${i + 1}.png`);
+      const outputPath = path.join(outputDir, `slide_${slideNumber}.png`);
       
       // ディレクトリが存在しない場合は作成
       if (!existsSync(outputDir)) {
@@ -134,7 +237,7 @@ export async function parsePptx(filePath: string, outputDir: string) {
       slides.push({
         index: i,
         text: slideText,
-        image_path: `slide_${i + 1}.png`
+        image_path: `slide_${slideNumber}.png`
       });
     }
     
