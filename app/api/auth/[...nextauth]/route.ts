@@ -43,7 +43,7 @@ const authOptions: NextAuthOptions = {
           };
 
           return user;
-        } catch (error) {
+        } catch (error: any) {
           // エラー詳細のデバッグ出力
           console.error('Authorization error:', {
             message: error.message,

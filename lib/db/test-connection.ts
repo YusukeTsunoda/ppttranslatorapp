@@ -7,7 +7,7 @@ async function testConnection() {
     const result = await prisma.$queryRaw`SELECT 1`
     console.log('Database connection successful:', result)
     return true
-  } catch (error) {
+  } catch (error: any) {
     console.error('Database connection failed:', {
       error: error.message,
       timestamp: new Date().toISOString()

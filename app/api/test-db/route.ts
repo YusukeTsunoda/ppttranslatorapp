@@ -8,7 +8,7 @@ export async function GET() {
       success: isConnected,
       timestamp: new Date().toISOString()
     })
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ 
       success: false, 
       error: error.message,
