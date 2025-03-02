@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 import JSZip from 'jszip';
@@ -111,6 +112,19 @@ export async function parsePptx(filePath: string, outputDir: string) {
       
       // 画像を保存
       const outputPath = path.join(outputDir, `slide_${i + 1}.png`);
+      
+      // ディレクトリが存在しない場合は作成
+      if (!existsSync(outputDir)) {
+        console.log(`Creating directory: ${outputDir}`);
+        mkdirSync(outputDir, { recursive: true });
+      }
+      
+      // デバッグ情報を追加
+      console.log('Saving image to:', {
+        outputDir,
+        outputPath,
+        exists: existsSync(path.dirname(outputPath))
+      });
       
       await sharp(imageBuffer)
         .png()
