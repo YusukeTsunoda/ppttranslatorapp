@@ -46,6 +46,7 @@ export interface SlideContent {
   index: number;
   texts: TextElement[];
   layout: LayoutInfo;
+  image_path?: string; // スライド画像のパス
 }
 
 // PPTXファイル全体の解析結果

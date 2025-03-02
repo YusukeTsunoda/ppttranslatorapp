@@ -15,7 +15,10 @@ import {
   filePathManager,
   logFileOperation
 } from '@/lib/utils/file-utils';
-import { parsePptx } from '@/lib/utils/pptx-parser';
+// JavaScriptのパーサーを削除
+// import { parsePptx } from '@/lib/utils/pptx-parser';
+// Pythonのパーサーを使用
+import { PPTXParser } from '@/lib/pptx/parser';
 
 // ファイルサイズ制限
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -109,19 +112,11 @@ export async function POST(request: NextRequest) {
     });
     
     try {
-      // Node.jsベースのPPTX解析処理を使用
-      const slideData = await parsePptx(filePath, slidesDir);
+      // Pythonベースのパーサーを使用
+      const parser = PPTXParser.getInstance();
+      const slideData = await parser.parsePPTX(filePath, slidesDir);
 
-      if ('error' in slideData) {
-        console.error("PPTX parsing error:", slideData.error);
-        await logFileOperation(userId, 'access', fileId, false, slideData.error);
-        return NextResponse.json(
-          { error: slideData.error },
-          { status: 500 }
-        );
-      }
-
-      if (!slideData.slides || !Array.isArray(slideData.slides)) {
+      if (!slideData || !slideData.slides || !Array.isArray(slideData.slides)) {
         await logFileOperation(userId, 'access', fileId, false, 'スライドデータの形式が不正です');
         return NextResponse.json(
           { error: "スライドデータの形式が不正です" },
@@ -133,7 +128,7 @@ export async function POST(request: NextRequest) {
         ...slide,
         fileId,
         filePath: filePath,
-        image_path: `${fileId}/slide_${slide.index + 1}.png`
+        image_path: `${fileId}/${slide.image_path}`
       }));
 
       console.log('Debug - Generated slides data:', {

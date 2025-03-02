@@ -29,11 +29,18 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
         print(f"Converting PPTX to PDF: {pptx_path} -> {pdf_path}", file=sys.stderr)
         
         if sys.platform == "darwin":  # macOS
+            # LibreOfficeのパスを確認
+            libreoffice_path = subprocess.run(["which", "soffice"], capture_output=True, text=True).stdout.strip()
+            print(f"LibreOffice path: {libreoffice_path}", file=sys.stderr)
+            
             result = subprocess.run(
-                ["soffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, pptx_path],
+                [libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", output_dir, pptx_path],
                 capture_output=True,
                 text=True
             )
+            print(f"LibreOffice conversion stdout: {result.stdout}", file=sys.stderr)
+            print(f"LibreOffice conversion stderr: {result.stderr}", file=sys.stderr)
+            
             if result.returncode != 0:
                 print(f"Error converting to PDF: {result.stderr}", file=sys.stderr)
                 return [], (0, 0)
@@ -52,15 +59,38 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
             return [], (0, 0)
             
         print(f"Converting PDF to images: {pdf_path}", file=sys.stderr)
+        print(f"PDF file size: {os.path.getsize(pdf_path)} bytes", file=sys.stderr)
             
         # PDFを画像に変換（16:9のアスペクト比を保持）
         try:
-            # 720x405のサイズ（16:9）で変換
-            target_width = 720
-            target_height = int(target_width * 9 / 16)  # 405px
-            images = convert_from_path(pdf_path, size=(target_width, target_height))
+            # 高解像度で変換（1920x1080のサイズ）
+            target_width = 1920
+            target_height = int(target_width * 9 / 16)  # 1080px
+            
+            # popplerのパスを確認
+            poppler_path = None
+            if sys.platform == "darwin":  # macOS
+                # Homebrewでインストールされたpopplerのパスを使用
+                poppler_path = "/opt/homebrew/bin"
+                if not os.path.exists(poppler_path):
+                    poppler_path = "/usr/local/bin"
+            
+            print(f"Using poppler path: {poppler_path}", file=sys.stderr)
+            
+            # 高品質設定でPDFを画像に変換
+            images = convert_from_path(
+                pdf_path, 
+                size=(target_width, target_height),
+                poppler_path=poppler_path,
+                dpi=300,  # 高解像度
+                fmt="png",  # PNG形式で出力
+                transparent=False,  # 透明度なし
+                use_cropbox=True,  # クロップボックスを使用
+                strict=False  # 厳密なエラーチェックを無効化
+            )
             
             if not images:
+                print("No images were generated from PDF", file=sys.stderr)
                 return [], (0, 0)
                 
             # 実際の画像サイズを取得
@@ -68,6 +98,7 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
             actual_height = images[0].height
             
             print(f"Generated image size: {actual_width}x{actual_height}", file=sys.stderr)
+            print(f"Number of images generated: {len(images)}", file=sys.stderr)
             
         except Exception as e:
             print(f"Error converting PDF to images: {str(e)}", file=sys.stderr)
@@ -76,10 +107,11 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
         image_paths = []
         for i, image in enumerate(images):
             image_path = os.path.join(output_dir, f"slide_{i+1}.png")
-            image.save(image_path, "PNG")
+            # 高品質で保存
+            image.save(image_path, "PNG", quality=95, optimize=True)
             rel_path = f"slide_{i+1}.png"
             image_paths.append(rel_path)
-            print(f"Saved image: {image_path}", file=sys.stderr)
+            print(f"Saved image: {image_path} (size: {os.path.getsize(image_path)} bytes)", file=sys.stderr)
         
         try:
             os.remove(pdf_path)
@@ -91,6 +123,8 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
         
     except Exception as e:
         print(f"Error converting to PNG: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return [], (0, 0)
 
 def convert_coordinates(x: float, y: float, width: float, height: float, 
