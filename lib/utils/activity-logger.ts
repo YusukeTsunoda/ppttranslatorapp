@@ -25,7 +25,7 @@ async function getUserFromCache(userId: string) {
   }
 
   // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.users.findUnique({ where: { id: userId } });
   if (user) {
     userCache.set(userId, {
       id: user.id,
@@ -119,4 +119,4 @@ export async function getUserActivityLogs(userId: string, limit = 50, cursor?: s
     }
     throw error;
   }
-} 
+}
