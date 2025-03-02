@@ -20,7 +20,7 @@ export async function parsePptx(filePath: string, outputDir: string) {
     );
     
     // 結果を格納する配列
-    const slides = [];
+    const slides: Array<{index: number; text: string; image_path: string}> = [];
     
     // 各スライドの処理
     for (let i = 0; i < slideFiles.length; i++) {
