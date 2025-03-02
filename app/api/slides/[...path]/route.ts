@@ -4,6 +4,7 @@ import { readFile } from 'fs/promises';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth/auth-options';
 import { existsSync } from 'fs';
+import { FILE_CONFIG } from '@/lib/utils/file-utils';
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function GET(
     }
 
     // パスパラメータを結合して画像パスを作成
-    const imagePath = join(process.cwd(), 'tmp', 'users', session.user.id, 'slides', ...params.path);
+    const imagePath = join(FILE_CONFIG.tempDir, session.user.id, 'slides', ...params.path);
     console.log('Debug - Image request:', {
       userId: session.user.id,
       pathParams: params.path,

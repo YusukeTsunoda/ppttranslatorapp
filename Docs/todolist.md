@@ -1,3 +1,81 @@
+# Python実装とDockerによるVercelデプロイ計画
+
+## 目標
+現在のNext.jsアプリケーションをPythonで実装し、Dockerコンテナ化してVercelにデプロイする
+
+## 実装手順
+
+### 1. Pythonバックエンドの構築
+- [x] FastAPIフレームワークを使用したバックエンドの構築
+- [x] 必要なPythonパッケージの整理とrequirements.txtの作成
+- [x] PPTXパーサー機能のPython実装への移行
+- [x] PPTXジェネレーター機能のPython実装への移行
+- [ ] 認証機能のPython実装への移行
+- [x] ファイルアップロード/ダウンロード機能の実装
+- [x] エラーハンドリングの実装
+
+### 2. Dockerコンテナ化
+- [x] Dockerfileの作成
+- [x] docker-compose.ymlの更新
+- [ ] 開発環境用のコンテナ設定
+- [x] 本番環境用のコンテナ設定
+- [ ] 環境変数の管理方法の整備
+
+### 3. フロントエンドとの連携
+- [x] APIエンドポイントの整備
+- [x] CORS設定の実装
+- [ ] フロントエンドからのAPI呼び出し方法の調整
+- [ ] 認証トークンの受け渡し方法の実装
+
+### 4. Vercelデプロイ準備
+- [x] Vercel.jsonの更新
+- [x] Serverless Functionsの設定
+- [ ] 環境変数の設定
+- [ ] ビルドスクリプトの調整
+
+### 5. デプロイとテスト
+- [ ] ローカル環境でのテスト
+- [ ] Vercelへのデプロイ
+- [ ] デプロイ後の動作確認
+- [ ] パフォーマンステスト
+
+## 技術スタック
+- バックエンド: Python 3.9+, FastAPI
+- コンテナ化: Docker, docker-compose
+- デプロイ: Vercel
+- 依存パッケージ: python-pptx, Pillow, pdf2image
+
+## デプロイ手順
+
+1. リポジトリをクローン
+```bash
+git clone <repository-url>
+cd ppttranslatorapp
+```
+
+2. Dockerイメージをビルド
+```bash
+cd python_backend
+docker build -t ppt-translator-api .
+```
+
+3. ローカルでテスト実行
+```bash
+docker run -p 3000:3000 ppt-translator-api
+```
+
+4. Vercelにデプロイ
+```bash
+vercel
+```
+
+5. 環境変数の設定
+Vercelダッシュボードで以下の環境変数を設定:
+- `PORT`: 3000
+- `ALLOWED_ORIGINS`: フロントエンドのURL（カンマ区切りで複数指定可能）
+
+---
+
 # タスクリスト
 
 ## 優先度: 高

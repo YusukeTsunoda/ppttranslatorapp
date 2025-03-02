@@ -3,7 +3,6 @@ import { type NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/db/prisma';
 import { comparePasswords } from '@/lib/auth/password';
-import { User } from '@prisma/client';
 
 /**
  * セッション有効期限の設定
@@ -25,7 +24,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error('メールアドレスとパスワードは必須です');
         }
 
-        const user = await prisma.user.findUnique({
+        const user = await prisma.users.findUnique({
           where: { email: credentials.email }
         });
 
@@ -39,11 +38,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         // ログイン成功時の処理
-        await prisma.user.update({
+        await prisma.users.update({
           where: { id: user.id },
           data: {
             lastLogin: new Date(),
-            sessionExpires: new Date(Date.now() + SESSION_MAXAGE * 1000)
+            sessionExpires: new Date(Date.now() + SESSION_MAXAGE * 1000),
+            updatedAt: new Date()
           }
         });
 

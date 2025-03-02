@@ -2,7 +2,8 @@ import { prisma } from '@/lib/db';
 
 async function listUsers() {
   try {
-    const users = await prisma.user.findMany({
+    // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
+    const users = await prisma.users.findMany({
       select: {
         name: true,
         email: true, // ユーザーアドレスとして email を取得

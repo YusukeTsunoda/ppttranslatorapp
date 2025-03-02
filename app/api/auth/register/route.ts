@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth/session';
 import { prisma } from '@/lib/db';
+import { v4 as uuidv4 } from 'uuid';
 
 // Node.jsランタイムを明示的に指定
 // bcryptjsを使用するため、Edge Runtimeでは動作しません
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { email, password, name } = await request.json();
 
     // メールアドレスの重複チェック
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email },
     });
 
@@ -26,11 +27,13 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password);
 
     // ユーザーの作成
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
+        id: uuidv4(),
         email,
         name,
         passwordHash: hashedPassword,
+        updatedAt: new Date(),
       },
     });
 

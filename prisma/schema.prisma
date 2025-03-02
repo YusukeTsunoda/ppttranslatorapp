@@ -3,98 +3,97 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id                    String    @id @default(cuid())
-  name                  String?
-  email                 String?   @unique
-  emailVerified         DateTime?
-  image                 String?
-  passwordHash          String?
-  role                 String    @default("user")
-  lastLogin           DateTime?
-  sessionExpires      DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  deletedAt           DateTime?
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?
-  stripeProductId      String?
-  planName            String?
-  subscriptionStatus   String?
-  resetToken          String?   @unique
-  resetTokenExpires   DateTime?
-  lastPasswordReset   DateTime?
-  magicLinkToken      String?   @unique
-  magicLinkExpires    DateTime?
-  lastMagicLinkSent   DateTime?
-  activityLogs    ActivityLog[]
-  translations    Translation[]
-  accounts         Account[]
-  sessions         Session[]
-
-  @@map("users")
-  @@index([email])
-  @@index([lastLogin])
-  @@index([sessionExpires])
-  @@index([magicLinkToken])
-  @@index([resetToken])
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model ActivityLog {
-  id         String         @id @default(uuid())
-  userId     String
-  action     ActivityAction
-  ipAddress  String
-  metadata   Json?
-  createdAt  DateTime      @default(now())
-  user       User          @relation(fields: [userId], references: [id])
+  id        String         @id @default(uuid())
+  userId    String
+  action    ActivityAction
+  ipAddress String
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  user      users          @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([createdAt])
 }
 
-model Translation {
-  id          String   @id @default(cuid())
-  slides      Json
-  translations Json
-  currentSlide Int
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-}
-
 model Account {
-  id                String   @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?  @db.Text
-  access_token      String?  @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?  @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Translation {
+  id           String   @id
+  slides       Json
+  translations Json
+  currentSlide Int
+  userId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  users        users    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model users {
+  id                   String        @id
+  name                 String?
+  email                String?       @unique
+  emailVerified        DateTime?
+  image                String?
+  role                 String        @default("user")
+  lastLogin            DateTime?
+  sessionExpires       DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime
+  deletedAt            DateTime?
+  stripeCustomerId     String?       @unique
+  stripeSubscriptionId String?
+  stripeProductId      String?
+  planName             String?
+  subscriptionStatus   String?
+  lastMagicLinkSent    DateTime?
+  magicLinkExpires     DateTime?
+  magicLinkToken       String?       @unique
+  passwordHash         String?
+  lastPasswordReset    DateTime?
+  resetToken           String?       @unique
+  resetTokenExpires    DateTime?
+  Account              Account[]
+  activityLogs         ActivityLog[]
+  Session              Session[]
+  Translation          Translation[]
+
+  @@index([email])
+  @@index([lastLogin])
+  @@index([magicLinkToken])
+  @@index([resetToken])
+  @@index([sessionExpires])
 }
 
 enum ActivityAction {
@@ -108,4 +107,5 @@ enum ActivityAction {
   translation
   download
   settings_change
-} 
+  file_access
+}

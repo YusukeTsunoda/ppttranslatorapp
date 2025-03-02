@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: session.user.email },
       select: {
         stripeCustomerId: true,
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { email: session.user.email }
     });
 
@@ -87,9 +87,12 @@ export async function POST(request: NextRequest) {
       });
       customerId = customer.id;
 
-      await prisma.user.update({
+      await prisma.users.update({
         where: { id: user.id },
-        data: { stripeCustomerId: customerId }
+        data: { 
+          stripeCustomerId: customerId,
+          updatedAt: new Date()
+        }
       });
     }
 

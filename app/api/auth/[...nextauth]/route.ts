@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from '@/lib/prisma'
@@ -61,6 +62,13 @@ const authOptions: NextAuthOptions = {
     signIn: '/signin',
   }
 };
+=======
+import NextAuth from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
+
+// authOptionsを使用してNextAuthハンドラーを作成
+const handler = NextAuth(authOptions);
+>>>>>>> e11681c39053f84811f97f42f714604db87abfc9
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST }; 

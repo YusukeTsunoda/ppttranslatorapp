@@ -1,20 +1,21 @@
 {
   "version": 2,
-  "env": {
-    "PYTHONPATH": "lib/python",
-    "RESEND_API_KEY": "${RESEND_API_KEY}",
-    "DATABASE_URL": "${DATABASE_URL}",
-    "NEXTAUTH_URL": "${NEXTAUTH_URL}",
-    "NEXTAUTH_SECRET": "${NEXTAUTH_SECRET}",
-    "BASE_URL": "${BASE_URL}",
-    "NEXT_PUBLIC_APP_URL": "${NEXT_PUBLIC_APP_URL}",
-    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}",
-    "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}",
-    "STRIPE_WEBHOOK_SECRET": "${STRIPE_WEBHOOK_SECRET}",
-    "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
-    "ANTHROPIC_API_URL": "${ANTHROPIC_API_URL}",
-    "JWT_SECRET": "${JWT_SECRET}"
-  },
+  "builds": [
+    {
+      "src": "python_backend/Dockerfile",
+      "use": "@vercel/docker"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "python_backend/app/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
   "functions": {
     "app/api/stripe/**/*.ts": {
       "runtime": "@vercel/node@2.15.10"
@@ -24,6 +25,18 @@
     },
     "app/api/auth/**/*.ts": {
       "runtime": "@vercel/node@2.15.10"
+    },
+    "app/api/upload/route.ts": {
+      "runtime": "@vercel/node@2.15.10"
+    },
+    "app/api/pptx/parse/route.ts": {
+      "runtime": "@vercel/node@2.15.10"
+    },
+    "app/api/pptx/generate/route.ts": {
+      "runtime": "@vercel/node@2.15.10"
     }
-  }
+  },
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "framework": "nextjs"
 } 

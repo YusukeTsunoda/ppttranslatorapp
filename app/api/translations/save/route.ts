@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/db/prisma';
 import { PrismaTranslation } from '@/types/prisma';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
   try {
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
 
       const result = await prisma.$transaction(async (tx) => {
         // ユーザーの存在確認
-        const user = await tx.user.findUnique({
+        const user = await tx.users.findUnique({
           where: { email: userEmail },
           select: { id: true }
         });
@@ -41,10 +42,12 @@ export async function POST(request: Request) {
         // 翻訳データの保存
         const translation = await tx.translation.create({
           data: {
+            id: uuidv4(),
             slides,
             translations,
             currentSlide,
-            userId: user.id
+            userId: user.id,
+            updatedAt: new Date()
           }
         });
 

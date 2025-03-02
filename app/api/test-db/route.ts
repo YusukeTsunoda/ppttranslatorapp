@@ -8,10 +8,14 @@ export async function GET() {
       success: isConnected,
       timestamp: new Date().toISOString()
     })
+<<<<<<< HEAD
   } catch (error: any) {
+=======
+  } catch (error: unknown) {
+>>>>>>> e11681c39053f84811f97f42f714604db87abfc9
     return NextResponse.json({ 
       success: false, 
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }

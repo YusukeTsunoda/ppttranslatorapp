@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db/prisma';
 import { redirect } from 'next/navigation';
-import { User } from '@prisma/client';
+// import { users } from '@prisma/client';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY environment variable is not set');
@@ -85,9 +85,9 @@ export async function createCheckoutSession({
   }
 }
 
-export async function createCustomerPortalSession(user: User) {
+export async function createCustomerPortalSession(user: any) {
   // ユーザーのStripe情報を取得
-  const userData = await prisma.user.findUnique({
+  const userData = await prisma.users.findUnique({
     where: { id: user.id },
     select: {
       stripeCustomerId: true,
@@ -170,7 +170,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
     const priceId = subscription.items.data[0]?.price.id;
     const productName = subscription.items.data[0]?.price.product.toString();
 
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: userId },
       data: {
         stripeSubscriptionId: subscription.id,
@@ -198,7 +198,7 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
       throw new Error('Subscription metadata does not contain userId');
     }
 
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: userId },
       data: {
         stripeSubscriptionId: null,

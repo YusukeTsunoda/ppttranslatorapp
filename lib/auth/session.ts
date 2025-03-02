@@ -1,11 +1,12 @@
 import { getServerSession } from 'next-auth';
-import type { User } from '@prisma/client';
 import type { DefaultSession, Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 import GoogleProvider from "next-auth/providers/google";
 import { authOptions } from './auth-options';
+import { compare } from "bcrypt";
+import { sign, verify } from "jsonwebtoken";
 
 // Node.jsランタイムを明示的に指定
 // bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
@@ -17,11 +18,10 @@ export async function getSession() {
   return getServerSession(authOptions);
 }
 
-export async function setSession(user: User) {
-  // NextAuth.jsはセッションを自動的に管理するため、
-  // このメソッドは不要になりました
-  return;
-}
+// This function is no longer necessary as NextAuth.js handles session management automatically
+export const setSession = async (user: any) => {
+  // Implementation details...
+};
 
 export async function comparePasswords(plainText: string, hash: string | null): Promise<boolean> {
   if (!hash) return false;
