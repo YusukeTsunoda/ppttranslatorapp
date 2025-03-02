@@ -6,9 +6,9 @@ import { ActivityAction } from '@prisma/client';
 
 // ファイル設定の一元管理
 export const FILE_CONFIG = {
-  tempDir: 'tmp/users',
+  tempDir: '/tmp/users',
   publicDir: 'public/uploads',
-  processingDir: 'tmp/processing',
+  processingDir: '/tmp/processing',
   retentionPeriod: 24 * 60 * 60 * 1000, // 24時間
   maxRetries: 3,
   retryDelay: 1000, // 1秒
@@ -44,7 +44,7 @@ export class FilePathManager {
   // 実際のファイルパスを取得するヘルパーメソッド
   async findActualFilePath(userId: string, fileId: string, type: 'original' | 'translated' = 'original'): Promise<string | null> {
     try {
-      const dirPath = join(process.cwd(), this.config.tempDir, userId, 'uploads');
+      const dirPath = join(this.config.tempDir, userId, 'uploads');
       const files = await readdir(dirPath);
       
       // ファイルIDで始まり、タイプに応じたファイルを検索
@@ -86,7 +86,7 @@ export class FilePathManager {
   // 絶対パスを取得
   getAbsolutePath(relativePath: string): string {
     // 既に絶対パスの場合はそのまま返す
-    if (relativePath.startsWith(process.cwd())) {
+    if (relativePath.startsWith('/')) {
       return relativePath;
     }
     return join(process.cwd(), relativePath);
@@ -94,9 +94,14 @@ export class FilePathManager {
   
   // パスの存在確認と作成
   async ensurePath(filePath: string): Promise<void> {
-    const dirPath = join(process.cwd(), filePath, '..');
+    // 絶対パスかどうかを確認
+    const dirPath = filePath.startsWith('/') 
+      ? join(filePath, '..') 
+      : join(process.cwd(), filePath, '..');
+    
     try {
       await mkdir(dirPath, { recursive: true });
+      console.log(`Directory created successfully: ${dirPath}`);
     } catch (error) {
       console.error('Directory creation error:', error);
       throw error;
@@ -237,14 +242,29 @@ export function generateFileId(): string {
 
 export async function createUserDirectories(userId: string, fileId: string) {
   const pathManager = new FilePathManager();
-  const baseDir = join(process.cwd(), FILE_CONFIG.tempDir, userId);
+  const baseDir = FILE_CONFIG.tempDir.startsWith('/') 
+    ? join(FILE_CONFIG.tempDir, userId)
+    : join(process.cwd(), FILE_CONFIG.tempDir, userId);
   const uploadDir = join(baseDir, 'uploads');
   const slidesDir = pathManager.getSlidesPath(userId, fileId);
-  const absoluteSlidesDir = pathManager.getAbsolutePath(slidesDir);
+  const absoluteSlidesDir = slidesDir.startsWith('/') ? slidesDir : pathManager.getAbsolutePath(slidesDir);
+
+  console.log('Creating directories:', {
+    baseDir,
+    uploadDir,
+    slidesDir,
+    absoluteSlidesDir
+  });
 
   for (const dir of [baseDir, uploadDir, absoluteSlidesDir]) {
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
+    try {
+      if (!existsSync(dir)) {
+        await mkdir(dir, { recursive: true });
+        console.log(`Successfully created directory: ${dir}`);
+      }
+    } catch (error) {
+      console.error(`Error creating directory ${dir}:`, error);
+      throw new Error(`Error creating directory ${dir}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -254,7 +274,9 @@ export async function createUserDirectories(userId: string, fileId: string) {
 export async function cleanupOldFiles(userId: string) {
   try {
     const pathManager = new FilePathManager();
-    const baseDir = join(process.cwd(), FILE_CONFIG.tempDir, userId);
+    const baseDir = FILE_CONFIG.tempDir.startsWith('/') 
+      ? join(FILE_CONFIG.tempDir, userId)
+      : join(process.cwd(), FILE_CONFIG.tempDir, userId);
     const uploadsDir = join(baseDir, 'uploads');
     const slidesDir = join(baseDir, 'slides');
 
