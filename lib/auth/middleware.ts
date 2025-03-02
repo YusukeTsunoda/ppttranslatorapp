@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import type { users } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth/auth-options';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 async function getUser() {
   const session = await getServerSession(authOptions);

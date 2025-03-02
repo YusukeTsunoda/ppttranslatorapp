@@ -17,6 +17,7 @@ const nextConfig = {
       ],
     },
     serverComponentsExternalPackages: ['bcryptjs'],
+    appDir: true
   },
   // 静的ファイルの配信設定を追加
   async rewrites() {

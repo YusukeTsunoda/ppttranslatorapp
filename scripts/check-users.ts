@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 async function checkUsers() {
   try {
@@ -13,7 +13,7 @@ async function checkUsers() {
     
     console.log('登録されているユーザー:');
     console.table(users);
-  } catch (error) {
+  } catch (error: any) {
     console.error('エラー:', error);
   } finally {
     await prisma.$disconnect();

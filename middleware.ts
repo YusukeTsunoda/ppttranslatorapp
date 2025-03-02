@@ -6,38 +6,16 @@ import type { NextRequestWithAuth } from 'next-auth/middleware';
 export const runtime = 'nodejs';
 
 export default withAuth(
-  function middleware(request: NextRequestWithAuth) {
-    const token = request.nextauth.token;
-
-    // セッションエラーがある場合はサインインページにリダイレクト
-    if (token?.error) {
-      console.log('Auth error detected:', token.error);
-      const signInUrl = new URL('/signin', request.url);
-      signInUrl.searchParams.set('error', token.error as string);
-      signInUrl.searchParams.set('callbackUrl', request.url);
-      return NextResponse.redirect(signInUrl);
-    }
-
-    // セッション有効期限切れの場合はサインインページにリダイレクト
-    if (token?.sessionExpires && new Date(token.sessionExpires as string | number | Date) < new Date()) {
-      console.log('Session expired. Current time:', new Date().toISOString(), 'Session expires:', new Date(token.sessionExpires as string | number | Date).toISOString());
-      const signInUrl = new URL('/signin', request.url);
-      signInUrl.searchParams.set('error', 'SessionExpiredError');
-      signInUrl.searchParams.set('callbackUrl', request.url);
-      return NextResponse.redirect(signInUrl);
-    }
-
-    return NextResponse.next();
+  // `withAuth` augments your `Request` with the user's token.
+  function middleware(req) {
+    console.log(req.nextauth.token)
   },
   {
     callbacks: {
       authorized: ({ token }) => !!token
     },
-    pages: {
-      signIn: '/signin'
-    }
   }
-);
+)
 
 // 保護するパスを指定
 export const config = {
