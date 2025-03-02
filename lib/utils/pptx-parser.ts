@@ -134,7 +134,7 @@ export async function parsePptx(filePath: string, outputDir: string) {
       slides.push({
         index: i,
         text: slideText,
-        image_path: outputPath
+        image_path: `slide_${i + 1}.png`
       });
     }
     

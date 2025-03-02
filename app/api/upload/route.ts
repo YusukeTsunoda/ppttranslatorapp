@@ -141,7 +141,8 @@ export async function POST(request: NextRequest) {
         slidesDir,
         slidesCount: slidesWithFileId.length,
         samplePath: slidesWithFileId[0]?.image_path,
-        fullPath: join(slidesDir, `slide_1.png`)
+        fullPath: join(slidesDir, `slide_1.png`),
+        exists: existsSync(join(slidesDir, `slide_1.png`))
       });
 
       await logFileOperation(userId, 'access', fileId, true);
