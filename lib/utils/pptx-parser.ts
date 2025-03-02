@@ -101,6 +101,158 @@ async function generateSlideImage(slideNumber: number, slideText: string): Promi
     .toBuffer();
 }
 
+// スライドの背景画像を抽出する関数
+async function extractSlideBackground(zip: JSZip, slideXml: string, slideNumber: number): Promise<Buffer | undefined> {
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(slideXml, 'text/xml');
+    
+    // 背景の画像参照を探す (p:bg 要素内の a:blip)
+    const bgElements = xmlDoc.getElementsByTagName('p:bg');
+    if (bgElements.length > 0) {
+      const blipElements = bgElements[0].getElementsByTagName('a:blip');
+      if (blipElements.length > 0) {
+        const embed = blipElements[0].getAttribute('r:embed');
+        if (embed) {
+          // 関係ファイルからメディアファイルを取得
+          const slideNum = slideNumber.toString();
+          const relsFile = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+          const relsXml = await zip.file(relsFile)?.async('text');
+          
+          if (relsXml) {
+            const relsDoc = parser.parseFromString(relsXml, 'text/xml');
+            const relationships = relsDoc.getElementsByTagName('Relationship');
+            
+            for (let i = 0; i < relationships.length; i++) {
+              if (relationships[i].getAttribute('Id') === embed) {
+                const target = relationships[i].getAttribute('Target');
+                if (target) {
+                  // メディアファイルのパスを構築
+                  let mediaPath = '';
+                  if (target.startsWith('/')) {
+                    mediaPath = target.substring(1);
+                  } else if (target.startsWith('../')) {
+                    mediaPath = 'ppt/' + target.substring(3);
+                  } else {
+                    mediaPath = 'ppt/slides/' + target;
+                  }
+                  
+                  console.log(`Found background image: ${mediaPath} for slide ${slideNumber}`);
+                  
+                  // 画像ファイルを取得
+                  const mediaFile = zip.file(mediaPath);
+                  if (mediaFile) {
+                    return await mediaFile.async('nodebuffer');
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return undefined;
+  } catch (err) {
+    console.error(`Error extracting background from slide ${slideNumber}:`, err);
+    return undefined;
+  }
+}
+
+// スライド内のすべての画像を抽出する関数
+async function extractAllSlideImages(zip: JSZip, slideXml: string, slideNumber: number): Promise<Buffer[]> {
+  const images: Buffer[] = [];
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(slideXml, 'text/xml');
+    
+    // すべての画像参照を探す (a:blip要素)
+    const blipElements = xmlDoc.getElementsByTagName('a:blip');
+    console.log(`Found ${blipElements.length} image references in slide ${slideNumber}`);
+    
+    if (blipElements.length > 0) {
+      // 関係ファイルのパスを取得
+      const relsFile = `ppt/slides/_rels/slide${slideNumber}.xml.rels`;
+      const relsXml = await zip.file(relsFile)?.async('text');
+      
+      if (relsXml) {
+        const relsDoc = parser.parseFromString(relsXml, 'text/xml');
+        const relationships = relsDoc.getElementsByTagName('Relationship');
+        
+        // 各画像参照を処理
+        for (let j = 0; j < blipElements.length; j++) {
+          const embed = blipElements[j].getAttribute('r:embed');
+          if (embed) {
+            // 対応するリレーションシップを探す
+            for (let k = 0; k < relationships.length; k++) {
+              if (relationships[k].getAttribute('Id') === embed) {
+                const target = relationships[k].getAttribute('Target');
+                if (target) {
+                  // メディアファイルのパスを構築
+                  let mediaPath = '';
+                  if (target.startsWith('/')) {
+                    mediaPath = target.substring(1);
+                  } else if (target.startsWith('../')) {
+                    mediaPath = 'ppt/' + target.substring(3);
+                  } else {
+                    mediaPath = 'ppt/slides/' + target;
+                  }
+                  
+                  console.log(`Found image reference: ${mediaPath} for slide ${slideNumber}`);
+                  
+                  // 画像ファイルを取得
+                  const mediaFile = zip.file(mediaPath);
+                  if (mediaFile) {
+                    const imageBuffer = await mediaFile.async('nodebuffer');
+                    images.push(imageBuffer);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Error extracting images from slide ${slideNumber}:`, err);
+  }
+  return images;
+}
+
+// スライドのスクリーンショットを生成する関数
+async function createSlideScreenshot(
+  slideNumber: number, 
+  slideText: string, 
+  backgroundImage?: Buffer, 
+  slideImages: Buffer[] = []
+): Promise<Buffer> {
+  try {
+    // 背景画像がある場合はそれを使用
+    if (backgroundImage) {
+      // 背景画像をリサイズして返す
+      return await sharp(backgroundImage)
+        .resize(800, 600, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .png()
+        .toBuffer();
+    }
+    
+    // スライド内の画像がある場合は最初の画像を使用
+    if (slideImages.length > 0) {
+      // 最初の画像をリサイズして返す
+      return await sharp(slideImages[0])
+        .resize(800, 600, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .png()
+        .toBuffer();
+    }
+    
+    // 画像がない場合はテキストベースの画像を生成
+    return await generateSlideImage(slideNumber, slideText);
+  } catch (err) {
+    console.error(`Error creating slide screenshot for slide ${slideNumber}:`, err);
+    // エラーが発生した場合はテキストベースの画像を生成
+    return await generateSlideImage(slideNumber, slideText);
+  }
+}
+
 export async function parsePptx(filePath: string, outputDir: string) {
   try {
     // PPTXファイルを読み込む
@@ -145,66 +297,19 @@ export async function parsePptx(filePath: string, outputDir: string) {
       
       console.log(`Processing slide ${slideNumber}: ${slideText.substring(0, 30)}...`);
       
-      // スライドのXMLを取得して画像参照を探す
+      // スライドのXMLを取得
       const slideXml = await zip.file(slideFiles[i])?.async('text');
       let imageBuffer: Buffer | undefined = undefined;
       
-      if (slideXml && mediaFiles.length > 0) {
-        try {
-          // スライド内の画像参照を探す
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(slideXml, 'text/xml');
-          
-          // すべての画像参照を探す (a:blip要素)
-          const blipElements = xmlDoc.getElementsByTagName('a:blip');
-          console.log(`Found ${blipElements.length} image references in slide ${slideNumber}`);
-          
-          if (blipElements.length > 0) {
-            // 関係ファイルのパスを取得
-            const slideNum = slideFiles[i].match(/slide([0-9]+)\.xml/)?.[1];
-            const relsFile = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
-            const relsXml = await zip.file(relsFile)?.async('text');
-            
-            if (relsXml) {
-              const relsDoc = parser.parseFromString(relsXml, 'text/xml');
-              const relationships = relsDoc.getElementsByTagName('Relationship');
-              
-              // 最初の画像参照を使用
-              const embed = blipElements[0].getAttribute('r:embed');
-              
-              if (embed) {
-                // 対応するリレーションシップを探す
-                for (let k = 0; k < relationships.length; k++) {
-                  if (relationships[k].getAttribute('Id') === embed) {
-                    const target = relationships[k].getAttribute('Target');
-                    if (target) {
-                      // メディアファイルのパスを構築
-                      let mediaPath = '';
-                      if (target.startsWith('/')) {
-                        mediaPath = target.substring(1);
-                      } else if (target.startsWith('../')) {
-                        mediaPath = 'ppt/' + target.substring(3);
-                      } else {
-                        mediaPath = 'ppt/slides/' + target;
-                      }
-                      
-                      console.log(`Found image reference: ${mediaPath} for slide ${slideNumber}`);
-                      
-                      // 画像ファイルを取得
-                      const mediaFile = zip.file(mediaPath);
-                      if (mediaFile) {
-                        imageBuffer = await mediaFile.async('nodebuffer');
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`Error extracting image from slide ${slideNumber}:`, err);
-        }
+      if (slideXml) {
+        // スライドの背景画像を抽出
+        const backgroundImage = await extractSlideBackground(zip, slideXml, slideNumber);
+        
+        // スライド内のすべての画像を抽出
+        const slideImages = await extractAllSlideImages(zip, slideXml, slideNumber);
+        
+        // スライドのスクリーンショットを生成
+        imageBuffer = await createSlideScreenshot(slideNumber, slideText, backgroundImage, slideImages);
       }
       
       // 画像が見つからなかった場合はダミー画像を生成
