@@ -7,8 +7,6 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
-import { exec } from "child_process";
-import { promisify } from "util";
 import { existsSync } from "fs";
 import { 
   generateFileId, 
@@ -17,8 +15,7 @@ import {
   filePathManager,
   logFileOperation
 } from '@/lib/utils/file-utils';
-
-const execAsync = promisify(exec);
+import { parsePptx } from '@/lib/utils/pptx-parser';
 
 // ファイルサイズ制限
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -110,20 +107,13 @@ export async function POST(request: NextRequest) {
       fileName,
       uploadDir
     });
-
-    const pythonScript = join(process.cwd(), "lib/python/pptx_parser.py");
     
     try {
-      const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" "${filePath}" "${slidesDir}"`);
-      
-      if (stderr) {
-        console.log("Python script debug info:", stderr);
-      }
+      // Node.jsベースのPPTX解析処理を使用
+      const slideData = await parsePptx(filePath, slidesDir);
 
-      const slideData = JSON.parse(stdout);
-
-      if (slideData.error) {
-        console.error("Python script error:", slideData.error);
+      if ('error' in slideData) {
+        console.error("PPTX parsing error:", slideData.error);
         await logFileOperation(userId, 'access', fileId, false, slideData.error);
         return NextResponse.json(
           { error: slideData.error },
@@ -151,7 +141,7 @@ export async function POST(request: NextRequest) {
         slidesDir,
         slidesCount: slidesWithFileId.length,
         samplePath: slidesWithFileId[0]?.image_path,
-        fullPath: join(slidesDir, `slide_${slideData.slides[0].index + 1}.png`)
+        fullPath: join(slidesDir, `slide_1.png`)
       });
 
       await logFileOperation(userId, 'access', fileId, true);
