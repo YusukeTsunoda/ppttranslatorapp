@@ -6,9 +6,9 @@ import { ActivityAction } from '@prisma/client';
 
 // ファイル設定の一元管理
 export const FILE_CONFIG = {
-  tempDir: '/tmp/users',
+  tempDir: 'tmp/users',
   publicDir: 'public/uploads',
-  processingDir: '/tmp/processing',
+  processingDir: 'tmp/processing',
   retentionPeriod: 24 * 60 * 60 * 1000, // 24時間
   maxRetries: 3,
   retryDelay: 1000, // 1秒
