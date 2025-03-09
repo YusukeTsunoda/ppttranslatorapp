@@ -1,33 +1,27 @@
 import { PrismaClient } from '@prisma/client';
-import { hash } from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  try {
-    // テストユーザーの作成
-    const testUser = await prisma.users.upsert({
-      where: { email: 'test@example.com' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        email: 'test@example.com',
-        name: 'Test User',
-        passwordHash: await hash('password123', 10),
-        updatedAt: new Date(),
-        role: 'user',
-      },
-    });
+  console.log('Seeding database...');
 
-    console.log('Created test user:', testUser);
+  // テストユーザーの作成
+  console.log('Creating test user...');
+  const testUser = await prisma.user.upsert({
+    where: { email: 'test@example.com' },
+    update: {},
+    create: {
+      id: '0ac6c6be-d1e7-4b5b-ba6b-a0b648fdbffa',
+      name: 'Test User',
+      email: 'test@example.com',
+      password: 'hashed_password_would_go_here',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
 
-  } catch (error) {
-    console.error('Error seeding database:', error);
-    process.exit(1);
-  } finally {
-    await prisma.$disconnect();
-  }
+  console.log(`Created test user with id: ${testUser.id}`);
+  console.log('Seeding completed.');
 }
 
 main()

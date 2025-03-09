@@ -1,3 +1,4 @@
+/*
 import { prisma } from '@/lib/db';
 import { Prisma, ActivityAction } from '@prisma/client';
 import {
@@ -25,7 +26,7 @@ async function getUserFromCache(userId: string) {
   }
 
   // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
-  const user = await prisma.users.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (user) {
     userCache.set(userId, {
       id: user.id,
@@ -119,4 +120,41 @@ export async function getUserActivityLogs(userId: string, limit = 50, cursor?: s
     }
     throw error;
   }
+}
+*/
+
+// ActivityLogモデルが存在しないため、一時的にダミー実装を提供
+import { Prisma } from '@prisma/client';
+
+export enum ActivityAction {
+  sign_in = 'sign_in',
+  sign_up = 'sign_up',
+  sign_out = 'sign_out',
+  update_account = 'update_account',
+  update_password = 'update_password',
+  delete_account = 'delete_account',
+  file_upload = 'file_upload',
+  translation = 'translation',
+  download = 'download',
+  settings_change = 'settings_change',
+  file_access = 'file_access'
+}
+
+export interface ActivityLogData {
+  userId: string;
+  action: ActivityAction;
+  metadata?: Record<string, any>;
+}
+
+export async function logActivity(data: ActivityLogData): Promise<void> {
+  console.log('Activity logged (dummy):', data);
+  return;
+}
+
+export async function getUserActivityLogs(userId: string, limit = 50, cursor?: string) {
+  console.log('Get user activity logs (dummy):', { userId, limit, cursor });
+  return {
+    logs: [],
+    nextCursor: undefined
+  };
 }

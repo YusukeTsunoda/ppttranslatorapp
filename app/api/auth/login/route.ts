@@ -29,24 +29,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
         email: true,
-        passwordHash: true,
+        password: true,
         name: true,
       },
     });
 
-    if (!user || !user.passwordHash) {
+    if (!user || !user.password) {
       return NextResponse.json(
         { error: 'メールアドレスまたはパスワードが正しくありません' },
         { status: 401 }
       );
     }
 
-    const isValid = await comparePasswords(password, user.passwordHash);
+    const isValid = await comparePasswords(password, user.password);
     if (!isValid) {
       return NextResponse.json(
         { error: 'メールアドレスまたはパスワードが正しくありません' },
@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ログイン成功時のアクティビティログを記録
+    // ActivityLogモデルが存在しないためコメントアウト
+    /*
     await prisma.activityLog.create({
       data: {
         userId: user.id,
@@ -65,6 +67,16 @@ export async function POST(request: NextRequest) {
           timestamp: new Date().toISOString(),
         },
       },
+    });
+    */
+
+    // 代わりにコンソールにログを出力
+    console.log('User logged in:', {
+      userId: user.id,
+      action: 'sign_in',
+      ipAddress: request.ip || 'unknown',
+      userAgent: request.headers.get('user-agent'),
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({ 

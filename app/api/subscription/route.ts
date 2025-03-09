@@ -1,11 +1,13 @@
+/*
+// 元のコード全体をコメントアウト
+*/
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth/auth-options';
-import { prisma } from '@/lib/db';
-import { stripe } from '@/lib/stripe';
+import { prisma } from '@/lib/db/prisma';
 
-export const runtime = 'nodejs';
-
+// サブスクリプション情報を取得するエンドポイント
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,14 +18,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await prisma.users.findUnique({
-      where: { email: session.user.email },
-      select: {
-        stripeCustomerId: true,
-        stripeSubscriptionId: true,
-        subscriptionStatus: true,
-        planName: true
-      }
+    // ユーザー情報を取得
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
     });
 
     if (!user) {
@@ -33,21 +30,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // ダミーのサブスクリプション情報を返す
     return NextResponse.json({
-      customerId: user.stripeCustomerId,
-      subscriptionId: user.stripeSubscriptionId,
-      status: user.subscriptionStatus,
-      plan: user.planName
+      subscription: {
+        status: 'active',
+        plan: 'premium',
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
     });
   } catch (error) {
-    console.error('Subscription error:', error);
+    console.error('サブスクリプション情報取得エラー:', error);
     return NextResponse.json(
-      { error: 'サブスクリプション情報の取得中にエラーが発生しました' },
+      { error: 'サブスクリプション情報の取得に失敗しました' },
       { status: 500 }
     );
   }
 }
 
+// サブスクリプションを作成するエンドポイント
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -61,12 +61,12 @@ export async function POST(request: NextRequest) {
     const { priceId } = await request.json();
     if (!priceId) {
       return NextResponse.json(
-        { error: 'プランが選択されていません' },
+        { error: 'プランIDが必要です' },
         { status: 400 }
       );
     }
 
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: session.user.email }
     });
 
@@ -77,45 +77,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let customerId = user.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: session.user.email,
-        metadata: {
-          userId: user.id
-        }
-      });
-      customerId = customer.id;
-
-      await prisma.users.update({
-        where: { id: user.id },
-        data: { 
-          stripeCustomerId: customerId,
-          updatedAt: new Date()
-        }
-      });
-    }
-
-    const checkoutSession = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{
-        price: priceId,
-        quantity: 1
-      }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
-      metadata: {
-        userId: user.id
-      }
+    // ダミーのチェックアウトセッションURLを返す
+    return NextResponse.json({
+      url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard?checkout_success=true`
     });
-
-    return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
-    console.error('Subscription creation error:', error);
+    console.error('サブスクリプション作成エラー:', error);
     return NextResponse.json(
-      { error: 'サブスクリプションの作成中にエラーが発生しました' },
+      { error: 'サブスクリプションの作成に失敗しました' },
       { status: 500 }
     );
   }

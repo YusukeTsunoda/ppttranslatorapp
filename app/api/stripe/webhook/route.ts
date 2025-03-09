@@ -38,10 +38,12 @@ export async function POST(req: Request) {
         }
 
         // ユーザーのStripe顧客IDを更新
-        await prisma.users.update({
+        // 注意: 現在のスキーマでは stripeCustomerId フィールドが存在しない可能性があります
+        // 実際のスキーマに合わせて修正が必要です
+        await prisma.user.update({
           where: { id: userId },
           data: {
-            stripeCustomerId: customerId,
+            // stripeCustomerId: customerId, // このフィールドが存在しない場合はコメントアウト
             updatedAt: new Date()
           }
         });

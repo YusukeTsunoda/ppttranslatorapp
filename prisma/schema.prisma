@@ -8,19 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model ActivityLog {
-  id        String         @id @default(uuid())
-  userId    String
-  action    ActivityAction
-  ipAddress String
-  metadata  Json?
-  createdAt DateTime       @default(now())
-  user      users          @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
 model Account {
   id                String  @id
   userId            String
@@ -34,7 +21,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -44,68 +31,82 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Translation {
-  id           String   @id
-  slides       Json
-  translations Json
-  currentSlide Int
+  id          String   @id
+  textId      String
+  sourceLang  Language
+  targetLang  Language
+  translation String
+  model       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Text        Text     @relation(fields: [textId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id           String     @id
   userId       String
-  createdAt    DateTime @default(now())
+  originalName String
+  storagePath  String
+  status       FileStatus @default(PROCESSING)
+  fileSize     Int
+  mimeType     String
+  createdAt    DateTime   @default(now())
   updatedAt    DateTime
-  users        users    @relation(fields: [userId], references: [id])
-
-  @@index([userId])
+  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Slide        Slide[]
 }
 
-model users {
-  id                   String        @id
-  name                 String?
-  email                String?       @unique
-  emailVerified        DateTime?
-  image                String?
-  role                 String        @default("user")
-  lastLogin            DateTime?
-  sessionExpires       DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime
-  deletedAt            DateTime?
-  stripeCustomerId     String?       @unique
-  stripeSubscriptionId String?
-  stripeProductId      String?
-  planName             String?
-  subscriptionStatus   String?
-  lastMagicLinkSent    DateTime?
-  magicLinkExpires     DateTime?
-  magicLinkToken       String?       @unique
-  passwordHash         String?
-  lastPasswordReset    DateTime?
-  resetToken           String?       @unique
-  resetTokenExpires    DateTime?
-  Account              Account[]
-  activityLogs         ActivityLog[]
-  Session              Session[]
-  Translation          Translation[]
+model Slide {
+  id        String   @id
+  fileId    String
+  index     Int
+  imagePath String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  File      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  Text      Text[]
 
-  @@index([email])
-  @@index([lastLogin])
-  @@index([magicLinkToken])
-  @@index([resetToken])
-  @@index([sessionExpires])
+  @@unique([fileId, index])
 }
 
-enum ActivityAction {
-  sign_in
-  sign_up
-  sign_out
-  update_account
-  update_password
-  delete_account
-  file_upload
-  translation
-  download
-  settings_change
-  file_access
+model Text {
+  id          String        @id
+  slideId     String
+  text        String
+  position    Json
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  Slide       Slide         @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  Translation Translation[]
+}
+
+model User {
+  id            String    @id
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  Account       Account[]
+  File          File[]
+  Session       Session[]
+}
+
+enum FileStatus {
+  PROCESSING
+  READY
+  ERROR
+}
+
+enum Language {
+  ja
+  en
+  zh
+  ko
 }

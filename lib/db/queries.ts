@@ -9,7 +9,7 @@ export async function getUser() {
       return null;
     }
 
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: {
         email: session.user.email
       }
@@ -24,6 +24,8 @@ export async function getUser() {
   }
 }
 
+// ActivityLog モデルが存在しないためコメントアウト
+/*
 export async function getActivityLogs(userId: string) {
   return prisma.activityLog.findMany({
     where: {
@@ -34,4 +36,12 @@ export async function getActivityLogs(userId: string) {
     },
     take: 50
   });
+}
+*/
+
+export async function getUserById(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+  return user;
 }

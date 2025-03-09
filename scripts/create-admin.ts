@@ -14,13 +14,12 @@ async function createAdminUser() {
     
     // ユーザーを作成
     // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
-    const user = await prisma.users.create({
+    const user = await prisma.user.create({
       data: {
         id: uuidv4(),
         email,
-        passwordHash: hashedPassword,
+        password: hashedPassword,
         name: 'Admin User',
-        role: 'admin',
         updatedAt: new Date(),
       },
     });

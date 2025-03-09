@@ -2,12 +2,11 @@ import { prisma } from '@/lib/prisma';
 
 async function checkUsers() {
   try {
-    const users = await prisma.users.findMany({
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
         name: true,
-        role: true,
       }
     });
     

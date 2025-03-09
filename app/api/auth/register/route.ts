@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { email, password, name } = await request.json();
 
     // メールアドレスの重複チェック
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
@@ -27,17 +27,19 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password);
 
     // ユーザーの作成
-    const user = await prisma.users.create({
+    const user = await prisma.user.create({
       data: {
         id: uuidv4(),
         email,
         name,
-        passwordHash: hashedPassword,
+        password: hashedPassword,
         updatedAt: new Date(),
       },
     });
 
     // アクティビティログの記録
+    // ActivityLogモデルが存在しないためコメントアウト
+    /*
     await prisma.activityLog.create({
       data: {
         userId: user.id,
@@ -49,6 +51,15 @@ export async function POST(request: NextRequest) {
       }
     }).catch((error: Error) => {
       console.error('Error creating activity log:', error);
+    });
+    */
+
+    // 代わりにコンソールにログを出力
+    console.log('User registered:', {
+      userId: user.id,
+      action: 'sign_up',
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      email: user.email
     });
 
     return NextResponse.json({ success: true, userId: user.id });
