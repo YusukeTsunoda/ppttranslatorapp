@@ -5,7 +5,8 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { verifyToken } from "@/lib/auth/session";
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
 import { filePathManager, logFileOperation, withRetry } from '@/lib/utils/file-utils';
 
 export async function GET(
@@ -14,13 +15,8 @@ export async function GET(
 ) {
   try {
     // セッションチェック
-    const sessionCookie = request.cookies.get('session');
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
-    }
-
-    const session = await verifyToken(sessionCookie.value);
-    if (!session) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 

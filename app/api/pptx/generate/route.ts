@@ -7,7 +7,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { verifyToken } from "@/lib/auth/session";
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
 import { filePathManager } from "@/lib/utils/file-utils";
 
 const execAsync = promisify(exec);
@@ -15,12 +16,8 @@ const execAsync = promisify(exec);
 export async function POST(req: NextRequest) {
   try {
     // セッションチェック
-    const sessionCookie = req.cookies.get('session');
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const session = await verifyToken(sessionCookie.value);
-    if (!session) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
