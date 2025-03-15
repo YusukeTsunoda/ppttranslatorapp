@@ -15,18 +15,9 @@ import path from 'path';
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { Toaster } from "@/components/ui/toaster";
-
-// ファイル先頭に型定義を追加
-interface CustomSession {
-    user: {
-        id: string;
-        name?: string | null;
-        email?: string | null;
-    };
-    expires: string;
-}
-
-type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
+import { FileUploadComponent } from "./components/FileUpload";
+import { PreviewSectionComponent } from "./components/PreviewSection";
+import { Slide, TranslationModel, CustomSession, SessionStatus } from "./types";
 
 function LoadingSpinner() {
   return (
@@ -36,169 +27,27 @@ function LoadingSpinner() {
   );
 }
 
-// スライドの型定義
-interface TextPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface TextItem {
-  text: string;
-  position: TextPosition;
-}
-
-interface TranslationItem {
-  text: string;
-  position: TextPosition;
-}
-
-interface Slide {
-  index: number;
-  imageUrl: string;
-  texts: TextItem[];
-  translations?: TranslationItem[];
-}
-
-// FileUploadコンポーネントを定義
-const FileUpload = ({ onUploadComplete }: { onUploadComplete: (file: File) => void }) => {
-  const [uploading, setUploading] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) onUploadComplete(file);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  return (
-    <div 
-      className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-all duration-200 ${
-        isDragOver 
-          ? 'border-primary bg-primary/5' 
-          : 'border-gray-300 hover:border-gray-400'
-      }`}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      data-testid="file-drop-area"
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".pptx"
-        onChange={(e) => e.target.files && onUploadComplete(e.target.files[0])}
-        data-testid="file-input"
-      />
-      <div className="text-center">
-        <div className="mb-4">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-primary/10 flex items-center justify-center">
-            <FileText className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-medium">ファイルをアップロード</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            PPTXファイルをドラッグ＆ドロップするか、クリックして選択してください
-          </p>
-        </div>
-        <Button 
-          onClick={handleButtonClick}
-          disabled={uploading}
-          data-testid="file-select-button"
-          className="w-full sm:w-auto"
-          variant="outline"
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              アップロード中...
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4 mr-2" />
-              ファイルを選択
-            </>
-          )}
-        </Button>
-        <p className="text-xs text-gray-500 mt-2">
-          最大ファイルサイズ: 20MB
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const PreviewSection = ({ slide }: { slide: Slide }) => {
-  const [imageError, setImageError] = useState(false);
-
-  return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* プレビュー画像 */}
-      <div className="relative w-full h-[400px] bg-gray-50">
-        {!imageError ? (
-          <Image
-            src={slide.imageUrl}
-            alt={`スライド ${slide.index + 1}`}
-            fill
-            style={{ objectFit: 'contain' }}
-            priority
-            onError={() => setImageError(true)}
-            data-testid="preview-image"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">画像の読み込みに失敗しました</p>
-          </div>
-        )}
-      </div>
-      
-      {/* テキスト一覧 */}
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-4">抽出されたテキスト</h3>
-        <div className="space-y-4">
-          {slide.texts.map((text, idx) => (
-            <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-gray-50">
-              {/* 原文 */}
-              <div>
-                <div className="text-sm text-gray-500 mb-1">原文:</div>
-                <div className="p-3 bg-white rounded border">{text.text}</div>
-              </div>
-              
-              {/* 翻訳 */}
-              <div>
-                <div className="text-sm text-gray-500 mb-1">翻訳:</div>
-                <div className="p-3 bg-white rounded border">
-                  {slide.translations?.[idx]?.text || '翻訳待ち...'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+// 利用可能なモデルのリスト
+const availableModels: TranslationModel[] = [
+  {
+    value: "claude-3-haiku-20240307",
+    label: "Claude 3 Haiku",
+    description: "高速で経済的な翻訳向け",
+    premium: false
+  },
+  {
+    value: "claude-3-sonnet-20240229",
+    label: "Claude 3 Sonnet",
+    description: "高品質な翻訳向け",
+    premium: true
+  },
+  {
+    value: "anthropic.claude-3-haiku-20240307-v1:0",
+    label: "Claude 3 Haiku (AWS Bedrock)",
+    description: "AWS Bedrock経由の高速翻訳",
+    premium: true
+  }
+];
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -228,29 +77,6 @@ export default function TranslatePage() {
   const [editingValue, setEditingValue] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [isTranslated, setIsTranslated] = useState(false);
-
-  // 利用可能なモデルのリスト
-  const availableModels = [
-    {
-      value: "claude-3-haiku-20240307",
-      label: "Claude 3 Haiku",
-      description: "高速で経済的な翻訳向け",
-      premium: false
-    },
-    {
-      value: "claude-3-sonnet-20240229",
-      label: "Claude 3 Sonnet",
-      description: "高品質な翻訳向け",
-      premium: true
-    },
-    {
-      value: "anthropic.claude-3-haiku-20240307-v1:0",
-      label: "Claude 3 Haiku (AWS Bedrock)",
-      description: "AWS Bedrock経由の高速翻訳",
-      premium: true
-    }
-  ];
-
   const [selectedModel, setSelectedModel] = useState(availableModels[0].value);
 
   // コンポーネントの初期化
@@ -370,32 +196,105 @@ export default function TranslatePage() {
       }
 
       const data = await response.json();
-      console.log('Upload response:', data);
       
-      if (data.slides && Array.isArray(data.slides) && data.slides.length > 0) {
-        // スライドデータの整形
-        const formattedSlides = data.slides.map((slide: any, index: number) => ({
-          index,
-          imageUrl: `/api/slides/${data.fileId}/slide_${index + 1}.png`,
-          texts: slide.texts || [],
-          translations: slide.translations || []
-        }));
-        
-        setSlides(formattedSlides);
-        setCurrentSlide(0);
-        setShouldUpdateOverlay(true);
-        
-        toast({
-          title: "成功",
-          description: `${formattedSlides.length}枚のスライドの解析が完了しました`,
-          variant: "default",
-        });
-      } else {
+      // APIレスポンスの詳細をログ出力
+      console.log('=== API Response Debug ===');
+      console.log('Status:', response.status);
+      console.log('Response Data:', {
+        type: typeof data,
+        keys: Object.keys(data),
+        fileId: data.fileId,
+        success: data.success,
+        hasSlides: data.slides && Array.isArray(data.slides),
+        slidesLength: data.slides && Array.isArray(data.slides) ? data.slides.length : 0
+      });
+
+      // ファイルIDの取得を改善
+      const fileId = data.fileId;
+      if (!fileId) {
+        console.error('=== File ID Error ===');
+        console.error('Expected fileId in response data structure:');
+        console.error('- data.fileId:', data.fileId);
+        throw new Error('ファイルIDが見つかりません');
+      }
+
+      // スライドデータの検証と整形を改善
+      let slides = data.slides;
+      if (!slides || !Array.isArray(slides) || slides.length === 0) {
+        console.error('=== Slides Data Error ===');
+        console.error('Expected slides data structure not found:');
+        console.error('- data.slides:', data.slides);
         throw new Error('スライドデータの形式が不正です');
       }
 
+      // スライドデータの詳細をログ出力
+      console.log('=== Slides Data Debug ===');
+      console.log('First slide keys:', Object.keys(slides[0]));
+      console.log('First slide texts sample:', slides[0].texts && slides[0].texts.length > 0 ? slides[0].texts[0] : 'No texts');
+
+      // スライドデータの整形
+      const formattedSlides = slides.map((slide: any, index: number) => {
+        if (!slide) {
+          console.error(`Invalid slide data at index ${index}:`, slide);
+          return null;
+        }
+
+        // テキストデータの形式を確認
+        const texts = Array.isArray(slide.texts) 
+          ? slide.texts.map((text: any) => {
+              // TextItem型に変換
+              if (typeof text === 'string') {
+                return {
+                  text: text,
+                  position: { x: 0, y: 0, width: 0, height: 0 }
+                };
+              } else if (text && typeof text === 'object') {
+                return {
+                  text: text.text || text.content || '',
+                  position: text.position || { x: 0, y: 0, width: 0, height: 0 }
+                };
+              } else {
+                console.error('Invalid text format:', text);
+                return {
+                  text: '',
+                  position: { x: 0, y: 0, width: 0, height: 0 }
+                };
+              }
+            })
+          : [];
+
+        return {
+          index,
+          imageUrl: `/api/slides/${fileId}/${slide.image_path || `slide_${index + 1}.png`}`,
+          texts: texts,
+          translations: []
+        };
+      }).filter(Boolean) as Slide[];
+
+      if (formattedSlides.length === 0) {
+        console.error('=== Formatting Error ===');
+        console.error('No valid slides after formatting');
+        throw new Error('有効なスライドデータがありません');
+      }
+
+      // 成功時のデータ構造を確認
+      console.log('=== Success ===');
+      console.log('Formatted Slides Count:', formattedSlides.length);
+      console.log('First formatted slide:', formattedSlides[0]);
+
+      setSlides(formattedSlides);
+      setCurrentSlide(0);
+      setShouldUpdateOverlay(true);
+      
+      toast({
+        title: "成功",
+        description: `${formattedSlides.length}枚のスライドの解析が完了しました`,
+        variant: "default",
+      });
+
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('=== Upload Error ===');
+      console.error('Error details:', error);
       toast({
         title: "エラー",
         description: error instanceof Error ? error.message : "アップロードに失敗しました",
@@ -528,22 +427,42 @@ export default function TranslatePage() {
   };
 
   // 翻訳処理
-  const handleTranslateSlide = async () => {
+  const handleTranslate = async () => {
     setIsTranslating(true);
     try {
-      // 翻訳APIの呼び出し処理をここに実装
-      // 実際のAPIコールは省略
+      // 現在のスライドのテキストを抽出
+      const textsToTranslate = slides[currentSlide].texts.map(textItem => ({
+        text: textItem.text,
+        position: textItem.position
+      }));
       
-      // 仮の実装として、少し待ってから翻訳完了とする
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 翻訳APIの呼び出し
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          texts: textsToTranslate,
+          sourceLang: 'ja',
+          targetLang: 'en',
+        }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('翻訳APIの呼び出しに失敗しました');
+      }
+      
+      const data = await response.json();
       
       // 翻訳結果を更新
       const updatedSlides = [...slides];
       updatedSlides[currentSlide] = {
         ...updatedSlides[currentSlide],
-        translations: updatedSlides[currentSlide].texts.map(text => ({
-          text: `Translated: ${text.text}`,
-          position: text.position
+        translations: data.translations.map((translatedText: string, index: number) => ({
+          text: translatedText,
+          position: textsToTranslate[index].position
         }))
       };
       
@@ -570,21 +489,57 @@ export default function TranslatePage() {
     try {
       setIsDownloading(true);
       
-      // ダウンロードAPIの呼び出し処理をここに実装
-      // 実際のAPIコールは省略
-      
-      // 仮の実装として、少し待ってからダウンロード完了とする
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "ダウンロード完了",
-        description: "翻訳済みファイルのダウンロードが完了しました",
+      // 翻訳データの準備
+      const slidesWithTranslations = slides.map(slide => {
+        return {
+          index: slide.index,
+          texts: slide.texts,
+          translations: slide.translations || []
+        };
       });
+      
+      // ダウンロードAPIの呼び出し
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: slides[0].imageUrl.split('/').slice(-2)[0], // URLからfileIdを抽出
+          slides: slidesWithTranslations
+        }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'ダウンロードに失敗しました');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.filePath) {
+        // ファイルのダウンロード
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `/${data.filePath}`;
+        downloadLink.download = `translated_presentation.pptx`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        toast({
+          title: "ダウンロード完了",
+          description: "翻訳済みファイルのダウンロードが完了しました",
+        });
+      } else {
+        throw new Error('ダウンロードリンクの取得に失敗しました');
+      }
     } catch (error) {
       console.error('Download error:', error);
       toast({
         title: "エラー",
-        description: "ダウンロード中にエラーが発生しました",
+        description: error instanceof Error ? error.message : "ダウンロード中にエラーが発生しました",
+        variant: "destructive",
       });
     } finally {
       setIsDownloading(false);
@@ -620,8 +575,8 @@ export default function TranslatePage() {
   };
 
   // 翻訳実行
-  const handleTranslate = async () => {
-    await handleTranslateSlide();
+  const handleTranslateSlide = async () => {
+    await handleTranslate();
   };
 
   // リセット処理
@@ -639,35 +594,65 @@ export default function TranslatePage() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6" data-testid="translate-page-title">翻訳</h1>
       
-      {slides.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg shadow-md" data-testid="upload-area">
-          <h2 className="text-xl font-semibold mb-4">ファイルをアップロード</h2>
-          <FileUpload onUploadComplete={handleFileUpload} />
+      {/* ファイルアップロードセクション - スライドがない場合のみ表示 */}
+      {slides.length === 0 && (
+        <div className="mb-8">
+          <FileUploadComponent onUploadComplete={handleFileUpload} />
         </div>
-      ) : (
+      )}
+
+      {/* プレビューセクション */}
+      {slides.length > 0 && (
         <div className="space-y-6">
           {/* 操作ボタン */}
-          <div className="flex justify-between items-center">
-            <div className="flex space-x-4">
-              <Button 
-                onClick={handleTranslate} 
-                disabled={isTranslating}
-                data-testid="translate-button"
-              >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    翻訳中...
-                  </>
-                ) : (
-                  '翻訳開始'
-                )}
-              </Button>
-              <Button 
-                onClick={handleDownload} 
-                disabled={isDownloading || !isTranslated}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleTranslateSlide}
+              disabled={isTranslating}
+              className="flex items-center"
+            >
+              {isTranslating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  翻訳中...
+                </>
+              ) : (
+                <>
+                  翻訳する
+                </>
+              )}
+            </Button>
+            
+            {slides.length > 1 && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                  disabled={currentSlide === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm">
+                  {currentSlide + 1} / {slides.length}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+                  disabled={currentSlide === slides.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {isTranslated && (
+              <Button
                 variant="outline"
-                data-testid="download-button"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="flex items-center"
               >
                 {isDownloading ? (
                   <>
@@ -677,30 +662,62 @@ export default function TranslatePage() {
                 ) : (
                   <>
                     <Download className="mr-2 h-4 w-4" />
-                    ダウンロード
+                    翻訳済みファイルをダウンロード
                   </>
                 )}
               </Button>
-            </div>
-            <Button 
-              variant="ghost" 
+            )}
+            
+            {/* リセットボタン追加 */}
+            <Button
+              variant="ghost"
               onClick={handleReset}
-              data-testid="reset-button"
+              className="flex items-center ml-auto"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               リセット
             </Button>
           </div>
-
-          {/* プレビューとテキスト */}
-          {isLoading ? (
-            <div className="flex justify-center items-center py-12" data-testid="loading-indicator">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2 text-lg">スライドを読み込み中...</span>
-            </div>
-          ) : (
-            <PreviewSection slide={slides[currentSlide]} />
-          )}
+          
+          {/* スライドプレビュー - 大きく表示 */}
+          <div className="w-full max-w-full">
+            <PreviewSectionComponent 
+              slide={slides[currentSlide]} 
+              onTranslationEdit={(index, newText) => {
+                // 翻訳テキストの更新
+                const updatedSlides = [...slides];
+                if (!updatedSlides[currentSlide].translations) {
+                  updatedSlides[currentSlide].translations = [];
+                }
+                
+                // 既存の翻訳がない場合は新しい配列を作成
+                if (!Array.isArray(updatedSlides[currentSlide].translations)) {
+                  updatedSlides[currentSlide].translations = [];
+                }
+                
+                // 翻訳アイテムを更新または作成
+                if (updatedSlides[currentSlide].translations[index]) {
+                  updatedSlides[currentSlide].translations[index].text = newText;
+                } else {
+                  // 翻訳アイテムが存在しない場合は新規作成
+                  const position = updatedSlides[currentSlide].texts[index]?.position || { x: 0, y: 0, width: 0, height: 0 };
+                  updatedSlides[currentSlide].translations[index] = {
+                    text: newText,
+                    position: position
+                  };
+                }
+                
+                setSlides(updatedSlides);
+                
+                // 編集履歴も更新
+                const translationKey = `${currentSlide}-${index}`;
+                setEditedTranslations(prev => ({
+                  ...prev,
+                  [translationKey]: newText
+                }));
+              }}
+            />
+          </div>
         </div>
       )}
       

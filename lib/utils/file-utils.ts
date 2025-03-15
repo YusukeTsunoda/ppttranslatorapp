@@ -55,12 +55,10 @@ export class FilePathManager {
       );
       
       if (file) {
-        console.log(`Found ${type} file: ${file} for fileId: ${fileId}`);
         // 相対パスを返す
         return join(this.config.tempDir, userId, 'uploads', file);
       }
       
-      console.log(`No ${type} file found for fileId: ${fileId} in directory: ${dirPath}`);
       return null;
     } catch (error) {
       console.error(`Error finding ${type} file for fileId: ${fileId}:`, error);
@@ -101,7 +99,6 @@ export class FilePathManager {
     
     try {
       await mkdir(dirPath, { recursive: true });
-      console.log(`Directory created successfully: ${dirPath}`);
     } catch (error) {
       console.error('Directory creation error:', error);
       throw error;
@@ -113,23 +110,12 @@ export class FilePathManager {
     const sourceAbsPath = this.getAbsolutePath(sourcePath);
     const destAbsPath = this.getAbsolutePath(destPath);
     
-    // 詳細なパス情報をログに出力
-    console.log("移動ファイルパス詳細:", {
-      sourcePath,
-      sourceAbsPath,
-      destPath,
-      destAbsPath,
-      cwd: process.cwd(),
-      timestamp: new Date().toISOString()
-    });
-    
     // 宛先ディレクトリの作成
     await this.ensurePath(destPath);
     
     try {
       // ファイルのコピー
       await copyFile(sourceAbsPath, destAbsPath);
-      console.log(`File copied from ${sourceAbsPath} to ${destAbsPath}`);
     } catch (error) {
       console.error(`Error copying file from ${sourceAbsPath} to ${destAbsPath}:`, error);
       throw error;
@@ -143,7 +129,6 @@ export class FilePathManager {
     
     try {
       await mkdir(absolutePublicUserDir, { recursive: true });
-      console.log(`Ensured public directory exists: ${absolutePublicUserDir}`);
     } catch (error) {
       console.error(`Error creating public directory ${absolutePublicUserDir}:`, error);
       throw error;

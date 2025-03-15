@@ -182,4 +182,108 @@ sequenceDiagram
         Frontend->>User: ユーザーフレンドリーなエラー表示
         Frontend->>Frontend: リトライ/代替手段の提案
     end
-``` 
+```
+
+# PPTXファイルアップロードから翻訳までのシーケンス図と問題分析
+
+## 現在のデータフロー
+
+```mermaid
+sequenceDiagram
+    participant ユーザー as ユーザー
+    participant フロントエンド as フロントエンド (React)
+    participant アップロードAPI as アップロードAPI (upload/route.ts)
+    participant PPTXParser as PPTXParser (lib/pptx/parser.ts)
+    participant Python as Pythonスクリプト (lib/python/pptx_parser.py)
+    participant 翻訳API as 翻訳API (translate/route.ts)
+    participant Claude as Claude API (Anthropic)
+    participant ファイルシステム as ファイルシステム
+    
+    ユーザー->>フロントエンド: PPTXファイルを選択
+    フロントエンド->>アップロードAPI: FormDataでファイルをPOST
+    
+    アップロードAPI->>ファイルシステム: ユーザーディレクトリ作成
+    アップロードAPI->>ファイルシステム: PPTXファイル保存
+    
+    アップロードAPI->>PPTXParser: parsePPTX(filePath, slidesDir)呼び出し
+    PPTXParser->>Python: pptx_parser.pyをPythonShellで実行
+    
+    Python->>Python: PPTXファイルを読み込み
+    Python->>Python: LibreOfficeでPDFに変換
+    Python->>Python: PDFをPNG画像に変換
+    Python->>ファイルシステム: スライド画像を保存
+    Python->>Python: テキスト要素を抽出
+    
+    Python-->>PPTXParser: JSON形式のスライドデータ返却
+    PPTXParser-->>アップロードAPI: スライドデータ返却
+    
+    アップロードAPI->>アップロードAPI: スライドデータを正規化
+    アップロードAPI-->>フロントエンド: 成功レスポンス (slides配列含む)
+    
+    フロントエンド->>フロントエンド: スライドデータを表示
+    
+    Note over フロントエンド: ここで原文が[object Object]として表示される問題が発生
+    
+    ユーザー->>フロントエンド: 翻訳ボタンをクリック
+    フロントエンド->>翻訳API: テキスト配列を送信
+    
+    翻訳API->>Claude: プロンプトを作成して送信
+    Claude-->>翻訳API: 翻訳結果を返却
+    翻訳API-->>フロントエンド: 翻訳結果を返却
+    
+    フロントエンド->>フロントエンド: 翻訳結果を表示
+```
+
+## 問題分析
+
+現在、スライドの原文が`[object Object]`として表示されている問題が発生しています。コンソール出力とスクリーンショットから、以下の問題点が特定されました：
+
+### 1. データ構造の不一致
+
+フロントエンドのコンポーネント（PreviewSection.tsx）では、スライドのテキストを以下のように表示しています：
+
+```tsx
+<p className="text-sm">{slide.texts.join("\n")}</p>
+```
+
+しかし、`slide.texts`は文字列の配列ではなく、オブジェクトの配列になっています。型定義（types.ts）では：
+
+```typescript
+export interface TextItem {
+  text: string;
+  position: TextPosition;
+}
+
+export interface Slide {
+  index: number;
+  imageUrl: string;
+  texts: TextItem[];  // TextItemオブジェクトの配列
+  translations?: TranslationItem[];
+}
+```
+
+このため、`join()`メソッドを呼び出すと、各オブジェクトはデフォルトの`toString()`メソッドで文字列化され、`[object Object]`として表示されています。
+
+### 2. ログ出力エラー
+
+コンソール出力には以下のエラーも表示されています：
+
+```
+File operation logging error: TypeError: Cannot read properties of undefined (reading 'create')
+```
+
+これは`logFileOperation`関数内で`prisma.activityLog.create`を呼び出そうとしていますが、`activityLog`が存在しないことを示しています。Prismaスキーマに`ActivityLog`モデルが定義されていないか、正しく生成されていない可能性があります。
+
+## 修正方法
+
+1. **テキスト表示の修正**:
+   - PreviewSection.tsxを修正して、オブジェクト配列から文字列を正しく抽出する
+   ```tsx
+   <p className="text-sm">{slide.texts.map(item => item.text).join("\n")}</p>
+   ```
+
+2. **翻訳APIへのデータ送信**:
+   - 翻訳APIにテキストを送信する際に、オブジェクトではなく文字列を送信するよう修正
+
+3. **Prismaスキーマの修正**:
+   - `ActivityLog`モデルをPrismaスキーマに追加するか、ログ機能を一時的に無効化 
