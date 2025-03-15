@@ -22,22 +22,31 @@ function SignInContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  console.log('初期化時のcallbackUrl:', callbackUrl);
+  console.log('現在のURL:', typeof window !== 'undefined' ? window.location.href : 'SSR');
+  console.log('環境変数NEXTAUTH_URL:', process.env.NEXT_PUBLIC_APP_URL);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation(); // イベント伝播を停止
     setError('');
     setLoading(true);
+
+    console.log('フォーム送信時のcallbackUrl:', callbackUrl);
 
     try {
       if (!email || !password) {
         throw new Error('メールアドレスとパスワードを入力してください');
       }
 
+      console.log('認証前のcallbackUrl:', callbackUrl);
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
         callbackUrl,
       });
+      console.log('認証結果:', result);
 
       if (result?.error) {
         throw new Error(result.error);
@@ -49,16 +58,46 @@ function SignInContent() {
         description: 'リダイレクトします...',
       });
 
-      // リダイレクト - router.pushの代わりにwindow.location.hrefを使用
-      window.location.href = callbackUrl;
+      // リダイレクト処理を修正
+      console.log('サインイン成功、リダイレクト先:', callbackUrl);
+      
+      // 少し遅延を入れてからリダイレクト
+      setTimeout(() => {
+        console.log('リダイレクト実行:', callbackUrl);
+        
+        try {
+          // Next.jsのルーターを使用してリダイレクト
+          console.log('router.pushを実行:', callbackUrl);
+          router.push(callbackUrl);
+          
+          // 念のため、少し遅延を入れてからwindow.location.hrefも使用
+          setTimeout(() => {
+            console.log('window.location.hrefを使用したリダイレクト:', callbackUrl);
+            window.location.href = callbackUrl;
+          }, 500);
+        } catch (error) {
+          console.error('リダイレクトエラー:', error);
+          // エラーが発生した場合は直接URLを変更
+          window.location.href = callbackUrl;
+        }
+      }, 1000); // 遅延を1秒に延長
     } catch (error) {
       console.error('Sign in error:', error);
-      setError(error instanceof Error ? error.message : 'サインインに失敗しました');
-      toast({
-        title: 'エラー',
-        description: error instanceof Error ? error.message : 'サインインに失敗しました',
-        variant: 'destructive',
-      });
+      // エラーメッセージを統一して「サインインに失敗しました」を含むようにする
+      const errorMessage = error instanceof Error ? 
+        `サインインに失敗しました: ${error.message}` : 
+        'サインインに失敗しました';
+      
+      setError(errorMessage);
+      
+      // エラー時のトースト表示を修正
+      setTimeout(() => {
+        toast({
+          title: 'エラー',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }, 100);
     } finally {
       setLoading(false);
     }
@@ -81,11 +120,12 @@ function SignInContent() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <ErrorMessage 
-              message={error}
-              variant="destructive"
-              className="mb-4"
-            />
+            <div 
+              className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md" 
+              data-testid="signin-error"
+            >
+              {error}
+            </div>
           )}
 
           <div className="space-y-2">
@@ -99,6 +139,7 @@ function SignInContent() {
               placeholder="メールアドレスを入力"
               required
               disabled={loading}
+              autoComplete="email"
             />
           </div>
 
@@ -121,6 +162,7 @@ function SignInContent() {
               placeholder="パスワードを入力"
               required
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
 
@@ -128,6 +170,10 @@ function SignInContent() {
             type="submit"
             disabled={loading}
             className="w-full"
+            onClick={(e) => {
+              // クリックイベントの伝播を停止
+              e.stopPropagation();
+            }}
           >
             {loading ? (
               <LoadingSpinner 

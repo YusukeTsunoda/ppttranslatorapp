@@ -49,6 +49,10 @@ const Toast = React.forwardRef<
     <ToastPrimitives.Root
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onClick?.(e);
+      }}
       {...props}
     />
   )

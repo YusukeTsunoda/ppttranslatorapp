@@ -107,7 +107,7 @@ function Header() {
           </Link>
           <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-menu">
                 <Avatar className="h-8 w-8">
                   <AvatarImage alt={session.user.name || ''} />
                   <AvatarFallback>
@@ -117,19 +117,27 @@ function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <Link href="/profile" passHref legacyBehavior>
-                <DropdownMenuItem className="cursor-pointer">
-                  <Home className="mr-2 h-4 w-4" />
-                  <span>マイページ</span>
-                </DropdownMenuItem>
-              </Link>
-              <DropdownMenuItem
-                className="cursor-pointer flex items-center text-red-600 hover:text-red-700 hover:bg-red-50"
-                onSelect={handleSignOut}
-                data-testid="logout-button"
-              >
+              <DropdownMenuItem asChild>
+                <Link href="/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  プロフィール
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  設定
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/activity">
+                  <Activity className="mr-2 h-4 w-4" />
+                  アクティビティ
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut} data-testid="logout-button">
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>ログアウト</span>
+                ログアウト
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

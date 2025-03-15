@@ -8,6 +8,12 @@ const nextConfig = {
     domains: ['localhost', process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '')].filter(Boolean),
   },
   output: 'standalone',
+  // SWCコンパイラを明示的に有効化
+  swcMinify: true,
+  compiler: {
+    // SWCコンパイラの設定
+    styledComponents: true,
+  },
   experimental: {
     outputFileTracingExcludes: {
       '*': [
@@ -17,7 +23,6 @@ const nextConfig = {
       ],
     },
     serverComponentsExternalPackages: ['bcryptjs'],
-    appDir: true
   },
   // 静的ファイルの配信設定を追加
   async rewrites() {

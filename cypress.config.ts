@@ -1,4 +1,6 @@
 import { defineConfig } from 'cypress';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export default defineConfig({
   e2e: {
@@ -7,10 +9,11 @@ export default defineConfig({
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     video: false,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 15000,
-    pageLoadTimeout: 15000,
-    requestTimeout: 15000,
-    responseTimeout: 15000,
+    defaultCommandTimeout: 10000,
+    pageLoadTimeout: 30000,
+    requestTimeout: 30000,
+    responseTimeout: 30000,
+    taskTimeout: 60000,
     retries: {
       runMode: 2,
       openMode: 0
@@ -18,7 +21,9 @@ export default defineConfig({
     viewportWidth: 1280,
     viewportHeight: 720,
     env: {
-      NEXT_PUBLIC_API_URL: 'http://localhost:3003/api'
+      NEXT_PUBLIC_API_URL: 'http://localhost:3003/api',
+      TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'tsunotsunoda@gmail.com',
+      TEST_USER_PASSWORD: process.env.TEST_USER_PASSWORD || 'Tsuno202502'
     },
     setupNodeEvents(on, config) {
       on('before:browser:launch', (browser, launchOptions) => {
@@ -29,6 +34,26 @@ export default defineConfig({
         }
         return launchOptions;
       });
+
+      on('task', {
+        async ensureDir(dirPath: string) {
+          try {
+            const fullPath = path.resolve(process.cwd(), dirPath);
+            await fs.mkdir(fullPath, { recursive: true });
+            console.log(`Directory ensured: ${fullPath}`);
+            return true;
+          } catch (error) {
+            console.error(`Error ensuring directory: ${error}`);
+            return false;
+          }
+        },
+        log(message: string) {
+          console.log(message);
+          return null;
+        }
+      });
+
+      return config;
     }
   }
 });

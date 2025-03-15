@@ -75,10 +75,15 @@ function SignUpContent() {
       router.push(redirect);
     } catch (error) {
       console.error('サインアップエラー:', error);
-      setError(error instanceof Error ? error.message : 'アカウントの作成に失敗しました');
+      // エラーメッセージを統一
+      const errorMessage = error instanceof Error ? 
+        `アカウントの作成に失敗しました: ${error.message}` : 
+        'アカウントの作成に失敗しました';
+      
+      setError(errorMessage);
       toast({
         title: "エラー",
-        description: error instanceof Error ? error.message : 'アカウントの作成に失敗しました',
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -107,11 +112,12 @@ function SignUpContent() {
           <input type="hidden" name="inviteId" value={inviteId || ''} />
 
           {error && (
-            <ErrorMessage 
-              message={error}
-              variant="destructive"
-              className="mb-4"
-            />
+            <div 
+              className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md"
+              data-testid="signup-error"
+            >
+              {error}
+            </div>
           )}
 
           <div className="space-y-2">

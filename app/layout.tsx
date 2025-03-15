@@ -2,11 +2,9 @@
 
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
-
-const inter = Inter({ subsets: ['latin'] });
+import { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'PPT Translator',
@@ -16,11 +14,11 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html lang="ja">
-      <body className={`${inter.className} min-h-screen bg-background`}>
+      <body>
         <Providers>
           {children}
           <Toaster />

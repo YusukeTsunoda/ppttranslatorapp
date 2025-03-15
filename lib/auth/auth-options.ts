@@ -70,20 +70,29 @@ export const authOptions: NextAuthOptions = {
         password: { label: "パスワード", type: "password" }
       },
       async authorize(credentials): Promise<any> {
+        console.log('Authorize関数実行:', { email: credentials?.email });
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log('認証エラー: 必須フィールドが不足しています');
           throw new Error('メールアドレスとパスワードは必須です');
         }
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         });
+        
+        console.log('ユーザー検索結果:', { found: !!user });
 
         if (!user || !user.password) {
+          console.log('認証エラー: ユーザーが見つからないか、パスワードが設定されていません');
           throw new Error('メールアドレスまたはパスワードが正しくありません');
         }
 
         const isValid = await comparePasswords(credentials.password, user.password);
+        console.log('パスワード検証結果:', { isValid });
+        
         if (!isValid) {
+          console.log('認証エラー: パスワードが一致しません');
           throw new Error('メールアドレスまたはパスワードが正しくありません');
         }
 
@@ -94,6 +103,8 @@ export const authOptions: NextAuthOptions = {
             updatedAt: new Date()
           }
         });
+        
+        console.log('認証成功:', { userId: user.id });
 
         return {
           id: user.id,
@@ -115,8 +126,17 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      console.log('JWT Callback実行:', { 
+        trigger, 
+        hasUser: !!user, 
+        hasToken: !!token,
+        tokenId: token?.id,
+        userId: user?.id
+      });
+      
       // 初回ログイン時にユーザー情報をトークンに追加
       if (user) {
+        console.log('ユーザー情報をトークンに追加:', user.id);
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
@@ -131,15 +151,28 @@ export const authOptions: NextAuthOptions = {
       
       // セッション更新時の処理
       if (trigger === 'update' && session) {
+        console.log('セッション更新トリガー:', session);
         if (session.user) {
           token.name = session.user.name;
         }
       }
       
       // トークンのリフレッシュ処理
-      return refreshToken(token);
+      const refreshedToken = await refreshToken(token);
+      console.log('トークンリフレッシュ後:', { 
+        id: refreshedToken.id,
+        exp: refreshedToken.exp,
+        iat: refreshedToken.iat
+      });
+      return refreshedToken;
     },
     async session({ session, token }) {
+      console.log('Session Callback実行:', { 
+        hasToken: !!token, 
+        tokenId: token?.id,
+        sessionUserId: session?.user?.id
+      });
+      
       if (token) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
@@ -148,6 +181,7 @@ export const authOptions: NextAuthOptions = {
         // セッションに有効期限情報を追加
         if (token.exp) {
           session.expires = new Date((token.exp as number) * 1000).toISOString();
+          console.log('セッション有効期限設定:', session.expires);
         }
         
         // セキュリティ強化: ユーザーエージェントの検証
@@ -160,6 +194,11 @@ export const authOptions: NextAuthOptions = {
           }
         }
       }
+      
+      console.log('最終的なセッション:', { 
+        userId: session?.user?.id, 
+        expires: session?.expires 
+      });
       return session;
     }
   },
@@ -170,7 +209,9 @@ export const authOptions: NextAuthOptions = {
   cookies: {
     // Cookieのセキュリティ設定
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: process.env.NODE_ENV === 'production' 
+        ? `__Secure-next-auth.session-token`
+        : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -180,7 +221,9 @@ export const authOptions: NextAuthOptions = {
       }
     },
     callbackUrl: {
-      name: `__Secure-next-auth.callback-url`,
+      name: process.env.NODE_ENV === 'production'
+        ? `__Secure-next-auth.callback-url`
+        : `next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -189,7 +232,9 @@ export const authOptions: NextAuthOptions = {
       }
     },
     csrfToken: {
-      name: `__Host-next-auth.csrf-token`,
+      name: process.env.NODE_ENV === 'production'
+        ? `__Host-next-auth.csrf-token`
+        : `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',

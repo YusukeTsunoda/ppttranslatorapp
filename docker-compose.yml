@@ -1,3 +1,4 @@
+version: '3.8'
 
 services:
   postgres:
@@ -11,6 +12,19 @@ services:
       - "54322:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+    command: npm run dev
 
 volumes:
   postgres_data:
