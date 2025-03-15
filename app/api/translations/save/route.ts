@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/db/prisma';
-import { PrismaTranslation } from '@/types/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
@@ -26,11 +25,11 @@ export async function POST(request: Request) {
     // トランザクションを使用して保存処理を実行
     try {
       const body = await request.json();
-      const { slides, translations, currentSlide } = body;
+      const { slides, translations, currentSlide, sourceLang, targetLang } = body;
 
       const result = await prisma.$transaction(async (tx) => {
         // ユーザーの存在確認
-        const user = await tx.users.findUnique({
+        const user = await tx.user.findUnique({
           where: { email: userEmail },
           select: { id: true }
         });
@@ -39,32 +38,36 @@ export async function POST(request: Request) {
           throw new Error('ユーザーが見つかりません');
         }
 
-        // 翻訳データの保存
-        const translation = await tx.translation.create({
+        // 翻訳履歴の保存
+        const translationHistory = await tx.translationHistory.create({
           data: {
             id: uuidv4(),
-            slides,
-            translations,
-            currentSlide,
             userId: user.id,
-            updatedAt: new Date()
+            fileName: `スライド_${new Date().toISOString().split('T')[0]}`,
+            pageCount: slides?.length || 0,
+            status: '完了',
+            creditsUsed: 1,
+            sourceLang: sourceLang || 'ja',
+            targetLang: targetLang || 'en',
+            model: 'claude-3-haiku-20240307',
           }
         });
 
         // アクティビティログの記録
         await tx.activityLog.create({
           data: {
+            id: uuidv4(),
             userId: user.id,
-            action: 'translation',
-            ipAddress: 'unknown',
+            type: 'translation',
+            description: '翻訳を保存しました',
             metadata: {
-              translationId: translation.id,
+              translationId: translationHistory.id,
               timestamp: new Date().toISOString()
             }
           }
         });
 
-        return translation;
+        return translationHistory;
       });
 
       return NextResponse.json({ 
