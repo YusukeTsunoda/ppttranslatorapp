@@ -1,5 +1,5 @@
 /*
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db/prisma';
 import { Prisma, ActivityAction } from '@prisma/client';
 import {
   createDatabaseError,

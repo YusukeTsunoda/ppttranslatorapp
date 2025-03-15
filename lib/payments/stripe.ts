@@ -4,7 +4,7 @@
 
 import { redirect } from 'next/navigation';
 import Stripe from 'stripe';
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db/prisma';
 
 // Stripeクライアントの初期化
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {

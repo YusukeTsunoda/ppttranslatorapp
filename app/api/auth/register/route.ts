@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth/password';
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/db/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
 // Node.jsランタイムを明示的に指定

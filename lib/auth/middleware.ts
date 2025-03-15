@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
-import type { users } from '@prisma/client';
-import { getServerSession } from 'next-auth/next';
+import type { User } from '@prisma/client';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db/prisma';
 
 async function getUser() {
   const session = await getServerSession(authOptions);
@@ -38,7 +38,7 @@ export function validatedAction<S extends z.ZodType<any, any>, T>(
 type ValidatedActionWithUserFunction<S extends z.ZodType<any, any>, T> = (
   data: z.infer<S>,
   formData: FormData,
-  user: users
+  user: User
 ) => Promise<T>;
 
 export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
@@ -56,14 +56,14 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
       return { error: result.error.errors[0].message } as T;
     }
 
-    return action(result.data, formData, user as users);
+    return action(result.data, formData, user as User);
   };
 }
 
 export function withAuth<T>(
-  action: (data: T, formData: FormData, user: users) => Promise<Response>
+  action: (data: T, formData: FormData, user: User) => Promise<Response>
 ) {
-  return async (data: T, formData: FormData, user: users) => {
+  return async (data: T, formData: FormData, user: User) => {
     if (!user) {
       return new Response('Unauthorized', { status: 401 });
     }
@@ -74,13 +74,13 @@ export function withAuth<T>(
 
 // チーム関連の処理用のミドルウェア
 // 注意: Teamモデルが削除されたため、この関数はユーザー情報のみを使用するように修正
-export function withTeam(action: (formData: FormData, user: users) => Promise<any>) {
+export function withTeam(action: (formData: FormData, user: User) => Promise<any>) {
   return async (formData: FormData) => {
     const user = await getUser();
     if (!user) {
       throw new Error('User is not authenticated');
     }
     
-    return action(formData, user as users);
+    return action(formData, user as User);
   };
 }

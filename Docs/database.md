@@ -11,115 +11,76 @@
 
 ### コアエンティティ
 
-#### users
+#### User
 ユーザー情報を管理するテーブル
 ```prisma
 model User {
-  id                String         @id @default(cuid())
-  name              String?
-  email             String         @unique
-  emailVerified     DateTime?
-  image             String?
-  password          String?        // ハッシュ化されたパスワード
-  role              UserRole       @default(USER)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  deletedAt         DateTime?      // 論理削除用
-  
-  // リレーション
-  accounts          Account[]
-  sessions          Session[]
-  teamMembers       TeamMember[]
-  activityLogs      ActivityLog[]
-  
-  // インデックス
-  @@index([email])
-  @@index([deletedAt])
-}
-
-enum UserRole {
-  ADMIN
-  USER
+  id                 String               @id
+  name               String?
+  email              String               @unique
+  emailVerified      DateTime?
+  image              String?
+  password           String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  credits            Int                  @default(0)
+  Account            Account[]
+  ActivityLog        ActivityLog[]
+  File               File[]
+  Session            Session[]
+  TranslationHistory TranslationHistory[]
 }
 ```
 
-#### teams
-チーム情報を管理するテーブル
+#### Account
+認証アカウント情報を管理するテーブル
 ```prisma
-model Team {
-  id                  String         @id @default(cuid())
-  name                String
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  stripeCustomerId    String?        @unique
-  stripeSubscriptionId String?       @unique
-  
-  // リレーション
-  members             TeamMember[]
-  files               File[]
-  invitations         Invitation[]
-  activityLogs        ActivityLog[]
-  subscriptions       Subscription[]
-  translationMemories TranslationMemory[]
-  glossaries          Glossary[]
-  
-  // インデックス
-  @@index([stripeCustomerId])
-  @@index([stripeSubscriptionId])
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 ```
 
-#### team_members
-チームメンバーシップを管理するテーブル
+#### Session
+セッション情報を管理するテーブル
 ```prisma
-model TeamMember {
-  id        String       @id @default(cuid())
-  userId    String
-  teamId    String
-  role      MemberRole   @default(MEMBER)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  
-  // リレーション
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team      Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@unique([userId, teamId])
-  @@index([teamId])
-  @@index([userId])
-}
-
-enum MemberRole {
-  OWNER
-  ADMIN
-  MEMBER
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  users        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
 
-#### files
+#### File
 アップロードされたファイル情報を管理するテーブル
 ```prisma
 model File {
-  id            String       @id @default(cuid())
-  teamId        String
-  originalName  String
-  storagePath   String
-  status        FileStatus   @default(PROCESSING)
-  fileSize      Int
-  mimeType      String
-  metadata      Json?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // リレーション
-  team          Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  slides        Slide[]
-  
-  // インデックス
-  @@index([teamId])
-  @@index([status])
-  @@index([createdAt])
+  id           String     @id
+  userId       String
+  originalName String
+  storagePath  String
+  status       FileStatus @default(PROCESSING)
+  fileSize     Int
+  mimeType     String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime
+  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Slide        Slide[]
 }
 
 enum FileStatus {
@@ -129,272 +90,178 @@ enum FileStatus {
 }
 ```
 
-#### slides
+#### Slide
 ファイル内のスライド情報を管理するテーブル
 ```prisma
 model Slide {
-  id            String       @id @default(cuid())
-  fileId        String
-  index         Int
-  imagePath     String
-  metadata      Json?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // リレーション
-  file          File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  texts         Text[]
-  
-  // インデックス
-  @@index([fileId])
+  id        String   @id
+  fileId    String
+  index     Int
+  imagePath String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  File      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  Text      Text[]
+
   @@unique([fileId, index])
 }
 ```
 
-#### texts
+#### Text
 スライド内のテキスト情報を管理するテーブル
 ```prisma
 model Text {
-  id            String       @id @default(cuid())
-  slideId       String
-  text          String       @db.Text
-  position      Json
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // リレーション
-  slide         Slide        @relation(fields: [slideId], references: [id], onDelete: Cascade)
-  translations  Translation[]
-  
-  // インデックス
-  @@index([slideId])
+  id          String        @id
+  slideId     String
+  text        String
+  position    Json
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  Slide       Slide         @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  Translation Translation[]
 }
 ```
 
-#### translations
+#### Translation
 翻訳テキストを管理するテーブル
 ```prisma
 model Translation {
-  id            String       @id @default(cuid())
-  textId        String
-  sourceLang    Language
-  targetLang    Language
-  translation   String       @db.Text
-  model         String
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // リレーション
-  text          Text         @relation(fields: [textId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([textId])
-  @@index([sourceLang, targetLang])
+  id          String   @id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  model       String
+  sourceLang  Language
+  targetLang  Language
+  textId      String
+  translation String
+  Text        Text     @relation(fields: [textId], references: [id], onDelete: Cascade)
 }
+```
 
+#### TranslationHistory
+翻訳履歴を管理するテーブル
+```prisma
+model TranslationHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  fileName    String
+  pageCount   Int      @default(0)
+  status      String
+  creditsUsed Int
+  sourceLang  Language
+  targetLang  Language
+  model       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+```
+
+#### ActivityLog
+ユーザーアクティビティを記録するテーブル
+```prisma
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  description String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+```
+
+#### UsageStatistics
+使用統計情報を管理するテーブル
+```prisma
+model UsageStatistics {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenCount Int      @default(0)
+  apiCalls   Int      @default(0)
+  month      Int
+  year       Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, month, year])
+}
+```
+
+### 言語設定
+
+```prisma
 enum Language {
   ja
   en
   zh
   ko
+  fr
+  de
+  es
+  it
+  ru
+  pt
 }
 ```
 
-### サポートエンティティ
+## リレーションシップ
 
-#### subscriptions
-サブスクリプション情報を管理するテーブル
-```prisma
-model Subscription {
-  id                  String             @id @default(cuid())
-  teamId              String
-  stripeSubscriptionId String            @unique
-  status              SubscriptionStatus @default(TRIALING)
-  plan                SubscriptionPlan   @default(FREE)
-  currentPeriodStart  DateTime
-  currentPeriodEnd    DateTime
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  
-  // リレーション
-  team                Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([teamId])
-  @@index([status])
-  @@index([plan])
-}
+### ユーザー関連
+- User → Account: 1対多 (ユーザーは複数の認証アカウントを持つことができる)
+- User → Session: 1対多 (ユーザーは複数のセッションを持つことができる)
+- User → File: 1対多 (ユーザーは複数のファイルをアップロードできる)
+- User → ActivityLog: 1対多 (ユーザーの活動は複数のログとして記録される)
+- User → TranslationHistory: 1対多 (ユーザーは複数の翻訳履歴を持つことができる)
 
-enum SubscriptionStatus {
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  TRIALING
-}
+### ファイル関連
+- File → Slide: 1対多 (1つのファイルは複数のスライドを持つ)
+- Slide → Text: 1対多 (1つのスライドは複数のテキスト要素を持つ)
+- Text → Translation: 1対多 (1つのテキストは複数の翻訳を持つことができる)
 
-enum SubscriptionPlan {
-  FREE
-  PREMIUM
-}
-```
+## インデックス戦略
 
-#### activity_logs
-ユーザーアクティビティを記録するテーブル
-```prisma
-model ActivityLog {
-  id            String          @id @default(cuid())
-  teamId        String
-  userId        String
-  action        ActivityAction
-  ipAddress     String
-  metadata      Json?
-  createdAt     DateTime        @default(now())
-  
-  // リレーション
-  team          Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([teamId])
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-}
+- ユーザーメールアドレスにユニークインデックス
+- ファイルステータスにインデックス
+- スライドのファイルIDとインデックスの組み合わせにユニークインデックス
+- 翻訳の言語ペア（ソース言語とターゲット言語）にインデックス
+- 使用統計のユーザーID、月、年の組み合わせにユニークインデックス
 
-enum ActivityAction {
-  FILE_UPLOAD
-  TRANSLATION
-  DOWNLOAD
-  SETTINGS_CHANGE
-  MEMBER_INVITE
-}
-```
+## データ整合性
 
-#### invitations
-チーム招待を管理するテーブル
-```prisma
-model Invitation {
-  id            String           @id @default(cuid())
-  teamId        String
-  email         String
-  role          MemberRole       @default(MEMBER)
-  status        InvitationStatus @default(PENDING)
-  expiresAt     DateTime
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  
-  // リレーション
-  team          Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([teamId])
-  @@index([email])
-  @@index([status])
-  @@index([expiresAt])
-}
+### 外部キー制約
+- すべての関連するテーブル間に適切な外部キー制約を設定
+- 親レコードが削除された場合の動作は、関連するすべての子レコードをカスケード削除
 
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  EXPIRED
-}
-```
+### 一意性制約
+- ユーザーのメールアドレス
+- セッショントークン
+- アカウントのプロバイダーとプロバイダーアカウントIDの組み合わせ
+- スライドのファイルIDとインデックスの組み合わせ
+- 使用統計のユーザーID、月、年の組み合わせ
 
-#### translation_memory
-翻訳メモリを管理するテーブル
-```prisma
-model TranslationMemory {
-  id              String       @id @default(cuid())
-  teamId          String
-  sourceText      String       @db.Text
-  translatedText  String       @db.Text
-  sourceLang      Language
-  targetLang      Language
-  usageCount      Int          @default(0)
-  lastUsedAt      DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  
-  // リレーション
-  team            Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([teamId])
-  @@index([sourceLang, targetLang])
-  @@index([usageCount])
-}
-```
+## データ型と制約
 
-#### glossary
-用語集を管理するテーブル
-```prisma
-model Glossary {
-  id              String       @id @default(cuid())
-  teamId          String
-  sourceTerm      String
-  translatedTerm  String
-  sourceLang      Language
-  targetLang      Language
-  domain          String?
-  priority        Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  
-  // リレーション
-  team            Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([teamId])
-  @@index([sourceLang, targetLang])
-  @@index([domain])
-  @@index([priority])
-}
-```
+- ID: 文字列（CUID形式）
+- 日時: DateTime型（タイムゾーン情報を含む）
+- テキスト: 標準的な文字列型
+- 長いテキスト: Text型
+- JSON: PostgreSQLのJSONB型
+- 列挙型: 適切な列挙型を使用（Language, FileStatus）
 
-### 認証関連エンティティ
+## マイグレーション戦略
 
-#### accounts
-OAuth連携アカウント情報を管理するテーブル
-```prisma
-model Account {
-  id                 String    @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?   @db.Text
-  access_token       String?   @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?   @db.Text
-  session_state      String?
-  
-  // リレーション
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-```
+- Prisma Migrateを使用して、スキーマの変更を管理
+- 開発環境では`prisma migrate dev`コマンドを使用
+- 本番環境では`prisma migrate deploy`コマンドを使用
+- マイグレーションファイルはバージョン管理システムで追跡
 
-#### sessions
-ユーザーセッション情報を管理するテーブル
-```prisma
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  
-  // リレーション
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // インデックス
-  @@index([userId])
-}
-```
+## バックアップと復元
+
+- 日次の自動バックアップ
+- ポイントインタイムリカバリ（PITR）の設定
+- バックアップの保持期間: 30日
+- 復元手順のドキュメント化と定期的なテスト
 
 ## データベース最適化
 
@@ -433,24 +300,6 @@ model Session {
 - **初期データ**: 基本設定、マスターデータ
 - **テストデータ**: 開発・テスト環境用
 - **サンプルデータ**: デモ用
-
-## バックアップと復元
-
-### バックアップ戦略
-- **フルバックアップ**: 日次
-- **増分バックアップ**: 6時間ごと
-- **トランザクションログ**: 継続的
-
-### 保持ポリシー
-- **日次バックアップ**: 7日間
-- **週次バックアップ**: 4週間
-- **月次バックアップ**: 12ヶ月
-
-### 復元手順
-1. **バックアップ選択**: 復元ポイントの決定
-2. **データ復元**: バックアップからの復元
-3. **整合性検証**: データ検証
-4. **アプリケーション再開**: サービス再開
 
 ## セキュリティ対策
 
