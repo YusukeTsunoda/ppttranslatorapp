@@ -3,7 +3,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 /**
  * モデルの型定義
  */
-export type users = {
+export type User = {
   id: string;
   name: string | null;
   email: string;
@@ -68,5 +68,5 @@ export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'trial';
 export type PrismaDB = PrismaClient;
 
 // Prisma型のエクスポート
-export type PrismaUser = Prisma.usersGetPayload<{}>;
+export type PrismaUser = Prisma.UserGetPayload<{}>;
 export type PrismaTranslation = Prisma.TranslationGetPayload<{}>; 

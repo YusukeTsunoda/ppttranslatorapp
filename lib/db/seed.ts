@@ -9,11 +9,11 @@ async function main() {
   console.log('Seeding database...');
 
   // Delete existing data
-  await prisma.users.deleteMany();
+  await prisma.user.deleteMany();
 
   // Create a test user
   const hashedPassword = await hashPassword('password123');
-  const user = await prisma.users.create({
+  const user = await prisma.user.create({
     data: {
       id: uuidv4(),
       name: 'Test User',
