@@ -49,6 +49,20 @@ const availableModels: TranslationModel[] = [
   }
 ];
 
+// 利用可能な言語のリスト
+const availableLanguages = [
+  { value: "ja", label: "日本語" },
+  { value: "en", label: "英語" },
+  { value: "zh", label: "中国語" },
+  { value: "ko", label: "韓国語" },
+  { value: "fr", label: "フランス語" },
+  { value: "de", label: "ドイツ語" },
+  { value: "es", label: "スペイン語" },
+  { value: "it", label: "イタリア語" },
+  { value: "ru", label: "ロシア語" },
+  { value: "pt", label: "ポルトガル語" }
+];
+
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -163,6 +177,7 @@ export default function TranslatePage() {
       return;
     }
 
+    setFile(file);
     setUploading(true);
     setIsLoading(true);
     const formData = new FormData();
@@ -444,8 +459,10 @@ export default function TranslatePage() {
         },
         body: JSON.stringify({
           texts: textsToTranslate,
-          sourceLang: 'ja',
-          targetLang: 'en',
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+          model: selectedModel,
+          fileName: file?.name || "スライド"
         }),
         credentials: 'include',
       });
@@ -489,14 +506,35 @@ export default function TranslatePage() {
     try {
       setIsDownloading(true);
       
-      // 翻訳データの準備
+      // 翻訳データの準備 - 修正: 翻訳データの構造を正しく整形
       const slidesWithTranslations = slides.map(slide => {
+        // 各スライドのテキストに対応する翻訳を取得
+        const textsWithTranslations = slide.texts.map((text, idx) => {
+          // 編集された翻訳があればそれを使用
+          const translationKey = `${slide.index}-${idx}`;
+          const editedTranslation = editedTranslations[translationKey];
+          
+          // スライドの翻訳配列から対応する翻訳を取得
+          const originalTranslation = slide.translations && slide.translations[idx] 
+            ? slide.translations[idx].text 
+            : "";
+            
+          // 編集された翻訳があればそれを優先、なければ元の翻訳を使用
+          return {
+            text: text.text,
+            position: text.position,
+            translation: editedTranslation || originalTranslation
+          };
+        });
+        
         return {
           index: slide.index,
-          texts: slide.texts,
-          translations: slide.translations || []
+          texts: textsWithTranslations
         };
       });
+      
+      // デバッグ用にデータ構造をログ出力
+      console.log("送信する翻訳データ:", slidesWithTranslations);
       
       // ダウンロードAPIの呼び出し
       const response = await fetch('/api/download', {
@@ -591,135 +629,192 @@ export default function TranslatePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6" data-testid="translate-page-title">翻訳</h1>
-      
-      {/* ファイルアップロードセクション - スライドがない場合のみ表示 */}
-      {slides.length === 0 && (
-        <div className="mb-8">
-          <FileUploadComponent onUploadComplete={handleFileUpload} />
-        </div>
-      )}
-
-      {/* プレビューセクション */}
-      {slides.length > 0 && (
-        <div className="space-y-6">
-          {/* 操作ボタン */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleTranslateSlide}
-              disabled={isTranslating}
-              className="flex items-center"
-            >
-              {isTranslating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  翻訳中...
-                </>
-              ) : (
-                <>
-                  翻訳する
-                </>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex flex-col space-y-4">
+        <h1 className="text-2xl font-bold">プレゼンテーション翻訳</h1>
+        
+        {!file && (
+          <Card className="p-6">
+            <FileUploadComponent onUploadComplete={handleFileUpload} />
+          </Card>
+        )}
+        
+        {file && slides.length > 0 && (
+          <>
+            <div className="flex flex-col gap-4">
+              {/* 言語選択とモデル選択を上部に移動 */}
+              <Card className="p-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="source-lang">翻訳元言語</Label>
+                    <Select
+                      value={sourceLang}
+                      onValueChange={setSourceLang}
+                    >
+                      <SelectTrigger id="source-lang" className="w-full">
+                        <SelectValue placeholder="翻訳元言語を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLanguages.map((lang) => (
+                          <SelectItem key={lang.value} value={lang.value}>
+                            {lang.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="target-lang">翻訳先言語</Label>
+                    <Select
+                      value={targetLang}
+                      onValueChange={setTargetLang}
+                    >
+                      <SelectTrigger id="target-lang" className="w-full">
+                        <SelectValue placeholder="翻訳先言語を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLanguages.map((lang) => (
+                          <SelectItem key={lang.value} value={lang.value}>
+                            {lang.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="model-select">翻訳モデル</Label>
+                    <Select
+                      value={selectedModel}
+                      onValueChange={setSelectedModel}
+                    >
+                      <SelectTrigger id="model-select" className="w-full">
+                        <SelectValue placeholder="モデルを選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModels.map((model) => (
+                          <SelectItem
+                            key={model.value}
+                            value={model.value}
+                            disabled={model.premium && !isPremium}
+                          >
+                            {model.label}
+                            {model.premium && !isPremium && " (プレミアム限定)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      onClick={handleTranslate}
+                      disabled={isTranslating || slides[currentSlide]?.texts?.length === 0}
+                    >
+                      {isTranslating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          翻訳中...
+                        </>
+                      ) : (
+                        "翻訳する"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+              
+              {/* スライドナビゲーション - プレビューの上に移動 */}
+              {slides.length > 1 && (
+                <Card className="p-4">
+                  <div className="flex items-center justify-center space-x-4">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+                      disabled={currentSlide === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
+                      スライド {currentSlide + 1} / {slides.length}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+                      disabled={currentSlide === slides.length - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
               )}
-            </Button>
-            
-            {slides.length > 1 && (
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-                  disabled={currentSlide === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  {currentSlide + 1} / {slides.length}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
-                  disabled={currentSlide === slides.length - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+              
+              {/* ダウンロードボタン */}
+              {isTranslated && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ダウンロード中...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        ダウンロード
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+              
+              {/* スライドプレビュー */}
+              <div className="w-full max-w-full">
+                <PreviewSectionComponent 
+                  slide={slides[currentSlide]} 
+                  onTranslationEdit={(index, newText) => {
+                    // 翻訳テキストの更新
+                    const updatedSlides = [...slides];
+                    if (!updatedSlides[currentSlide].translations) {
+                      updatedSlides[currentSlide].translations = [];
+                    }
+                    
+                    // 既存の翻訳がない場合は新しい配列を作成
+                    if (!Array.isArray(updatedSlides[currentSlide].translations)) {
+                      updatedSlides[currentSlide].translations = [];
+                    }
+                    
+                    // 翻訳アイテムを更新または作成
+                    if (updatedSlides[currentSlide].translations[index]) {
+                      updatedSlides[currentSlide].translations[index].text = newText;
+                    } else {
+                      // 翻訳アイテムが存在しない場合は新規作成
+                      const position = updatedSlides[currentSlide].texts[index]?.position || { x: 0, y: 0, width: 0, height: 0 };
+                      updatedSlides[currentSlide].translations[index] = {
+                        text: newText,
+                        position: position
+                      };
+                    }
+                    
+                    setSlides(updatedSlides);
+                    
+                    // 編集履歴も更新
+                    const translationKey = `${currentSlide}-${index}`;
+                    setEditedTranslations(prev => ({
+                      ...prev,
+                      [translationKey]: newText
+                    }));
+                  }}
+                />
               </div>
-            )}
-            
-            {isTranslated && (
-              <Button
-                variant="outline"
-                onClick={handleDownload}
-                disabled={isDownloading}
-                className="flex items-center"
-              >
-                {isDownloading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ダウンロード中...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    翻訳済みファイルをダウンロード
-                  </>
-                )}
-              </Button>
-            )}
-            
-            {/* リセットボタン追加 */}
-            <Button
-              variant="ghost"
-              onClick={handleReset}
-              className="flex items-center ml-auto"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              リセット
-            </Button>
-          </div>
-          
-          {/* スライドプレビュー - 大きく表示 */}
-          <div className="w-full max-w-full">
-            <PreviewSectionComponent 
-              slide={slides[currentSlide]} 
-              onTranslationEdit={(index, newText) => {
-                // 翻訳テキストの更新
-                const updatedSlides = [...slides];
-                if (!updatedSlides[currentSlide].translations) {
-                  updatedSlides[currentSlide].translations = [];
-                }
-                
-                // 既存の翻訳がない場合は新しい配列を作成
-                if (!Array.isArray(updatedSlides[currentSlide].translations)) {
-                  updatedSlides[currentSlide].translations = [];
-                }
-                
-                // 翻訳アイテムを更新または作成
-                if (updatedSlides[currentSlide].translations[index]) {
-                  updatedSlides[currentSlide].translations[index].text = newText;
-                } else {
-                  // 翻訳アイテムが存在しない場合は新規作成
-                  const position = updatedSlides[currentSlide].texts[index]?.position || { x: 0, y: 0, width: 0, height: 0 };
-                  updatedSlides[currentSlide].translations[index] = {
-                    text: newText,
-                    position: position
-                  };
-                }
-                
-                setSlides(updatedSlides);
-                
-                // 編集履歴も更新
-                const translationKey = `${currentSlide}-${index}`;
-                setEditedTranslations(prev => ({
-                  ...prev,
-                  [translationKey]: newText
-                }));
-              }}
-            />
-          </div>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
       
       <Toaster />
     </div>

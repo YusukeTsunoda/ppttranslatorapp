@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Language } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -7,20 +8,136 @@ async function main() {
 
   // テストユーザーの作成
   console.log('Creating test user...');
-  const testUser = await prisma.user.upsert({
+  const userId = uuidv4();
+  const user = await prisma.user.upsert({
     where: { email: 'test@example.com' },
-    update: {},
+    update: {
+      credits: 15,
+    },
     create: {
-      id: '0ac6c6be-d1e7-4b5b-ba6b-a0b648fdbffa',
-      name: 'Test User',
+      id: userId,
       email: 'test@example.com',
-      password: 'hashed_password_would_go_here',
-      createdAt: new Date(),
+      name: 'Test User',
+      credits: 15,
       updatedAt: new Date(),
     },
   });
 
-  console.log(`Created test user with id: ${testUser.id}`);
+  console.log(`Created test user with id: ${user.id}`);
+
+  // 翻訳履歴のサンプルデータ
+  console.log('Creating translation history...');
+  await prisma.translationHistory.createMany({
+    data: [
+      {
+        id: uuidv4(),
+        userId: user.id,
+        fileName: 'presentation1.pptx',
+        pageCount: 15,
+        status: '完了',
+        creditsUsed: 15,
+        sourceLang: Language.ja,
+        targetLang: Language.en,
+        model: 'claude-3-haiku-20240307',
+        createdAt: new Date('2024-03-01'),
+        updatedAt: new Date('2024-03-01'),
+      },
+      {
+        id: uuidv4(),
+        userId: user.id,
+        fileName: 'meeting.pptx',
+        pageCount: 10,
+        status: '完了',
+        creditsUsed: 10,
+        sourceLang: Language.ja,
+        targetLang: Language.en,
+        model: 'claude-3-haiku-20240307',
+        createdAt: new Date('2024-03-10'),
+        updatedAt: new Date('2024-03-10'),
+      },
+      {
+        id: uuidv4(),
+        userId: user.id,
+        fileName: 'proposal.pptx',
+        pageCount: 20,
+        status: '完了',
+        creditsUsed: 20,
+        sourceLang: Language.en,
+        targetLang: Language.ja,
+        model: 'claude-3-sonnet-20240229',
+        createdAt: new Date('2024-03-15'),
+        updatedAt: new Date('2024-03-15'),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  // アクティビティログのサンプルデータ
+  console.log('Creating activity logs...');
+  await prisma.activityLog.createMany({
+    data: [
+      {
+        id: uuidv4(),
+        userId: user.id,
+        type: 'translation',
+        description: 'presentation1.pptxを翻訳しました',
+        createdAt: new Date('2024-03-01'),
+      },
+      {
+        id: uuidv4(),
+        userId: user.id,
+        type: 'login',
+        description: 'ログインしました',
+        createdAt: new Date('2024-03-05'),
+      },
+      {
+        id: uuidv4(),
+        userId: user.id,
+        type: 'translation',
+        description: 'meeting.pptxを翻訳しました',
+        createdAt: new Date('2024-03-10'),
+      },
+      {
+        id: uuidv4(),
+        userId: user.id,
+        type: 'translation',
+        description: 'proposal.pptxを翻訳しました',
+        createdAt: new Date('2024-03-15'),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  // 使用統計のサンプルデータ
+  console.log('Creating usage statistics...');
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // JavaScriptの月は0から始まるため+1
+  const currentYear = currentDate.getFullYear();
+
+  await prisma.usageStatistics.upsert({
+    where: {
+      userId_month_year: {
+        userId: user.id,
+        month: currentMonth,
+        year: currentYear,
+      },
+    },
+    update: {
+      tokenCount: 12345,
+      apiCalls: 89,
+    },
+    create: {
+      id: uuidv4(),
+      userId: user.id,
+      tokenCount: 12345,
+      apiCalls: 89,
+      month: currentMonth,
+      year: currentYear,
+      updatedAt: new Date(),
+    },
+  });
+
+  console.log('シードデータを投入しました');
   console.log('Seeding completed.');
 }
 

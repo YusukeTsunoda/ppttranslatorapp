@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         email,
         name,
         password: hashedPassword,
+        credits: 15,
         updatedAt: new Date(),
       },
     });

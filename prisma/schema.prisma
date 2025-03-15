@@ -36,13 +36,13 @@ model Session {
 
 model Translation {
   id          String   @id
-  textId      String
-  sourceLang  Language
-  targetLang  Language
-  translation String
-  model       String
   createdAt   DateTime @default(now())
   updatedAt   DateTime
+  model       String
+  sourceLang  Language
+  targetLang  Language
+  textId      String
+  translation String
   Text        Text     @relation(fields: [textId], references: [id], onDelete: Cascade)
 }
 
@@ -85,17 +85,58 @@ model Text {
 }
 
 model User {
-  id            String    @id
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime
-  Account       Account[]
-  File          File[]
-  Session       Session[]
+  id                 String               @id
+  name               String?
+  email              String               @unique
+  emailVerified      DateTime?
+  image              String?
+  password           String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  credits            Int                  @default(0)
+  Account            Account[]
+  ActivityLog        ActivityLog[]
+  File               File[]
+  Session            Session[]
+  TranslationHistory TranslationHistory[]
+}
+
+model TranslationHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  fileName    String
+  pageCount   Int      @default(0)
+  status      String
+  creditsUsed Int
+  sourceLang  Language
+  targetLang  Language
+  model       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  description String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UsageStatistics {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenCount Int      @default(0)
+  apiCalls   Int      @default(0)
+  month      Int
+  year       Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, month, year])
 }
 
 enum FileStatus {
@@ -109,4 +150,10 @@ enum Language {
   en
   zh
   ko
+  fr
+  de
+  es
+  it
+  ru
+  pt
 }

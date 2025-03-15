@@ -15,19 +15,38 @@ def update_slide_text(slide, slide_data):
     if not slide_data.get('texts'):
         return
 
-    for text_data in slide_data['texts']:
+    for i, text_data in enumerate(slide_data['texts']):
         original_text = text_data.get('text', '').strip()
-        translation = text_data.get('translation', '')
-
+        
+        # 翻訳テキストの取得方法を修正
+        translation = None
+        
+        # 1. translations配列から取得を試みる
+        if slide_data.get('translations') and i < len(slide_data['translations']):
+            translation = slide_data['translations'][i].get('text', '')
+        
+        # 2. text_dataから直接translationを取得
+        if not translation and text_data.get('translation'):
+            translation = text_data.get('translation', '')
+            
         # 翻訳が存在しない場合はスキップ
         if not translation:
+            print(f"No translation found for text: {original_text}", file=sys.stderr)
             continue
 
+        print(f"Updating text: '{original_text}' -> '{translation}'", file=sys.stderr)
+        
         # スライド内の全シェイプを検索
+        found = False
         for shape in slide.shapes:
             if find_matching_shape(shape, original_text):
                 shape.text_frame.text = translation
+                found = True
+                print(f"  - Text updated successfully", file=sys.stderr)
                 break
+                
+        if not found:
+            print(f"  - Warning: No matching shape found for text: {original_text}", file=sys.stderr)
 
 def main():
     if len(sys.argv) != 4:
@@ -47,6 +66,9 @@ def main():
         # 元のプレゼンテーションを読み込む
         prs = Presentation(input_file)
         print(f"Loaded presentation with {len(prs.slides)} slides", file=sys.stderr)
+
+        # スライドデータの構造をデバッグ出力
+        print(f"Slides data structure: {json.dumps(slides_data[0] if slides_data else {}, indent=2)}", file=sys.stderr)
 
         # 各スライドの翻訳を適用
         for slide_data in slides_data:

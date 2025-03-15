@@ -8,6 +8,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { Session } from 'next-auth';
+import { prisma } from '@/lib/db/prisma';
+import { v4 as uuidv4 } from 'uuid';
+import { Language } from '@prisma/client';
 
 interface CustomSession extends Session {
   user: {
@@ -19,6 +22,10 @@ interface CustomSession extends Session {
   }
 }
 
+// APIキーの設定状況をログ出力
+console.log("API Key set:", !!process.env.ANTHROPIC_API_KEY);
+console.log("API Key prefix:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.substring(0, 10) + "..." : "Not set");
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -27,6 +34,14 @@ const getLanguageName = (langCode: string): string => {
   const languages: Record<string, string> = {
     'ja': '日本語',
     'en': '英語',
+    'zh': '中国語',
+    'ko': '韓国語',
+    'fr': 'フランス語',
+    'de': 'ドイツ語',
+    'es': 'スペイン語',
+    'it': 'イタリア語',
+    'ru': 'ロシア語',
+    'pt': 'ポルトガル語'
     // 必要に応じて他の言語を追加
   };
   return languages[langCode] || langCode;
@@ -51,7 +66,7 @@ export async function POST(req: Request) {
     const data = await req.json()
     
     // リクエストBodyからパラメータ取得
-    const { texts, sourceLang, targetLang, model } = data;
+    const { texts, sourceLang, targetLang, model, fileName = "スライド", pageCount = 0 } = data;
 
     // デフォルトモデルを指定
     const defaultModel = "claude-3-haiku-20240307";
@@ -116,6 +131,49 @@ ${textObj.text}
         return (message.content[0] as any).text.trim();
       })
     );
+
+    // クレジット消費と履歴記録を試みる（エラーが発生しても翻訳結果は返す）
+    try {
+      // ユーザー情報を取得
+      const userBefore = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { credits: true }
+      });
+      console.log('クレジット消費前のユーザー情報:', userBefore);
+
+      // Prisma標準APIを使用してクレジットを更新
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { credits: { decrement: 1 } }
+      });
+      
+      // 更新後のユーザー情報を取得
+      const userAfter = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { credits: true }
+      });
+      console.log('クレジット消費後のユーザー情報:', userAfter);
+
+      // 翻訳履歴を記録（Prisma標準APIを使用）
+      const createdHistory = await prisma.translationHistory.create({
+        data: {
+          id: uuidv4(),
+          userId: session.user.id,
+          fileName,
+          pageCount: pageCount || texts.length, // テキスト数をページ数として使用（pageCountが指定されていない場合）
+          status: '完了',
+          creditsUsed: 1,
+          sourceLang: sourceLang as Language,
+          targetLang: targetLang as Language,
+          model: selectedModel,
+        }
+      });
+      
+      console.log('作成された翻訳履歴:', createdHistory);
+      console.log("クレジット更新と履歴記録が完了しました");
+    } catch (dbError) {
+      console.error('データベース操作エラー:', dbError);
+    }
 
     console.log("All translations completed:", translations);
     return NextResponse.json({ 

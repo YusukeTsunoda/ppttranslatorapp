@@ -86,6 +86,7 @@ export async function POST(request: Request) {
         name,
         email,
         password: hashedPassword,
+        credits: 15, // 初期クレジットを15に設定
         updatedAt: new Date(), // 現在の日時
       },
     });
