@@ -2,7 +2,6 @@ import { mkdir, readdir, unlink, stat, copyFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { prisma } from '@/lib/db/prisma';
-import { ActivityAction } from '@prisma/client';
 
 // ファイル設定の一元管理
 export const FILE_CONFIG = {
@@ -13,6 +12,9 @@ export const FILE_CONFIG = {
   maxRetries: 3,
   retryDelay: 1000, // 1秒
 };
+
+// 文字列リテラル型を定義
+type ActivityAction = 'file_upload' | 'file_delete' | 'file_access';
 
 // ファイル操作のマッピング
 const FILE_OPERATIONS = {
@@ -174,8 +176,8 @@ export async function logFileOperation(
     await prisma.activityLog.create({
       data: {
         userId,
-        action,
-        ipAddress: 'unknown',
+        type: action,
+        description: `File operation: ${operation}`,
         metadata: {
           fileId,
           operation,
