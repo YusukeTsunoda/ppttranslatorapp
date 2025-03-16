@@ -1,3 +1,6 @@
+import { spawn } from 'child_process';
+import path from 'path';
+
 export async function parsePptxFile(filePath: string, outputDir: string): Promise<any> {
   try {
     const pythonProcess = spawn('python3', [
@@ -47,12 +50,12 @@ export async function parsePptxFile(filePath: string, outputDir: string): Promis
       console.log(`最初のスライド: ${parsedOutput.slides[0].texts?.length || 0}件のテキスト要素を含む`);
       
       return parsedOutput;
-    } catch (error) {
+    } catch (error: any) {
       console.error("JSON解析エラー:", error.message);
       console.error("Python出力の生データ:", pythonOutput.substring(0, 500) + "..."); // 先頭500文字だけ表示
       return { error: "スライドデータのJSON解析に失敗しました" };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("PPTX解析エラー:", error.message);
     return { error: "PPTXファイルの解析中にエラーが発生しました" };
   }
