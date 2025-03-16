@@ -55,11 +55,16 @@ export async function GET(
     const imagePath = join(FILE_CONFIG.tempDir, session.user.id, 'slides', ...params.path);
 
     try {
+      // ファイルパスのデバッグ情報
+      console.log('Requested slide image path:', imagePath);
+      console.log('File exists check:', existsSync(imagePath));
+      
       const imageBuffer = await readFile(imagePath);
       
       // Content-Typeの設定
       const contentType = imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
       
+      console.log('Successfully served image:', imagePath);
       return new NextResponse(imageBuffer, {
         headers: {
           'Content-Type': contentType,
@@ -67,7 +72,18 @@ export async function GET(
         },
       });
     } catch (error) {
-      return new NextResponse('Image not found', { status: 404 });
+      console.error('Failed to read image file:', imagePath, error);
+      // 詳細なエラーメッセージを返す
+      return new NextResponse(JSON.stringify({
+        error: 'Image not found',
+        path: imagePath,
+        message: error instanceof Error ? error.message : 'Unknown error'
+      }), { 
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     }
   } catch (error) {
     console.error('Error in slide image API:', error);

@@ -120,177 +120,209 @@ describe('テストスイート名', () => {
 
 ## テスト実装のガイドライン
 
-### 1. セレクタの優先順位
+### セレクタの優先順位
 
-要素の選択には以下の優先順位でセレクタを使用してください：
+テスト対象の要素を選択する際は、以下の優先順位でセレクタを使用してください：
 
 1. `data-testid` 属性（最優先）
-2. ラベルやテキスト内容
-3. クラス名やID（最終手段）
+2. アクセシビリティ属性（`aria-*`）
+3. セマンティックなHTML要素（`button`, `input`など）
+4. クラス名やID（最終手段）
 
 例：
 ```typescript
 // 良い例
 cy.get('[data-testid="login-button"]').click();
 
-// 次善の例
-cy.contains('ログイン').click();
-
 // 避けるべき例
 cy.get('.btn-primary').click();
 ```
 
-### 2. 待機と非同期処理
+### data-testid属性の命名規則
 
-非同期処理を扱う際は、明示的なタイムアウト値を設定してください：
+`data-testid` 属性は以下の命名規則に従って付与してください：
 
-```typescript
-// 要素が表示されるまで待機
-cy.get('[data-testid="user-menu"]', { timeout: 10000 }).should('be.visible');
+- 単語はハイフン（-）で区切る
+- 機能名-要素タイプの形式を基本とする
+- 同じタイプの要素が複数ある場合は、末尾に識別子を付ける
 
-// テキストが含まれるまで待機
-cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+例：
+```
+data-testid="login-button"
+data-testid="user-menu"
+data-testid="translation-text"
+data-testid="slide-preview"
 ```
 
-### 3. テストデータの管理
+### 主要なdata-testid属性一覧
 
-テストデータは `fixtures` ディレクトリに配置し、テスト間で共有できるようにしてください：
+アプリケーションの主要な要素には以下の `data-testid` 属性が付与されています：
+
+#### 認証関連
+- `user-menu`: ユーザーメニューボタン
+- `logout-button`: ログアウトボタン
+
+#### 翻訳フロー関連
+- `upload-text`: アップロードテキスト
+- `upload-area`: ファイルドロップエリア
+- `slide-preview`: スライドプレビュー
+- `translating-indicator`: 翻訳中インジケーター
+- `translation-text`: 翻訳テキスト表示
+- `save-translation-button`: 翻訳保存ボタン
+- `download-button`: ダウンロードボタン
+- `downloading-indicator`: ダウンロード中インジケーター
+
+### 待機戦略
+
+テストの安定性を向上させるために、以下の待機戦略を使用してください：
+
+1. **明示的な待機**: 特定の要素が表示されるまで待機
+   ```typescript
+   cy.get('[data-testid="slide-preview"]', { timeout: 30000 }).should('be.visible');
+   ```
+
+2. **ネットワークリクエストの待機**: APIリクエストの完了を待機
+   ```typescript
+   cy.intercept('POST', '/api/upload').as('uploadRequest');
+   cy.wait('@uploadRequest', { timeout: 30000 });
+   ```
+
+3. **状態変化の待機**: 要素の状態変化を待機
+   ```typescript
+   cy.get('[data-testid="translating-indicator"]')
+     .should('exist')
+     .then(() => {
+       cy.get('[data-testid="translating-indicator"]', { timeout: 60000 })
+         .should('not.exist');
+     });
+   ```
+
+### テスト間の独立性
+
+各テストは独立して実行できるようにしてください。テスト間で状態を共有しないことで、テストの信頼性と再現性が向上します。
 
 ```typescript
-// ファイルの読み込み
-cy.fixture('sample.pptx', 'binary').then(Cypress.Blob.binaryStringToBlob)
-  .then(fileContent => {
-    // ファイルを使用した処理
-  });
-```
-
-### 4. 認証処理の共通化
-
-認証処理など、複数のテストで共通して使用する処理はカスタムコマンドとして実装してください：
-
-```typescript
-// support/e2e.ts でカスタムコマンドを定義
-Cypress.Commands.add('login', (email, password) => {
+// 良い例: 各テストで独立してログイン処理を行う
+const login = () => {
+  cy.clearCookies();
+  cy.clearLocalStorage();
   cy.visit('/signin');
-  cy.get('input[name="email"]').type(email);
-  cy.get('input[name="password"]').type(password);
+  cy.get('input[name="email"]').type(testUser.email);
+  cy.get('input[name="password"]').type(testUser.password);
   cy.get('button[type="submit"]').click();
-  cy.url().should('include', '/translate', { timeout: 15000 });
-  cy.get('[data-testid="user-menu"]', { timeout: 15000 }).should('be.visible');
+};
+
+it('テスト1', () => {
+  login();
+  // テスト内容
 });
 
-// テストファイルでカスタムコマンドを使用
-cy.login('test@example.com', 'password123');
+it('テスト2', () => {
+  login();
+  // テスト内容
+});
 ```
 
-### 5. APIモックの活用
+### モックの使用
 
-外部APIに依存するテストでは、APIレスポンスをモックして安定したテスト環境を構築してください：
+外部依存性をモックすることで、テストの安定性と速度を向上させることができます。
 
 ```typescript
-// APIリクエストをモック
+// APIレスポンスをモック
 cy.intercept('POST', '/api/upload', {
   statusCode: 200,
-  body: mockSlideData
+  body: mockSlideData,
+  delay: 1000
 }).as('uploadRequest');
-
-// リクエストが完了するまで待機
-cy.wait('@uploadRequest', { timeout: 30000 });
 ```
-
-## 最新のテスト実装状況
-
-### 認証テスト (`auth.cy.ts`)
-
-現在、以下のテストケースが実装されています：
-
-1. ログインページへのアクセス
-2. 無効な認証情報でのログイン試行
-3. 有効な認証情報でのログイン
-4. ログアウト機能
-5. 認証が必要なページへの未認証アクセス
-6. セッション維持の確認
-7. 新規登録機能
-8. 無効なデータでの新規登録試行
-
-### 翻訳フローテスト (`translate-flow.cy.ts`)
-
-現在、以下のテストケースが実装されています：
-
-1. 翻訳ページへのアクセス
-2. PPTファイルのアップロードと翻訳
-3. 翻訳テキストの編集
-4. 翻訳済みPPTのダウンロード
 
 ## 既知の問題と対処法
 
-### 1. 認証関連の問題
+### タイムアウトエラー
 
-認証テストで問題が発生する場合は、以下の対策を実施してください：
+問題: 要素が表示されるまでのタイムアウトエラー
 
-- `data-testid="signin-error"` 属性が正しく設定されていることを確認
-- 実際のエラーメッセージテキストとテストの期待値が一致していることを確認
-- NextAuth.jsの設定を確認し、認証後のリダイレクト処理が正しく機能していることを確認
+対処法:
+- タイムアウト値を増やす: `{ timeout: 30000 }`
+- 要素が確実に表示されるまでの前提条件を確認する
+- ネットワークリクエストの完了を待機してから要素を検索する
 
-### 2. ポート番号の不一致問題
+### ファイルアップロードの問題
 
-アプリケーションが異なるポートで起動している場合は、以下の対策を実施してください：
+問題: ファイルアップロードが安定しない
 
-```typescript
-// cypress.config.ts を修正して動的なポート検出を実装
-setupNodeEvents(on, config) {
-  // 実際のアプリケーションポートを検出する処理
-  const port = process.env.PORT || 3000;
-  config.baseUrl = `http://localhost:${port}`;
-  return config;
-}
+対処法:
+- `{ force: true }` オプションを使用する
+- ファイルの存在を事前に確認する
+- アップロードAPIをモックする
+
+### ランダムな失敗
+
+問題: 同じテストが時々失敗する
+
+対処法:
+- 待機戦略を改善する
+- テスト間の独立性を確保する
+- 明示的なアサーションを追加する
+
+## CI/CD統合
+
+### GitHub Actionsでの実行
+
+GitHub Actionsでテストを実行するワークフロー例：
+
+```yaml
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  cypress-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Start application
+        run: npm run dev & npx wait-on http://localhost:3002
+      
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@v5
+        with:
+          browser: chrome
+          headless: true
 ```
 
-### 3. テストデータの問題
+## トラブルシューティング
 
-テストデータに関する問題を解決するには：
+### テスト実行時の一般的な問題
 
-- 実際のスライドとテキストを含む有効なPPTXテストファイルを作成
-- テスト実行前にテスト環境が正しく設定されていることを確認
-- `cypress/fixtures` ディレクトリが存在することを確認
+1. **アプリケーションが起動していない**
+   - 解決策: テスト実行前にアプリケーションが起動していることを確認してください。
 
-## 改善計画
+2. **環境変数が正しく設定されていない**
+   - 解決策: `.env.local` ファイルで環境変数が正しく設定されていることを確認してください。
 
-### 短期的な改善項目（1-2週間）
+3. **テストデータが存在しない**
+   - 解決策: `cypress/fixtures` ディレクトリにテストデータが存在することを確認してください。
 
-1. UI要素への `data-testid` 属性の追加
-   - サインインフォームの各要素
-   - 翻訳ページの各UI要素
-   - エラーメッセージ表示要素
-
-2. テスト環境の安定化
-   - 動的なポート検出機能の実装
-   - タイムアウト値の最適化
-   - テスト用のリセット機能の実装
-
-### 中期的な改善項目（2-4週間）
-
-1. テストカバレッジの拡充
-   - エラーケースのテスト追加
-   - 異なる言語間の翻訳テスト
-   - ユーザー設定変更のテスト
-
-2. テスト実行の自動化
-   - GitHub Actionsでの自動テスト設定
-   - テスト結果レポートの自動生成
-
-### 長期的な改善項目（1-2ヶ月）
-
-1. パフォーマンステストの追加
-   - 大きなPPTファイルでの処理時間測定
-   - 同時リクエスト処理のテスト
-
-2. ビジュアルリグレッションテストの導入
-   - UIコンポーネントの視覚的な変更を検出
-   - レスポンシブデザインのテスト
+4. **セレクタが変更された**
+   - 解決策: アプリケーションのコードが変更された場合は、テスト内のセレクタも更新してください。
 
 ## 参考リソース
 
 - [Cypress 公式ドキュメント](https://docs.cypress.io/)
+- [Cypressベストプラクティス](https://docs.cypress.io/guides/references/best-practices)
 - [cypress-file-upload プラグイン](https://github.com/abramenal/cypress-file-upload)
-- [Mochawesome レポーター](https://github.com/adamgruber/mochawesome)

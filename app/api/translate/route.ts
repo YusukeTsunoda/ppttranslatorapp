@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     const data = await req.json()
     
     // リクエストBodyからパラメータ取得
-    const { texts, sourceLang, targetLang, model, fileName = "スライド", pageCount = 0 } = data;
+    const { texts, sourceLang, targetLang, model, fileName = "スライド", slides } = data;
 
     // デフォルトモデルを指定
     const defaultModel = "claude-3-haiku-20240307";
@@ -159,7 +159,7 @@ ${textObj.text}
           id: uuidv4(),
           userId: session.user.id,
           fileName,
-          pageCount: pageCount || texts.length, // テキスト数をページ数として使用（pageCountが指定されていない場合）
+          pageCount: slides.length, // スライド数を正確に反映
           status: '完了',
           creditsUsed: 1,
           sourceLang: sourceLang as Language,

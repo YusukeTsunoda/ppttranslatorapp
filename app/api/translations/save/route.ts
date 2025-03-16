@@ -44,7 +44,7 @@ export async function POST(request: Request) {
             id: uuidv4(),
             userId: user.id,
             fileName: `スライド_${new Date().toISOString().split('T')[0]}`,
-            pageCount: slides?.length || 0,
+            pageCount: slides?.length > 0 ? slides.length : 1,
             status: '完了',
             creditsUsed: 1,
             sourceLang: sourceLang || 'ja',

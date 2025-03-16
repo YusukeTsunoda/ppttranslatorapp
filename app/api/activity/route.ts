@@ -29,7 +29,79 @@ export async function GET(req: Request) {
       },
       skip,
       take: limit,
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
+
+    // ファイルアクセスログの場合、関連するファイル情報を取得して追加
+    const enhancedLogs = await Promise.all(
+      logs.map(async (log) => {
+        // ファイルアクセスまたはファイルアップロードの場合
+        if (log.type === 'file_access' || log.type === 'file_upload') {
+          const metadata = log.metadata as any;
+          
+          // ファイルIDがメタデータに含まれている場合
+          if (metadata?.fileId) {
+            try {
+              const fileInfo = await prisma.file.findUnique({
+                where: { id: metadata.fileId },
+                select: {
+                  originalName: true,
+                  fileSize: true,
+                  Slide: {
+                    select: {
+                      id: true,
+                      index: true,
+                      Text: {
+                        select: {
+                          id: true,
+                          Translation: {
+                            select: {
+                              id: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              });
+
+              if (fileInfo) {
+                // 翻訳済みのスライド番号を抽出
+                const translatedSlides = fileInfo.Slide
+                  .filter(slide => slide.Text.some(text => text.Translation.length > 0))
+                  .map(slide => slide.index + 1); // インデックスは0始まりなので+1
+
+                // スライド数（ページ数）を計算
+                const pageCount = fileInfo.Slide.length;
+
+                // メタデータを拡張
+                return {
+                  ...log,
+                  metadata: {
+                    ...metadata,
+                    fileName: fileInfo.originalName,
+                    pageCount: pageCount,
+                    translatedPages: translatedSlides,
+                  },
+                };
+              }
+            } catch (err) {
+              console.error('ファイル情報取得エラー:', err);
+            }
+          }
+        }
+        
+        return log;
+      })
+    );
 
     // 総件数を取得
     const total = await prisma.activityLog.count({
@@ -39,7 +111,7 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({
-      logs,
+      logs: enhancedLogs,
       pagination: {
         page,
         limit,

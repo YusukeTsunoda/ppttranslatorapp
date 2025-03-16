@@ -5,19 +5,32 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # 手動実行も可能に
+
+env:
+  NODE_VERSION: '20'
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: ppttranslator_test
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
+  NEXTAUTH_URL: http://localhost:3000
+  NEXTAUTH_SECRET: test_secret
+  BASE_URL: http://localhost:3000
+  STRIPE_SECRET_KEY: dummy_key_for_tests
 
 jobs:
   lint-and-test:
     name: Lint and Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # タイムアウト設定を追加
 
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ppttranslator_test
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -29,32 +42,51 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 全履歴を取得（コードカバレッジの比較用）
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
 
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Prisma
+      uses: actions/cache@v3
+      with:
+        path: node_modules/.prisma
+        key: ${{ runner.os }}-prisma-${{ hashFiles('prisma/schema.prisma') }}
+        restore-keys: |
+          ${{ runner.os }}-prisma-
 
     - name: Generate Prisma client
       run: npx prisma generate
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
+        DATABASE_URL: ${{ env.DATABASE_URL }}
 
     - name: Run ESLint
       run: npm run lint
+      
+    - name: Cache Jest
+      uses: actions/cache@v3
+      with:
+        path: |
+          node_modules/.cache/jest
+        key: ${{ runner.os }}-jest-${{ hashFiles('jest.config.js') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+        restore-keys: |
+          ${{ runner.os }}-jest-
 
     - name: Run unit tests with coverage
       run: npm run test:coverage
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
-        NEXTAUTH_URL: http://localhost:3000
-        NEXTAUTH_SECRET: test_secret
-        BASE_URL: http://localhost:3000
-        STRIPE_SECRET_KEY: dummy_key_for_tests
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+        NEXTAUTH_URL: ${{ env.NEXTAUTH_URL }}
+        NEXTAUTH_SECRET: ${{ env.NEXTAUTH_SECRET }}
+        BASE_URL: ${{ env.BASE_URL }}
+        STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
@@ -63,26 +95,39 @@ jobs:
         directory: ./coverage
         fail_ci_if_error: false
         verbose: true
+        flags: unittests
+        name: codecov-umbrella
 
-    - name: Upload coverage report as artifact
+    - name: Generate test report
+      if: always()
+      run: |
+        npx jest --json --outputFile=jest-results.json || true
+        npx jest-html-reporter --json=jest-results.json --outputPath=./reports/jest-report.html
+
+    - name: Upload test reports
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: coverage-report
-        path: coverage
+        name: test-reports
+        path: |
+          coverage
+          reports
+          jest-results.json
         retention-days: 14
 
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: lint-and-test
+    timeout-minutes: 30  # E2Eテストは時間がかかるので長めに設定
 
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ppttranslator_test
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -98,11 +143,20 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
 
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Next.js build
+      uses: actions/cache@v3
+      with:
+        path: |
+          .next/cache
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-
 
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -121,25 +175,25 @@ jobs:
         npx prisma migrate deploy
         npm run db:seed
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
+        DATABASE_URL: ${{ env.DATABASE_URL }}
 
     - name: Build Next.js
       run: npm run build
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
-        NEXTAUTH_URL: http://localhost:3000
-        NEXTAUTH_SECRET: test_secret
-        BASE_URL: http://localhost:3000
-        STRIPE_SECRET_KEY: dummy_key_for_tests
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+        NEXTAUTH_URL: ${{ env.NEXTAUTH_URL }}
+        NEXTAUTH_SECRET: ${{ env.NEXTAUTH_SECRET }}
+        BASE_URL: ${{ env.BASE_URL }}
+        STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
 
     - name: Start Next.js
       run: npm run start &
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
-        NEXTAUTH_URL: http://localhost:3000
-        NEXTAUTH_SECRET: test_secret
-        BASE_URL: http://localhost:3000
-        STRIPE_SECRET_KEY: dummy_key_for_tests
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+        NEXTAUTH_URL: ${{ env.NEXTAUTH_URL }}
+        NEXTAUTH_SECRET: ${{ env.NEXTAUTH_SECRET }}
+        BASE_URL: ${{ env.BASE_URL }}
+        STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
 
     - name: Wait for Next.js
       run: |
@@ -147,24 +201,32 @@ jobs:
           sleep 1
         done
 
+    - name: Create directories for Cypress reports
+      run: |
+        mkdir -p cypress/results
+        mkdir -p cypress/reports
+
     - name: Run Cypress tests
       uses: cypress-io/github-action@v6
       with:
         browser: chrome
         record: false
+        config: video=true,screenshotOnRunFailure=true
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppttranslator_test
-        CYPRESS_BASE_URL: http://localhost:3000
-        NEXTAUTH_URL: http://localhost:3000
-        NEXTAUTH_SECRET: test_secret
-        BASE_URL: http://localhost:3000
-        STRIPE_SECRET_KEY: dummy_key_for_tests
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+        CYPRESS_BASE_URL: ${{ env.NEXTAUTH_URL }}
+        NEXTAUTH_URL: ${{ env.NEXTAUTH_URL }}
+        NEXTAUTH_SECRET: ${{ env.NEXTAUTH_SECRET }}
+        BASE_URL: ${{ env.BASE_URL }}
+        STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
         TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
         TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
     - name: Generate Cypress report
       if: always()
-      run: npx mochawesome-merge cypress/results/*.json > cypress/results/report.json
+      run: |
+        npx mochawesome-merge cypress/results/*.json > cypress/results/report.json || true
+        npx mochawesome-report-generator cypress/results/report.json --reportDir cypress/reports || true
 
     - name: Upload Cypress results
       uses: actions/upload-artifact@v4
@@ -175,6 +237,27 @@ jobs:
           cypress/videos
           cypress/screenshots
           cypress/results
+          cypress/reports
+        retention-days: 14
+
+    - name: Analyze test failures
+      if: failure()
+      run: |
+        echo "## E2E Test Failures Analysis" > test-failures.md
+        echo "### Failed Tests" >> test-failures.md
+        find cypress/screenshots -type f | while read -r screenshot; do
+          test_name=$(basename "$screenshot" .png | sed 's/ -- .*$//')
+          echo "- $test_name" >> test-failures.md
+          echo "  ![Screenshot]($screenshot)" >> test-failures.md
+        done
+        cat test-failures.md
+
+    - name: Upload test failure analysis
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: test-failure-analysis
+        path: test-failures.md
         retention-days: 14
 
   build-and-deploy:
@@ -182,6 +265,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-and-test, e2e-tests]
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 15
 
     steps:
     - name: Checkout code
@@ -190,7 +274,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
 
     - name: Install dependencies
@@ -212,4 +296,35 @@ jobs:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod' 
+        vercel-args: '--prod'
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, e2e-tests, build-and-deploy]
+    if: always()
+    steps:
+      - name: Check build status
+        id: status
+        run: |
+          if [[ "${{ needs.lint-and-test.result }}" == "success" && "${{ needs.e2e-tests.result }}" == "success" && "${{ needs.build-and-deploy.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        if: always()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: ci-cd
+          SLACK_COLOR: ${{ steps.status.outputs.status == 'success' && 'good' || 'danger' }}
+          SLACK_TITLE: ${{ steps.status.outputs.status == 'success' && '✅ CI/CD Pipeline Succeeded' || '❌ CI/CD Pipeline Failed' }}
+          SLACK_MESSAGE: |
+            *Repository:* ${{ github.repository }}
+            *Branch:* ${{ github.ref_name }}
+            *Commit:* ${{ github.event.head_commit.message }}
+            *Triggered by:* ${{ github.actor }}
+            *Status:* ${{ steps.status.outputs.status == 'success' && 'Success ✅' || 'Failure ❌' }}
+            *Details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 

@@ -35,6 +35,14 @@ export interface Slide {
   translations?: TranslationItem[];
 }
 
+// プレビュー用のスライドデータ型定義
+export interface SlideData {
+  index: number;
+  imageUrl: string;
+  texts: TextItem[];
+  translations?: TranslationItem[];
+}
+
 // 翻訳モデルの型定義
 export interface TranslationModel {
   value: string;

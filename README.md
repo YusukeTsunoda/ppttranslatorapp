@@ -76,6 +76,51 @@ To test Stripe payments, use the following test card details:
 - Expiration: Any future date
 - CVC: Any 3-digit number
 
+## Testing and CI/CD
+
+This project includes comprehensive testing and CI/CD setup using GitHub Actions.
+
+### Running Tests Locally
+
+```bash
+# Run Jest unit tests
+npm run test
+
+# Run Jest tests with coverage report
+npm run test:coverage
+
+# Run Cypress E2E tests
+npm run cypress:run
+
+# Run Cypress tests with HTML report generation
+npm run cypress:report
+
+# Run all tests (lint, unit tests with coverage, and E2E tests)
+npm run test:all
+
+# Clean up all report directories
+npm run reports:clean
+
+# Create report directories
+npm run reports:create-dirs
+```
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+1. **Lint and Test**: Runs ESLint and Jest tests with coverage reports
+2. **E2E Tests**: Runs Cypress tests with screenshots and video recording
+3. **Build and Deploy**: Builds the Next.js application and deploys to Vercel (on main branch only)
+
+The CI/CD pipeline automatically:
+- Generates test coverage reports
+- Creates HTML test reports for both Jest and Cypress tests
+- Captures and analyzes screenshots on test failures
+- Optimizes test execution with caching and parallel runs
+
+To manually trigger the CI/CD workflow, go to the Actions tab in your GitHub repository and select the workflow to run.
+
 ## Going to Production
 
 When you're ready to deploy your SaaS application to production, follow these steps:

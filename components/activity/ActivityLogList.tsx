@@ -17,6 +17,7 @@ import {
   UserCog,
   Key,
   Trash2,
+  FileSearch,
 } from 'lucide-react';
 
 interface ActivityLogItem {
@@ -46,6 +47,7 @@ const actionIcons = {
   download: Download,
   settings_change: Settings,
   member_invite: UserPlus,
+  file_access: FileSearch,
 };
 
 const actionLabels = {
@@ -64,6 +66,7 @@ const actionLabels = {
   download: 'ダウンロード',
   settings_change: '設定変更',
   member_invite: 'メンバー招待',
+  file_access: 'ファイルアクセス',
 };
 
 interface ActivityLogListProps {
@@ -78,6 +81,49 @@ const ActivityLogItemComponent = memo(({ log }: { log: ActivityLogItem }) => {
     locale: ja,
   });
 
+  const renderMetadata = () => {
+    if (!log.metadata) return null;
+    
+    if (log.action === 'file_upload' || log.action === 'file_access') {
+      const fileName = log.metadata.fileName || '';
+      const pageCount = log.metadata.pageCount || 0;
+      const translatedPages = log.metadata.translatedPages || [];
+      
+      return (
+        <span className="ml-1 text-gray-600">
+          {fileName && <span className="font-medium">{fileName}</span>}
+          {pageCount > 0 && <span className="ml-1">({pageCount}ページ)</span>}
+          {translatedPages.length > 0 && (
+            <span className="ml-1">翻訳済み: {translatedPages.join(', ')}</span>
+          )}
+        </span>
+      );
+    }
+    
+    if (log.action === 'translation') {
+      const fileName = log.metadata.fileName || '';
+      const sourceLang = log.metadata.sourceLang || '';
+      const targetLang = log.metadata.targetLang || '';
+      
+      return (
+        <span className="ml-1 text-gray-600">
+          {fileName && <span className="font-medium">{fileName}</span>}
+          {sourceLang && targetLang && (
+            <span className="ml-1">({sourceLang} → {targetLang})</span>
+          )}
+        </span>
+      );
+    }
+    
+    return (
+      <span className="ml-1 text-gray-400 text-xs">
+        {Object.entries(log.metadata)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')}
+      </span>
+    );
+  };
+
   return (
     <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
       <div className="flex-shrink-0">
@@ -89,11 +135,7 @@ const ActivityLogItemComponent = memo(({ log }: { log: ActivityLogItem }) => {
         </p>
         <p className="text-sm text-gray-500">
           {label}
-          {log.metadata && (
-            <span className="ml-1 text-gray-400">
-              {JSON.stringify(log.metadata)}
-            </span>
-          )}
+          {renderMetadata()}
         </p>
       </div>
       <div className="flex-shrink-0">

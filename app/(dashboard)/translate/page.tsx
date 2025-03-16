@@ -69,6 +69,7 @@ export default function TranslatePage() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedTextIndex, setSelectedTextIndex] = useState<number | null>(null);
+  const [hoveredTextIndex, setHoveredTextIndex] = useState<number | null>(null);
   const [sourceLang, setSourceLang] = useState("ja");  // 翻訳元言語を日本語に
   const [targetLang, setTargetLang] = useState("en");  // 翻訳先言語を英語に
   const { toast } = useToast();
@@ -278,9 +279,14 @@ export default function TranslatePage() {
             })
           : [];
 
+        // 画像パスの生成を修正
+        const imagePath = slide.image_path || `slide_${index + 1}.png`;
+        // デバッグ用にパスを出力
+        console.log(`Slide ${index} image path:`, imagePath);
+        
         return {
           index,
-          imageUrl: `/api/slides/${fileId}/${slide.image_path || `slide_${index + 1}.png`}`,
+          imageUrl: `/api/slides/${fileId}/${imagePath}`,
           texts: texts,
           translations: []
         };
@@ -462,7 +468,8 @@ export default function TranslatePage() {
           sourceLang: sourceLang,
           targetLang: targetLang,
           model: selectedModel,
-          fileName: file?.name || "スライド"
+          fileName: file?.name || "スライド",
+          slides: slides // スライドデータを送信
         }),
         credentials: 'include',
       });
@@ -628,6 +635,35 @@ export default function TranslatePage() {
     setEditingValue('');
   };
 
+  // テキストが選択された時の処理を追加
+  const handleTextSelect = (index: number | null) => {
+    setSelectedTextIndex(index);
+  };
+
+  // テキストにホバーした時の処理を追加
+  const handleTextHover = (index: number | null) => {
+    setHoveredTextIndex(index);
+  };
+
+  // プレビューセクションのレンダリング部分を修正
+  const renderPreviewSection = () => {
+    if (slides.length === 0) {
+      return null;
+    }
+
+    return (
+      <PreviewSectionComponent
+        currentSlide={currentSlide}
+        slides={slides}
+        onSlideChange={setCurrentSlide}
+        selectedTextIndex={selectedTextIndex}
+        onTextSelect={handleTextSelect}
+        hoveredTextIndex={hoveredTextIndex}
+        onTextHover={handleTextHover}
+      />
+    );
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col space-y-4">
@@ -756,6 +792,7 @@ export default function TranslatePage() {
                     variant="outline"
                     onClick={handleDownload}
                     disabled={isDownloading}
+                    data-testid="download-button"
                   >
                     {isDownloading ? (
                       <>
@@ -774,42 +811,7 @@ export default function TranslatePage() {
               
               {/* スライドプレビュー */}
               <div className="w-full max-w-full">
-                <PreviewSectionComponent 
-                  slide={slides[currentSlide]} 
-                  onTranslationEdit={(index, newText) => {
-                    // 翻訳テキストの更新
-                    const updatedSlides = [...slides];
-                    if (!updatedSlides[currentSlide].translations) {
-                      updatedSlides[currentSlide].translations = [];
-                    }
-                    
-                    // 既存の翻訳がない場合は新しい配列を作成
-                    if (!Array.isArray(updatedSlides[currentSlide].translations)) {
-                      updatedSlides[currentSlide].translations = [];
-                    }
-                    
-                    // 翻訳アイテムを更新または作成
-                    if (updatedSlides[currentSlide].translations[index]) {
-                      updatedSlides[currentSlide].translations[index].text = newText;
-                    } else {
-                      // 翻訳アイテムが存在しない場合は新規作成
-                      const position = updatedSlides[currentSlide].texts[index]?.position || { x: 0, y: 0, width: 0, height: 0 };
-                      updatedSlides[currentSlide].translations[index] = {
-                        text: newText,
-                        position: position
-                      };
-                    }
-                    
-                    setSlides(updatedSlides);
-                    
-                    // 編集履歴も更新
-                    const translationKey = `${currentSlide}-${index}`;
-                    setEditedTranslations(prev => ({
-                      ...prev,
-                      [translationKey]: newText
-                    }));
-                  }}
-                />
+                {renderPreviewSection()}
               </div>
             </div>
           </>
