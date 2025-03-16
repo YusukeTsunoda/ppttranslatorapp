@@ -7,7 +7,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:3000',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    video: false,
+    video: true,
     screenshotOnRunFailure: true,
     defaultCommandTimeout: 10000,
     pageLoadTimeout: 30000,
@@ -20,6 +20,13 @@ export default defineConfig({
     },
     viewportWidth: 1280,
     viewportHeight: 720,
+    reporter: 'mochawesome',
+    reporterOptions: {
+      reportDir: 'cypress/results',
+      overwrite: false,
+      html: false,
+      json: true
+    },
     env: {
       NEXT_PUBLIC_API_URL: 'http://localhost:3003/api',
       TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'tsunotsunoda@gmail.com',

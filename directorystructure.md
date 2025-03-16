@@ -8,22 +8,40 @@
 │   ├── api/                      # APIエンドポイント
 │   │   ├── auth/                 # 認証関連API
 │   │   │   ├── [...nextauth]/    # NextAuth.js設定
-│   │   │   ├── reset-password/   # パスワードリセット
-│   │   │   └── signup/           # ユーザー登録
-│   │   ├── test-db/              # データベース接続テスト
-│   │   ├── translate/            # 翻訳API
-│   │   ├── translations/         # 翻訳履歴API
-│   │   ├── upload/               # ファイルアップロードAPI
+│   │   │   ├── login/            # ログインAPI
+│   │   │   ├── register/         # ユーザー登録API
+│   │   │   ├── reset-password/   # パスワードリセットAPI
+│   │   │   ├── session/          # セッション管理API
+│   │   │   └── signup/           # ユーザー登録API
+│   │   ├── activity/             # アクティビティログAPI
+│   │   ├── anthropic/            # Anthropic AI API
 │   │   ├── download/             # ファイルダウンロードAPI
+│   │   ├── health/               # ヘルスチェックAPI
+│   │   ├── history/              # 翻訳履歴API
+│   │   ├── integrations/         # 外部サービス連携API
 │   │   ├── pptx/                 # PPTXファイル処理API
 │   │   ├── profile/              # ユーザープロファイルAPI
-│   │   ├── subscription/         # サブスクリプション管理API
+│   │   ├── slides/               # スライド管理API
 │   │   ├── stripe/               # Stripe決済API
-│   │   ├── anthropic/            # Anthropic AI API
-│   │   └── health/               # ヘルスチェックAPI
+│   │   ├── subscription/         # サブスクリプション管理API
+│   │   ├── test-db/              # データベース接続テスト
+│   │   ├── translate/            # 翻訳API
+│   │   ├── translations/         # 翻訳保存API
+│   │   └── upload/               # ファイルアップロードAPI
 │   ├── (auth)/                   # 認証関連ページ
+│   │   ├── reset-password/       # パスワードリセットページ
+│   │   ├── signin/               # サインインページ
+│   │   └── signup/               # サインアップページ
 │   ├── (dashboard)/              # ダッシュボード関連ページ
+│   │   ├── activity/             # アクティビティページ
+│   │   ├── checkout/             # 決済ページ
+│   │   ├── history/              # 履歴ページ
+│   │   ├── integrations/         # 連携ページ
+│   │   ├── profile/              # プロファイルページ
+│   │   ├── settings/             # 設定ページ
+│   │   └── translate/            # 翻訳ページ
 │   ├── (marketing)/              # マーケティング関連ページ
+│   │   └── pricing/              # 料金プランページ
 │   ├── globals.css               # グローバルスタイル
 │   ├── layout.tsx                # ルートレイアウト
 │   ├── providers.tsx             # プロバイダーコンポーネント
@@ -34,34 +52,37 @@
 │   ├── auth/                     # 認証関連コンポーネント
 │   └── activity/                 # アクティビティ関連コンポーネント
 ├── lib/                          # ユーティリティライブラリ
-│   ├── auth/                     # 認証関連処理
-│   │   └── auth-options.ts       # NextAuth.js設定
-│   ├── db/                       # データベース関連処理
-│   │   └── test-connection.ts    # DB接続テスト
-│   ├── pptx/                     # PPTXファイル処理
-│   ├── utils/                    # 共通ユーティリティ関数
-│   ├── payments/                 # 決済処理
-│   ├── stripe/                   # Stripe連携
-│   ├── email/                    # メール送信
-│   ├── supabase/                 # Supabase連携
-│   ├── python/                   # Python連携
 │   ├── anthropic/                # Anthropic AI連携
+│   ├── auth/                     # 認証関連処理
+│   ├── db/                       # データベース関連処理
+│   │   ├── migrations/           # データベースマイグレーション
+│   │   └── prisma.ts             # Prismaクライアント
+│   ├── email/                    # メール送信
 │   ├── hooks/                    # カスタムフック
-│   ├── prisma.ts                 # Prismaクライアント
-│   └── types.ts                  # 共通型定義
-├── types/                        # 型定義ファイル
-│   ├── next-auth.d.ts            # NextAuth型定義
-│   ├── prisma.ts                 # Prisma型定義
-│   ├── logger.ts                 # ロガー型定義
-│   └── pptx-parser.d.ts          # PPTX解析型定義
+│   ├── payments/                 # 決済処理
+│   ├── pptx/                     # PPTXファイル処理
+│   ├── python/                   # Python連携
+│   ├── stripe/                   # Stripe連携
+│   ├── supabase/                 # Supabase連携
+│   └── utils/                    # 共通ユーティリティ関数
+│       ├── activity-logger.ts    # アクティビティログ
+│       ├── error-handler.ts      # エラーハンドリング
+│       ├── file-utils.ts         # ファイル操作ユーティリティ
+│       └── pptx-parser.ts        # PPTXパーサー
 ├── prisma/                       # Prisma ORM
 │   ├── schema.prisma             # データベーススキーマ
-│   ├── seed.ts                   # シードデータ
 │   └── migrations/               # マイグレーションファイル
 ├── public/                       # 静的ファイル
+│   ├── static/                   # 静的リソース
+│   └── uploads/                  # アップロードファイル
 ├── scripts/                      # ユーティリティスクリプト
-│   └── check-users.ts            # ユーザー確認スクリプト
 ├── python_backend/               # Python処理バックエンド
+├── tests/                        # テストファイル
+│   ├── auth/                     # 認証テスト
+│   ├── hooks/                    # フックテスト
+│   └── utils/                    # ユーティリティテスト
+├── types/                        # 型定義ファイル
+├── cypress/                      # E2Eテスト
 ├── middleware.ts                 # Next.jsミドルウェア
 ├── auth.ts                       # 認証設定
 ├── next.config.js                # Next.js設定
@@ -79,6 +100,7 @@
 - **AI翻訳**: Anthropic APIを使用した翻訳処理
 - **決済システム**: Stripeによるサブスクリプション管理
 - **ストレージ**: Supabaseによるファイル保存
+- **アクティビティログ**: ユーザーアクティビティの記録と管理
 
 ### 配置ルール
 - UIコンポーネント → `components/ui/`
@@ -87,3 +109,5 @@
 - 認証関連 → `lib/auth/`
 - データベース処理 → `lib/db/`
 - 型定義 → `types/`
+- テスト → `tests/`
+- E2Eテスト → `cypress/`
