@@ -131,6 +131,7 @@ export const PreviewSectionComponent = ({ slide, onTranslationEdit }: PreviewSec
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
+          data-testid="slide-preview"
         >
           {imageError ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -217,6 +218,7 @@ export const PreviewSectionComponent = ({ slide, onTranslationEdit }: PreviewSec
                             size="sm" 
                             onClick={() => saveEdit(index)}
                             className="h-7 px-2"
+                            data-testid="save-translation-button"
                           >
                             <Save className="h-3.5 w-3.5 mr-1" />
                             保存
@@ -224,7 +226,7 @@ export const PreviewSectionComponent = ({ slide, onTranslationEdit }: PreviewSec
                         </div>
                       </div>
                     ) : (
-                      <div className="p-2 bg-gray-50 rounded min-h-[60px] text-sm">
+                      <div className="p-2 bg-gray-50 rounded min-h-[60px] text-sm" data-testid="translation-text">
                         {translation || "翻訳がありません"}
                       </div>
                     )}

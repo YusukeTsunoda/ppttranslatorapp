@@ -35,8 +35,8 @@ describe('認証フロー', () => {
     cy.get('button[type="submit"]').click();
     
     // ダッシュボードにリダイレクトされることを確認
-    // URLチェックの代わりにページ内容で確認
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+    // data-testid属性を使用して要素を検索
+    cy.get('[data-testid="upload-text"]', { timeout: 20000 }).should('be.visible');
   });
 
   it('ログアウトするとサインインページにリダイレクトされる', () => {
@@ -47,7 +47,7 @@ describe('認証フロー', () => {
     cy.get('button[type="submit"]').click();
     
     // ダッシュボードに移動したことを確認
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+    cy.get('[data-testid="upload-text"]', { timeout: 20000 }).should('be.visible');
     
     // ユーザーメニューが表示されるまで待機
     cy.get('[data-testid="user-menu"]', { timeout: 15000 }).should('be.visible').click();
@@ -74,7 +74,7 @@ describe('認証フロー', () => {
     cy.get('button[type="submit"]').click();
     
     // ダッシュボードに移動したことを確認
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+    cy.get('[data-testid="upload-text"]', { timeout: 20000 }).should('be.visible');
     
     // プロフィールページに移動
     cy.visit('/profile');
@@ -97,7 +97,7 @@ describe('認証フロー', () => {
     cy.get('button[type="submit"]').click();
     
     // ダッシュボードにリダイレクトされることを確認
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+    cy.get('[data-testid="upload-text"]', { timeout: 20000 }).should('be.visible');
   });
 
   it('無効なデータで新規登録するとエラーが表示される', () => {

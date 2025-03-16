@@ -49,7 +49,7 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      data-testid="file-drop-area"
+      data-testid="upload-area"
     >
       <input
         ref={fileInputRef}
@@ -64,7 +64,7 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
           <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-primary/10 flex items-center justify-center">
             <FileText className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-medium">ファイルをアップロード</h3>
+          <h3 className="text-lg font-medium" data-testid="upload-text">ファイルをアップロード</h3>
           <p className="text-sm text-gray-500 mt-1">
             PPTXファイルをドラッグ＆ドロップするか、クリックして選択してください
           </p>

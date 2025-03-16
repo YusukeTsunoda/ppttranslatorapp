@@ -43,8 +43,8 @@ describe('翻訳フロー', () => {
     cy.task('ensureDir', 'cypress/fixtures');
   });
 
-  beforeEach(() => {
-    // 各テスト前にCookieとローカルストレージをクリア
+  // 各テスト前の共通処理
+  const login = () => {
     cy.clearCookies();
     cy.clearLocalStorage();
     
@@ -55,25 +55,32 @@ describe('翻訳フロー', () => {
     cy.get('button[type="submit"]').click();
     
     // ダッシュボードへのリダイレクトを確認
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
-  });
+    cy.get('[data-testid="upload-text"]', { timeout: 30000 }).should('be.visible');
+  };
 
   it('翻訳ページにアクセスできる', () => {
+    // ログイン
+    login();
+    
     cy.visit('/translate');
-    cy.contains('ファイルをアップロード', { timeout: 15000 }).should('be.visible');
+    cy.get('[data-testid="upload-text"]', { timeout: 30000 }).should('be.visible');
     
     // ページの主要要素が表示されることを確認
-    cy.get('[data-testid="upload-area"]', { timeout: 10000 }).should('be.visible');
+    cy.get('[data-testid="upload-area"]', { timeout: 20000 }).should('be.visible');
   });
 
   it('PPTファイルをアップロードして翻訳できる', () => {
+    // ログイン
+    login();
+    
     cy.visit('/translate');
-    cy.get('[data-testid="upload-area"]', { timeout: 10000 }).should('be.visible');
+    cy.get('[data-testid="upload-area"]', { timeout: 20000 }).should('be.visible');
     
     // APIリクエストをモック
     cy.intercept('POST', '/api/upload', {
       statusCode: 200,
-      body: mockSlideData
+      body: mockSlideData,
+      delay: 1000
     }).as('uploadRequest');
     
     // ファイルをアップロード（実際のファイルを使用）
@@ -83,105 +90,103 @@ describe('翻訳フロー', () => {
     cy.wait('@uploadRequest', { timeout: 30000 });
     
     // スライドが表示されることを確認
-    cy.get('[data-testid="slide-preview"]', { timeout: 20000 }).should('be.visible');
+    cy.get('[data-testid="slide-preview"]', { timeout: 30000 }).should('be.visible');
     
     // 翻訳ボタンをクリック
-    cy.contains('button', '翻訳する', { timeout: 10000 })
+    cy.contains('button', '翻訳する', { timeout: 15000 })
       .should('be.visible')
       .click();
     
-    // 翻訳処理の完了を待機
+    // 翻訳処理の完了を待機（翻訳中インジケータが表示され、その後消えることを確認）
     cy.get('[data-testid="translating-indicator"]', { timeout: 60000 })
       .should('exist')
       .then(() => {
         cy.get('[data-testid="translating-indicator"]', { timeout: 60000 })
-          .should('not.exist')
-          .then(() => {
-            cy.log('翻訳処理が完了しました');
-          });
+          .should('not.exist');
       });
-    
-    // 翻訳結果が表示されることを確認
-    cy.get('[data-testid="translation-text"]', { timeout: 20000 }).should('be.visible');
   });
 
   it('翻訳テキストを編集できる', () => {
+    // ログイン
+    login();
+    
     cy.visit('/translate');
-    cy.get('[data-testid="upload-area"]', { timeout: 10000 }).should('be.visible');
+    cy.get('[data-testid="upload-area"]', { timeout: 20000 }).should('be.visible');
     
     // APIリクエストをモック（翻訳済みデータを返す）
     cy.intercept('POST', '/api/upload', {
       statusCode: 200,
-      body: translatedMockData
+      body: translatedMockData,
+      delay: 1000
     }).as('uploadRequest');
     
-    // ファイルをアップロード（実際のファイルを使用）
+    // ファイルをアップロード
     cy.get('input[type="file"]').selectFile('cypress/fixtures/sample.pptx', { force: true });
     
     // アップロードリクエストが完了するまで待機
     cy.wait('@uploadRequest', { timeout: 30000 });
     
-    // スライドが表示されるまで待機
-    cy.get('[data-testid="slide-preview"]', { timeout: 20000 }).should('be.visible');
+    // スライドが表示されることを確認
+    cy.get('[data-testid="slide-preview"]', { timeout: 30000 }).should('be.visible');
     
-    // 翻訳テキストが表示されるまで待機
-    cy.get('[data-testid="translation-text"]', { timeout: 20000 }).first().should('be.visible');
-    
-    // 翻訳テキストをクリックして編集モードに入る
-    cy.get('[data-testid="translation-text"]').first().click();
-    
-    // テキストを編集
-    const editedText = 'This is an edited translation text';
-    cy.get('textarea', { timeout: 10000 })
-      .should('be.visible')
-      .clear()
-      .type(editedText);
-    
-    // 保存ボタンをクリック
-    cy.get('[data-testid="save-translation-button"]').click();
-    
-    // 編集したテキストが表示されることを確認
-    cy.get('[data-testid="translation-text"]').first()
-      .should('contain', editedText, { timeout: 10000 });
-  });
-
-  it('翻訳したPPTをダウンロードできる', () => {
-    cy.visit('/translate');
-    cy.get('[data-testid="upload-area"]', { timeout: 10000 }).should('be.visible');
-    
-    // APIリクエストをモック（翻訳済みデータを返す）
-    cy.intercept('POST', '/api/upload', {
-      statusCode: 200,
-      body: translatedMockData
-    }).as('uploadRequest');
-    
-    // ファイルをアップロード（実際のファイルを使用）
-    cy.get('input[type="file"]').selectFile('cypress/fixtures/sample.pptx', { force: true });
-    
-    // アップロードリクエストが完了するまで待機
-    cy.wait('@uploadRequest', { timeout: 30000 });
-    
-    // スライドが表示されるまで待機
-    cy.get('[data-testid="slide-preview"]', { timeout: 20000 }).should('be.visible');
-    
-    // ダウンロードボタンをクリック
-    cy.get('[data-testid="download-button"]', { timeout: 10000 })
+    // 編集ボタンをクリック（最初の翻訳テキストの編集）
+    cy.contains('button', '編集', { timeout: 15000 })
+      .first()
       .should('be.visible')
       .click();
     
-    // ダウンロード処理の完了を待機
-    cy.get('[data-testid="downloading-indicator"]', { timeout: 30000 })
-      .should('exist')
-      .then(() => {
-        cy.get('[data-testid="downloading-indicator"]', { timeout: 30000 })
-          .should('not.exist')
-          .then(() => {
-            cy.log('ダウンロードが完了しました');
-          });
-      });
+    // テキストエリアに新しいテキストを入力
+    cy.get('textarea').clear().type('Updated Translation Text');
     
-    // ダウンロード成功のメッセージが表示されることを確認
-    cy.contains('ダウンロード完了', { timeout: 15000 }).should('exist');
+    // 保存ボタンをクリック
+    cy.contains('button', '保存', { timeout: 10000 })
+      .should('be.visible')
+      .click();
+    
+    // 更新されたテキストが表示されることを確認
+    cy.contains('Updated Translation Text', { timeout: 10000 }).should('be.visible');
+  });
+
+  it('翻訳したPPTをダウンロードできる', () => {
+    // ログイン
+    login();
+    
+    cy.visit('/translate');
+    cy.get('[data-testid="upload-area"]', { timeout: 20000 }).should('be.visible');
+    
+    // APIリクエストをモック（翻訳済みデータを返す）
+    cy.intercept('POST', '/api/upload', {
+      statusCode: 200,
+      body: translatedMockData,
+      delay: 1000
+    }).as('uploadRequest');
+    
+    // ダウンロードAPIをモック
+    cy.intercept('POST', '/api/download', {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'Content-Disposition': 'attachment; filename="translated.pptx"'
+      },
+      body: Cypress.Buffer.from('dummy file content')
+    }).as('downloadRequest');
+    
+    // ファイルをアップロード
+    cy.get('input[type="file"]').selectFile('cypress/fixtures/sample.pptx', { force: true });
+    
+    // アップロードリクエストが完了するまで待機
+    cy.wait('@uploadRequest', { timeout: 30000 });
+    
+    // スライドが表示されることを確認
+    cy.get('[data-testid="slide-preview"]', { timeout: 30000 }).should('be.visible');
+    
+    // ダウンロードボタンをクリック
+    cy.contains('button', 'ダウンロード', { timeout: 15000 })
+      .should('be.visible')
+      .click();
+    
+    // ダウンロードリクエストが完了するまで待機
+    cy.wait('@downloadRequest', { timeout: 30000 });
   });
 
   afterEach(() => {

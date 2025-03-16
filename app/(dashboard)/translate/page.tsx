@@ -711,7 +711,7 @@ export default function TranslatePage() {
                     >
                       {isTranslating ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" data-testid="translating-indicator" />
                           翻訳中...
                         </>
                       ) : (
@@ -759,7 +759,7 @@ export default function TranslatePage() {
                   >
                     {isDownloading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" data-testid="downloading-indicator" />
                         ダウンロード中...
                       </>
                     ) : (

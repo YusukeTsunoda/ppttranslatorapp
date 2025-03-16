@@ -10,7 +10,7 @@
 
 E2Eテストには以下のパッケージを使用しています：
 
-- Cypress: E2Eテストフレームワーク
+- Cypress: E2Eテストフレームワーク（最新バージョン）
 - cypress-file-upload: ファイルアップロードをテストするためのプラグイン
 
 ### インストール方法
@@ -29,11 +29,11 @@ npm install --save-dev cypress-file-upload
 
 ```typescript
 // cypress.config.ts
-config.env = {
-  ...config.env,
+env: {
+  NEXT_PUBLIC_API_URL: 'http://localhost:3003/api',
   TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'test@example.com',
   TEST_USER_PASSWORD: process.env.TEST_USER_PASSWORD || 'password123'
-};
+}
 ```
 
 ローカル環境で特定の環境変数を設定する場合は、`.env.local` ファイルを作成して設定することができます：
@@ -78,7 +78,9 @@ cypress/
 │   └── sample.pptx       # テスト用のPPTXファイル
 ├── support/              # サポートファイル
 │   └── e2e.ts            # グローバル設定とカスタムコマンド
-└── screenshots/          # テスト失敗時のスクリーンショット
+├── downloads/            # ダウンロードされたファイルの保存先
+├── reports/              # テスト結果レポート
+└── results/              # Mochawesomeレポート出力先
 ```
 
 ### テストファイルの構造
@@ -169,90 +171,126 @@ cy.fixture('sample.pptx', 'binary').then(Cypress.Blob.binaryStringToBlob)
 ```typescript
 // support/e2e.ts でカスタムコマンドを定義
 Cypress.Commands.add('login', (email, password) => {
-  // ログイン処理の実装
+  cy.visit('/signin');
+  cy.get('input[name="email"]').type(email);
+  cy.get('input[name="password"]').type(password);
+  cy.get('button[type="submit"]').click();
+  cy.url().should('include', '/translate', { timeout: 15000 });
+  cy.get('[data-testid="user-menu"]', { timeout: 15000 }).should('be.visible');
 });
 
 // テストファイルでカスタムコマンドを使用
 cy.login('test@example.com', 'password123');
 ```
 
+### 5. APIモックの活用
+
+外部APIに依存するテストでは、APIレスポンスをモックして安定したテスト環境を構築してください：
+
+```typescript
+// APIリクエストをモック
+cy.intercept('POST', '/api/upload', {
+  statusCode: 200,
+  body: mockSlideData
+}).as('uploadRequest');
+
+// リクエストが完了するまで待機
+cy.wait('@uploadRequest', { timeout: 30000 });
+```
+
+## 最新のテスト実装状況
+
+### 認証テスト (`auth.cy.ts`)
+
+現在、以下のテストケースが実装されています：
+
+1. ログインページへのアクセス
+2. 無効な認証情報でのログイン試行
+3. 有効な認証情報でのログイン
+4. ログアウト機能
+5. 認証が必要なページへの未認証アクセス
+6. セッション維持の確認
+7. 新規登録機能
+8. 無効なデータでの新規登録試行
+
+### 翻訳フローテスト (`translate-flow.cy.ts`)
+
+現在、以下のテストケースが実装されています：
+
+1. 翻訳ページへのアクセス
+2. PPTファイルのアップロードと翻訳
+3. 翻訳テキストの編集
+4. 翻訳済みPPTのダウンロード
+
 ## 既知の問題と対処法
 
 ### 1. 認証関連の問題
 
-認証テストで問題が発生する場合は、以下を確認してください：
+認証テストで問題が発生する場合は、以下の対策を実施してください：
 
-- テスト用のユーザーアカウントが有効であること
-- 環境変数が正しく設定されていること
-- セッション管理の仕組みに変更がないこと
+- `data-testid="signin-error"` 属性が正しく設定されていることを確認
+- 実際のエラーメッセージテキストとテストの期待値が一致していることを確認
+- NextAuth.jsの設定を確認し、認証後のリダイレクト処理が正しく機能していることを確認
 
-### 2. ファイルアップロード関連の問題
+### 2. ポート番号の不一致問題
 
-ファイルアップロードテストで問題が発生する場合は、以下を確認してください：
+アプリケーションが異なるポートで起動している場合は、以下の対策を実施してください：
 
-- テスト用のファイルが `fixtures` ディレクトリに存在すること
-- `cypress-file-upload` プラグインが正しくインストールされていること
-- ファイルアップロード処理のタイムアウト値が十分に長いこと
-
-### 3. 非同期処理関連の問題
-
-非同期処理のテストで問題が発生する場合は、以下を確認してください：
-
-- タイムアウト値が適切に設定されていること
-- 要素の表示条件が正しいこと
-- ネットワークリクエストの完了を適切に待機していること
-
-## CI/CD統合
-
-GitHub Actionsなどのワークフローでテストを自動実行する場合は、以下の設定を参考にしてください：
-
-```yaml
-# .github/workflows/e2e-tests.yml
-name: E2E Tests
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-
-jobs:
-  cypress-run:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Start development server
-        run: npm run dev & npx wait-on http://localhost:3000
-      
-      - name: Run Cypress tests
-        uses: cypress-io/github-action@v5
-        with:
-          browser: chrome
-          headless: true
+```typescript
+// cypress.config.ts を修正して動的なポート検出を実装
+setupNodeEvents(on, config) {
+  // 実際のアプリケーションポートを検出する処理
+  const port = process.env.PORT || 3000;
+  config.baseUrl = `http://localhost:${port}`;
+  return config;
+}
 ```
 
-## テスト拡充計画
+### 3. テストデータの問題
 
-今後、以下のテストを追加する予定です：
+テストデータに関する問題を解決するには：
 
-1. ユーザー設定の変更テスト
-2. チーム管理機能のテスト
-3. 翻訳履歴機能のテスト
-4. エラー処理のテスト
-5. パフォーマンステスト
+- 実際のスライドとテキストを含む有効なPPTXテストファイルを作成
+- テスト実行前にテスト環境が正しく設定されていることを確認
+- `cypress/fixtures` ディレクトリが存在することを確認
+
+## 改善計画
+
+### 短期的な改善項目（1-2週間）
+
+1. UI要素への `data-testid` 属性の追加
+   - サインインフォームの各要素
+   - 翻訳ページの各UI要素
+   - エラーメッセージ表示要素
+
+2. テスト環境の安定化
+   - 動的なポート検出機能の実装
+   - タイムアウト値の最適化
+   - テスト用のリセット機能の実装
+
+### 中期的な改善項目（2-4週間）
+
+1. テストカバレッジの拡充
+   - エラーケースのテスト追加
+   - 異なる言語間の翻訳テスト
+   - ユーザー設定変更のテスト
+
+2. テスト実行の自動化
+   - GitHub Actionsでの自動テスト設定
+   - テスト結果レポートの自動生成
+
+### 長期的な改善項目（1-2ヶ月）
+
+1. パフォーマンステストの追加
+   - 大きなPPTファイルでの処理時間測定
+   - 同時リクエスト処理のテスト
+
+2. ビジュアルリグレッションテストの導入
+   - UIコンポーネントの視覚的な変更を検出
+   - レスポンシブデザインのテスト
 
 ## 参考リソース
 
 - [Cypress 公式ドキュメント](https://docs.cypress.io/)
 - [cypress-file-upload プラグイン](https://github.com/abramenal/cypress-file-upload)
-- [Cypress ベストプラクティス](https://docs.cypress.io/guides/references/best-practices) 
+- [Mochawesome レポーター](https://github.com/adamgruber/mochawesome)
