@@ -119,6 +119,18 @@ export async function POST(request: NextRequest) {
       const firstSlideImagePath = join(slidesDir, 'slide_1.png');
       const imageExists = existsSync(firstSlideImagePath);
       
+      console.log('=== Image Verification ===');
+      console.log('First slide image path:', firstSlideImagePath);
+      console.log('Image exists:', imageExists);
+      
+      // 画像ディレクトリの内容を確認
+      try {
+        const dirContents = require('fs').readdirSync(slidesDir);
+        console.log('Slides directory contents:', dirContents);
+      } catch (err) {
+        console.error('Failed to read slides directory:', err);
+      }
+      
       if (!imageExists) {
         await logFileOperation(userId, 'access', fileId, false, 'スライド画像の生成に失敗しました');
         return NextResponse.json(

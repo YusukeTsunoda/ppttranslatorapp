@@ -265,9 +265,22 @@ export default function TranslatePage() {
                   position: { x: 0, y: 0, width: 0, height: 0 }
                 };
               } else if (text && typeof text === 'object') {
+                // 位置情報を取得（APIから返されるピクセル単位の位置情報をそのまま使用）
+                const position = text.position && typeof text.position === 'object' 
+                  ? {
+                      x: typeof text.position.x === 'number' ? text.position.x : 0,
+                      y: typeof text.position.y === 'number' ? text.position.y : 0,
+                      width: typeof text.position.width === 'number' ? text.position.width : 0,
+                      height: typeof text.position.height === 'number' ? text.position.height : 0
+                    }
+                  : { x: 0, y: 0, width: 0, height: 0 };
+                
+                // デバッグ用に位置情報を出力
+                console.log(`Text position for "${text.text || text.content || ''}":`, position);
+                
                 return {
                   text: text.text || text.content || '',
-                  position: text.position || { x: 0, y: 0, width: 0, height: 0 }
+                  position: position
                 };
               } else {
                 console.error('Invalid text format:', text);
@@ -284,9 +297,14 @@ export default function TranslatePage() {
         // デバッグ用にパスを出力
         console.log(`Slide ${index} image path:`, imagePath);
         
+        // 画像URLを生成（相対パスに戻す）
+        // 開発環境では相対パスを使用し、Next.jsのルーティングに任せる
+        const imageUrl = `/api/slides/${fileId}/${imagePath}`;
+        console.log(`Slide ${index} image URL:`, imageUrl);
+        
         return {
           index,
-          imageUrl: `/api/slides/${fileId}/${imagePath}`,
+          imageUrl: imageUrl,
           texts: texts,
           translations: []
         };

@@ -1,7 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { Slide, TextItem, TranslationItem, TextPosition, SlideData } from "../types";
+import { Slide, TextItem, TranslationItem, TextPosition, SlideData, ImageSize } from "../types";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +30,8 @@ export const PreviewSectionComponent = ({
   onTextHover,
 }: PreviewSectionProps) => {
   const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [scale, setScale] = useState(1);
@@ -39,6 +41,8 @@ export const PreviewSectionComponent = ({
   const previewRef = useRef<HTMLDivElement>(null);
   const [internalSelectedTextIndex, setInternalSelectedTextIndex] = useState<number | null>(externalSelectedTextIndex || null);
   const [internalHoveredTextIndex, setInternalHoveredTextIndex] = useState<number | null>(externalHoveredTextIndex || null);
+  const [imageSize, setImageSize] = useState<ImageSize>({ width: 0, height: 0 });
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // 外部から渡されたselectedTextIndexが変更されたら内部状態を更新
   useEffect(() => {
@@ -143,24 +147,158 @@ export const PreviewSectionComponent = ({
     }
   };
 
+  // 画像読み込み時にサイズを取得
+  const handleImageLoad = () => {
+    if (imageRef.current && previewRef.current) {
+      const { naturalWidth, naturalHeight, width, height } = imageRef.current;
+      const containerRect = previewRef.current.getBoundingClientRect();
+      
+      // 画像の実際の表示位置を取得
+      const rect = imageRef.current.getBoundingClientRect();
+      
+      // 画像の相対位置を計算
+      const offsetX = rect.left - containerRect.left;
+      const offsetY = rect.top - containerRect.top;
+      
+      console.log('画像サイズ:', { naturalWidth, naturalHeight, width, height });
+      console.log('画像オフセット:', { offsetX, offsetY });
+      console.log('コンテナサイズ:', { width: containerRect.width, height: containerRect.height });
+      
+      setImageSize({ 
+        width, 
+        height,
+        offsetX,
+        offsetY,
+        naturalWidth,
+        naturalHeight,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height
+      });
+      setImageError(false);
+    }
+  };
+
+  // 画像読み込みエラー時の再試行
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    console.error('画像読み込みエラー:', currentSlideData?.imageUrl, e);
+    
+    if (retryCount < maxRetries) {
+      // 再試行カウントを増やす
+      setRetryCount(prev => prev + 1);
+      
+      // 少し待ってから再読み込み
+      setTimeout(() => {
+        if (imageRef.current) {
+          console.log(`画像読み込み再試行 (${retryCount + 1}/${maxRetries}):`, currentSlideData?.imageUrl);
+          // 画像のsrcを再設定して強制的に再読み込み
+          const currentSrc = imageRef.current.src;
+          imageRef.current.src = '';
+          setTimeout(() => {
+            if (imageRef.current) {
+              imageRef.current.src = currentSrc;
+            }
+          }, 100);
+        }
+      }, 1000);
+    } else {
+      // 最大再試行回数を超えたらエラー表示
+      setImageError(true);
+    }
+  };
+
+  // スライドが変わったら再試行カウントをリセット
+  useEffect(() => {
+    setRetryCount(0);
+    setImageError(false);
+  }, [currentSlide]);
+
+  // 画像サイズの変更を検知して位置調整を更新
+  useEffect(() => {
+    // 画像サイズが変更されたときにログ出力
+    if (imageSize.width > 0 && imageSize.height > 0) {
+      console.log('画像サイズが更新されました:', imageSize);
+      
+      // 画像コンテナのサイズも取得
+      if (previewRef.current) {
+        const containerRect = previewRef.current.getBoundingClientRect();
+        console.log('コンテナサイズ:', {
+          width: containerRect.width,
+          height: containerRect.height
+        });
+      }
+    }
+  }, [imageSize]);
+
+  // ズーム変更時にも位置調整を更新
+  useEffect(() => {
+    if (imageRef.current && scale !== 1) {
+      console.log('ズーム変更:', scale);
+      // 強制的に再レンダリングを促す
+      setImageSize(prev => ({ ...prev }));
+    }
+  }, [scale]);
+
+  // 位置情報を画像サイズに合わせて調整
+  const adjustPositionToImageSize = (position: TextPosition) => {
+    if (!position || !imageSize.width || !imageSize.height) return position;
+    
+    // 画像の実際の表示サイズと位置を取得
+    const { 
+      width, 
+      height, 
+      offsetX = 0, 
+      offsetY = 0, 
+      naturalWidth = 1, 
+      naturalHeight = 1,
+      containerWidth = 1
+    } = imageSize;
+    
+    // スケール係数を計算（画像の実際の表示サイズに基づく）
+    // PPTの横幅に合わせるため、コンテナ幅を基準にスケールを計算
+    const containerScale = containerWidth / naturalWidth;
+    
+    // 実際の表示スケールを計算
+    const scaleX = width / naturalWidth;
+    const scaleY = height / naturalHeight;
+    
+    // 位置を調整（画像のオフセットを考慮）
+    return {
+      x: position.x * scaleX,
+      y: position.y * scaleY,
+      width: position.width * scaleX,
+      height: position.height * scaleY
+    };
+  };
+
   const getHighlightStyle = (position: TextPosition, isHovered: boolean, isSelected: boolean) => {
     // positionが存在しない場合は空のオブジェクトを返す
     if (!position) {
       console.log('位置情報がありません');
       return {};
     }
+    
+    // 画像サイズに合わせて位置を調整
+    const adjustedPosition = adjustPositionToImageSize(position);
+    
+    // 位置情報をログ出力（デバッグ用）
+    if (isSelected || isHovered) {
+      console.log('Original position:', position);
+      console.log('Adjusted position:', adjustedPosition);
+    }
 
     // 基本スタイルの定義
     const baseStyle: React.CSSProperties = {
       position: 'absolute',
-      left: `${position.x}%`,
-      top: `${position.y}%`,
-      width: `${position.width}%`,
-      height: `${position.height}%`,
+      left: `${adjustedPosition.x}px`,
+      top: `${adjustedPosition.y}px`,
+      width: `${adjustedPosition.width}px`,
+      height: `${adjustedPosition.height}px`,
       pointerEvents: 'auto', // クリックイベントを受け取れるように変更
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       zIndex: 30, // 高いz-indexを設定してクリック可能にする
+      // transformOriginを追加して、ズーム時の位置を正確に保持
+      transformOrigin: 'top left'
     };
 
     // 選択されている場合
@@ -279,125 +417,164 @@ export const PreviewSectionComponent = ({
         </div>
       </div>
 
-      <div 
-        ref={previewRef}
-        className="relative flex-1 border rounded-md overflow-hidden bg-gray-100" 
-        data-testid="slide-preview"
-        style={{ cursor: isDragging ? 'grabbing' : (scale > 1 ? 'grab' : 'default') }}
-      >
-        {currentSlideData ? (
-          <div 
-            className="absolute inset-0 w-full h-full"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-          >
+      <div className="flex flex-col lg:flex-row gap-4 h-full">
+        <div 
+          ref={previewRef}
+          className="relative flex-1 border rounded-md overflow-hidden bg-gray-100" 
+          data-testid="slide-preview"
+          style={{ 
+            cursor: isDragging ? 'grabbing' : (scale > 1 ? 'grab' : 'default'),
+            minHeight: '400px', // 最小高さを設定
+            height: '60vh', // 画面の60%の高さを確保
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          {currentSlideData ? (
             <div 
-              className="w-full h-full"
-              style={{ 
-                transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`, 
-                transformOrigin: 'center', 
-                transition: isDragging ? 'none' : 'transform 0.2s ease',
-                pointerEvents: 'auto' // イベントを確実に受け取る
-              }}
+              className="relative w-full h-full flex justify-center items-center"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
             >
-              <img
-                src={currentSlideData.imageUrl}
-                alt={`Slide ${currentSlide + 1}`}
-                className="w-full h-full object-contain"
-                data-testid="slide-image"
-                draggable="false" // 画像のデフォルトドラッグを無効化
-                style={{ pointerEvents: 'none' }} // 画像自体のイベントを無効化して親要素に伝播
-                onLoad={() => {
-                  console.log('画像読み込み成功:', currentSlideData.imageUrl);
-                  setImageError(false);
+              <div 
+                className="relative"
+                style={{ 
+                  transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`, 
+                  transformOrigin: 'center', 
+                  transition: isDragging ? 'none' : 'transform 0.2s ease',
+                  pointerEvents: 'auto', // イベントを確実に受け取る
+                  maxWidth: '100%',
+                  maxHeight: '100%'
                 }}
-                onError={(e) => {
-                  console.error('画像読み込みエラー:', currentSlideData.imageUrl);
-                  setImageError(true);
-                }}
-              />
-              {imageError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80">
-                  <div className="text-center p-4">
-                    <p className="text-red-500 font-medium">画像の読み込みに失敗しました</p>
-                    <p className="text-sm text-gray-600 mt-2">URL: {currentSlideData.imageUrl}</p>
+              >
+                <img
+                  ref={imageRef}
+                  src={currentSlideData.imageUrl}
+                  alt={`Slide ${currentSlide + 1}`}
+                  className="object-contain"
+                  data-testid="slide-image"
+                  draggable={false}
+                  style={{ 
+                    pointerEvents: 'none', // 画像自体のイベントを無効化して親要素に伝播
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    display: 'block'
+                  }}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+                {imageError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80">
+                    <div className="text-center p-4">
+                      <p className="text-red-500 font-medium">画像の読み込みに失敗しました</p>
+                      <p className="text-sm text-gray-600 mt-2">URL: {currentSlideData.imageUrl}</p>
+                      <button 
+                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        onClick={() => {
+                          setRetryCount(0);
+                          setImageError(false);
+                          if (imageRef.current) {
+                            const currentSrc = imageRef.current.src;
+                            imageRef.current.src = '';
+                            setTimeout(() => {
+                              if (imageRef.current) {
+                                imageRef.current.src = currentSrc;
+                              }
+                            }, 100);
+                          }
+                        }}
+                      >
+                        再読み込み
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {/* テキスト位置のハイライト表示 */}
-              {textItems.map((text, index) => {
-                const isHovered = internalHoveredTextIndex === index;
-                const isSelected = internalSelectedTextIndex === index;
+                )}
                 
-                return (
-                  <div
-                    key={`highlight-${index}`}
-                    style={{
-                      ...getHighlightStyle(text.position, isHovered, isSelected),
-                      // ハイライト要素は常にドラッグよりも優先してクリックできるように
-                      pointerEvents: 'auto',
-                      zIndex: isSelected ? 50 : (isHovered ? 40 : 30)
-                    }}
-                    onClick={() => handleTextClick(index)}
-                    onMouseEnter={() => handleTextHover(index)}
-                    onMouseLeave={() => handleTextHover(null)}
-                    className="cursor-pointer"
-                    data-testid={`text-highlight-${index}`}
-                  />
-                );
-              })}
+                {/* テキスト位置のハイライト表示 */}
+                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                  {textItems.map((text, index) => {
+                    const isHovered = internalHoveredTextIndex === index;
+                    const isSelected = internalSelectedTextIndex === index;
+                    
+                    return (
+                      <div
+                        key={`highlight-${index}`}
+                        style={{
+                          ...getHighlightStyle(text.position, isHovered, isSelected),
+                          // ハイライト要素は常にドラッグよりも優先してクリックできるように
+                          pointerEvents: 'auto',
+                          zIndex: isSelected ? 50 : (isHovered ? 40 : 30)
+                        }}
+                        onClick={() => handleTextClick(index)}
+                        onMouseEnter={() => handleTextHover(index)}
+                        onMouseLeave={() => handleTextHover(null)}
+                        className="cursor-pointer"
+                        data-testid={`text-highlight-${index}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-500">スライドがありません</p>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">スライドがありません</p>
+            </div>
+          )}
+        </div>
+
+        {/* 原文と翻訳テキストの表示セクション - すべてのテキストを表示 */}
+        {currentSlideData && textItems.length > 0 && (
+          <div className="lg:w-1/3 border rounded-md bg-white flex flex-col h-full" data-testid="translation-text">
+            <div className="p-3 border-b sticky top-0 bg-white z-10">
+              <h3 className="font-medium">スライド内のテキスト</h3>
+              <p className="text-xs text-gray-500">プレビューを確認しながらテキストを検証できます</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3" style={{ maxHeight: 'calc(60vh - 60px)' }}>
+              <div className="space-y-3">
+                {textItems.map((text, index) => {
+                  const isSelected = internalSelectedTextIndex === index;
+                  return (
+                    <div 
+                      key={`text-item-${index}`} 
+                      className={`p-2 rounded-md transition-colors duration-200 ${
+                        isSelected 
+                          ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' 
+                          : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                      }`}
+                      onClick={() => handleTextClick(index)}
+                    >
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1 flex justify-between items-center">
+                            <span>原文:</span>
+                            {isSelected && <span className="text-blue-600 text-xs px-2 py-0.5 bg-blue-100 rounded-full">選択中</span>}
+                          </p>
+                          <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
+                            {text.text || "テキストがありません"}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">翻訳:</p>
+                          <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
+                            {currentSlideData.translations && 
+                             currentSlideData.translations[index] ? 
+                             currentSlideData.translations[index].text : 
+                             "翻訳がありません"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* 原文と翻訳テキストの表示セクション - すべてのテキストを表示 */}
-      {currentSlideData && textItems.length > 0 && (
-        <div className="mt-4 border rounded-md p-4 bg-white" data-testid="translation-text">
-          <h3 className="font-medium mb-2">スライド内のテキスト</h3>
-          <div className="space-y-4">
-            {textItems.map((text, index) => {
-              const isSelected = internalSelectedTextIndex === index;
-              return (
-                <div 
-                  key={`text-item-${index}`} 
-                  className={`p-3 rounded-md transition-colors duration-200 ${
-                    isSelected ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
-                  }`}
-                  onClick={() => handleTextClick(index)}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">
-                        原文 {isSelected && <span className="text-blue-600">（選択中）</span>}:
-                      </p>
-                      <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100">
-                        {text.text || "テキストがありません"}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">翻訳:</p>
-                      <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100">
-                        {currentSlideData.translations && 
-                         currentSlideData.translations[index] ? 
-                         currentSlideData.translations[index].text : 
-                         "翻訳がありません"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }; 

@@ -4,8 +4,18 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
+  reactStrictMode: true,
   images: {
     domains: ['localhost', process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '')].filter(Boolean),
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3003',
+        pathname: '/api/slides/**',
+      },
+    ],
+    unoptimized: true, // 画像最適化を無効化
   },
   output: 'standalone',
   // SWCコンパイラを明示的に有効化
@@ -24,12 +34,12 @@ const nextConfig = {
     },
     serverComponentsExternalPackages: ['bcryptjs'],
   },
-  // 静的ファイルの配信設定を追加
+  // 開発サーバーの設定
   async rewrites() {
     return [
       {
-        source: '/public/uploads/:path*',
-        destination: '/uploads/:path*',
+        source: '/api/slides/:path*',
+        destination: '/api/slides/:path*',
       },
     ];
   },

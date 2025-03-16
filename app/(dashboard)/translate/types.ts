@@ -10,12 +10,24 @@ export interface CustomSession {
 
 export type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
 
-// スライド関連の型定義
+// テキスト位置情報の型定義
 export interface TextPosition {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+// 画像サイズ情報の型定義
+export interface ImageSize {
+  width: number;
+  height: number;
+  offsetX?: number;
+  offsetY?: number;
+  naturalWidth?: number;
+  naturalHeight?: number;
+  containerWidth?: number;
+  containerHeight?: number;
 }
 
 export interface TextItem {
