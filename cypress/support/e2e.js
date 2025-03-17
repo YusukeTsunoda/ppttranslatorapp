@@ -1,5 +1,5 @@
 // ***********************************************************
-// This example support/e2e.ts is processed and
+// This example support/e2e.js is processed and
 // loaded automatically before your test files.
 //
 // This is a great place to put global configuration and
@@ -13,11 +13,11 @@
 // https://on.cypress.io/configuration
 // ***********************************************************
 
-// Import commands.js using ES2015 syntax:
-// import './commands'
+// Import commands.js using CommonJS syntax:
+// require('./commands')
 
 // ファイルアップロード用のプラグインを追加
-import 'cypress-file-upload';
+require('cypress-file-upload');
 
 // グローバルタイムアウト設定
 Cypress.config('defaultCommandTimeout', 10000);
@@ -26,7 +26,7 @@ Cypress.config('requestTimeout', 10000);
 Cypress.config('responseTimeout', 10000);
 
 // カスタムコマンドの定義
-Cypress.Commands.add('login', (email: string, password: string) => {
+Cypress.Commands.add('login', (email, password) => {
   cy.visit('/signin', { failOnStatusCode: false });
   cy.get('input[name="email"]', { timeout: 10000 }).should('be.visible').type(email);
   cy.get('input[name="password"]', { timeout: 10000 }).should('be.visible').type(password);
@@ -73,7 +73,7 @@ Cypress.Commands.add('login', (email: string, password: string) => {
   });
 });
 
-Cypress.Commands.add('register', (name: string, email: string, password: string) => {
+Cypress.Commands.add('register', (name, email, password) => {
   cy.visit('/signup', { failOnStatusCode: false });
   cy.get('input[name="name"]', { timeout: 10000 }).should('be.visible').type(name);
   cy.get('input[name="email"]', { timeout: 10000 }).should('be.visible').type(email);
@@ -192,29 +192,4 @@ after(() => {
   cy.clearCookies();
   cy.clearLocalStorage();
   cy.task('log', 'テスト環境のクリーンアップが完了しました');
-});
-
-// Cypressのタイプ拡張
-declare global {
-  namespace Cypress {
-    interface Chainable {
-      /**
-       * カスタムコマンド: 指定された認証情報でログインします
-       * @example cy.login('user@example.com', 'password')
-       */
-      login(email: string, password: string): Chainable<Element>;
-      
-      /**
-       * カスタムコマンド: 新規ユーザーを登録します
-       * @example cy.register('Test User', 'user@example.com', 'password')
-       */
-      register(name: string, email: string, password: string): Chainable<Element>;
-      
-      /**
-       * カスタムコマンド: 認証をモックします
-       * @example cy.mockAuthentication()
-       */
-      mockAuthentication(): Chainable<Element>;
-    }
-  }
-} 
+}); 

@@ -1,11 +1,11 @@
-import { defineConfig } from 'cypress';
-import { promises as fs } from 'fs';
-import path from 'path';
+const { defineConfig } = require('cypress');
+const fs = require('fs').promises;
+const path = require('path');
 
-export default defineConfig({
+module.exports = defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:3002',
-    supportFile: 'cypress/support/e2e.ts',
+    baseUrl: 'http://localhost:3000',
+    supportFile: 'cypress/support/e2e.js',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     video: false,
     screenshotOnRunFailure: true,
@@ -48,7 +48,7 @@ export default defineConfig({
       });
 
       on('task', {
-        async ensureDir(dirPath: string) {
+        async ensureDir(dirPath) {
           try {
             const fullPath = path.resolve(process.cwd(), dirPath);
             await fs.mkdir(fullPath, { recursive: true });
@@ -59,7 +59,7 @@ export default defineConfig({
             return false;
           }
         },
-        log(message: string) {
+        log(message) {
           console.log(message);
           return null;
         }
@@ -83,4 +83,4 @@ export default defineConfig({
       return config;
     }
   }
-});
+}); 

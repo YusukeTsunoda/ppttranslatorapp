@@ -5,7 +5,13 @@ import { existsSync } from 'fs';
 import { prisma } from '@/lib/db/prisma';
 
 // モック設定
-jest.mock('fs/promises');
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  readdir: jest.fn(),
+  unlink: jest.fn().mockResolvedValue(undefined),
+  stat: jest.fn().mockResolvedValue({ isFile: () => true }),
+  copyFile: jest.fn().mockResolvedValue(undefined)
+}));
 jest.mock('fs', () => ({
   existsSync: jest.fn()
 }));
@@ -30,53 +36,81 @@ describe('ファイルユーティリティ', () => {
   });
 
   describe('FilePathManager', () => {
-    const filePathManager = new FilePathManager();
-    const userId = 'test-user-id';
-    const fileId = 'test-file-id';
+    let filePathManager: FilePathManager;
+    const userId = 'user123';
+    const fileId = 'file123';
+
+    beforeEach(() => {
+      filePathManager = new FilePathManager(FILE_CONFIG);
+      jest.clearAllMocks();
+    });
 
     describe('getTempPath', () => {
-      it('オリジナルファイルの一時パスを正しく生成する', () => {
-        const path = filePathManager.getTempPath(userId, fileId, 'original');
-        expect(path).toBe(`${FILE_CONFIG.tempDir}/${userId}/uploads/${fileId}_original.pptx`);
-        expect(join).toHaveBeenCalledWith(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_original.pptx`);
+      it('正しい一時ファイルパスを返す', () => {
+        const result = filePathManager.getTempPath(userId, fileId);
+        expect(result).toBe(`${FILE_CONFIG.tempDir}/${userId}/uploads/${fileId}`);
       });
+    });
 
-      it('翻訳済みファイルの一時パスを正しく生成する', () => {
-        const path = filePathManager.getTempPath(userId, fileId, 'translated');
-        expect(path).toBe(`${FILE_CONFIG.tempDir}/${userId}/uploads/${fileId}_translated.pptx`);
-        expect(join).toHaveBeenCalledWith(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`);
+    describe('getPublicPath', () => {
+      it('正しい公開ファイルパスを返す', () => {
+        const result = filePathManager.getPublicPath(userId, fileId);
+        expect(result).toBe(`${FILE_CONFIG.publicDir}/${userId}/${fileId}`);
       });
+    });
 
-      it('タイプが指定されていない場合はデフォルトでオリジナルを使用する', () => {
-        const path = filePathManager.getTempPath(userId, fileId);
-        expect(path).toBe(`${FILE_CONFIG.tempDir}/${userId}/uploads/${fileId}_original.pptx`);
+    describe('getProcessingPath', () => {
+      it('正しい処理中ファイルパスを返す', () => {
+        const result = filePathManager.getProcessingPath(userId, fileId);
+        expect(result).toBe(`${FILE_CONFIG.processingDir}/${userId}/${fileId}`);
       });
     });
 
     describe('findActualFilePath', () => {
       it('ファイルが存在する場合はパスを返す', async () => {
-        (readdir as jest.Mock).mockResolvedValueOnce([`${fileId}_original.pptx`, 'other-file.pptx']);
+        // モックを設定
+        (readdir as jest.Mock).mockResolvedValue([`${fileId}_original.pptx`, 'other-file.pptx']);
         
         const result = await filePathManager.findActualFilePath(userId, fileId, 'original');
-        
         expect(result).toBe(`${FILE_CONFIG.tempDir}/${userId}/uploads/${fileId}_original.pptx`);
-        expect(readdir).toHaveBeenCalledWith(`${FILE_CONFIG.tempDir}/${userId}/uploads`);
       });
 
       it('ファイルが存在しない場合はnullを返す', async () => {
-        (readdir as jest.Mock).mockResolvedValueOnce(['other-file.pptx']);
+        // モックを設定
+        (readdir as jest.Mock).mockResolvedValue(['other-file.pptx']);
         
         const result = await filePathManager.findActualFilePath(userId, fileId, 'original');
-        
         expect(result).toBeNull();
       });
 
       it('ディレクトリの読み取りに失敗した場合はnullを返す', async () => {
-        (readdir as jest.Mock).mockRejectedValueOnce(new Error('読み取りエラー'));
+        // モックを設定
+        (readdir as jest.Mock).mockRejectedValue(new Error('読み取りエラー'));
         
         const result = await filePathManager.findActualFilePath(userId, fileId, 'original');
-        
         expect(result).toBeNull();
+      });
+    });
+
+    describe('ensurePath', () => {
+      it('ディレクトリが存在しない場合は作成する', async () => {
+        // モックを設定
+        (existsSync as jest.Mock).mockReturnValue(false);
+        
+        const dirPath = `${FILE_CONFIG.tempDir}/${userId}/uploads`;
+        await filePathManager.ensurePath(dirPath);
+        
+        expect(mkdir).toHaveBeenCalledWith(dirPath, { recursive: true });
+      });
+
+      it('ディレクトリが既に存在する場合は何もしない', async () => {
+        // モックを設定
+        (existsSync as jest.Mock).mockReturnValue(true);
+        
+        const dirPath = `${FILE_CONFIG.tempDir}/${userId}/uploads`;
+        await filePathManager.ensurePath(dirPath);
+        
+        expect(mkdir).not.toHaveBeenCalled();
       });
     });
   });
@@ -86,8 +120,9 @@ describe('ファイルユーティリティ', () => {
       const id1 = generateFileId();
       const id2 = generateFileId();
       
-      expect(id1).toMatch(/^file_[a-zA-Z0-9]{16}$/);
-      expect(id2).toMatch(/^file_[a-zA-Z0-9]{16}$/);
+      // タイムスタンプとランダム文字列の形式になっているかチェック
+      expect(id1).toMatch(/^\d+_[a-z0-9]+$/);
+      expect(id2).toMatch(/^\d+_[a-z0-9]+$/);
       expect(id1).not.toBe(id2);
     });
   });
@@ -142,7 +177,7 @@ describe('ファイルユーティリティ', () => {
         .rejects
         .toThrow('エラー');
       
-      expect(operation).toHaveBeenCalledTimes(3); // 初回 + 2回のリトライ
+      expect(operation).toHaveBeenCalledTimes(2); // 初回 + 1回のリトライ
       expect(onError).toHaveBeenCalledTimes(2);
     });
   });

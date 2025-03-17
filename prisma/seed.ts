@@ -1,5 +1,6 @@
 import { PrismaClient, Language } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -136,6 +137,26 @@ async function main() {
       updatedAt: new Date(),
     },
   });
+
+  // 管理者ユーザーの作成
+  const adminEmail = 'admin@example.com';
+  const adminExists = await prisma.user.findUnique({
+    where: { email: adminEmail }
+  });
+  
+  if (!adminExists) {
+    await prisma.user.create({
+      data: {
+        id: 'admin-user-id',
+        name: '管理者',
+        email: adminEmail,
+        password: await hash('admin123', 10), // 本番環境では強力なパスワードを使用してください
+        role: 'ADMIN',
+        credits: 1000
+      }
+    });
+    console.log('管理者ユーザーを作成しました');
+  }
 
   console.log('シードデータを投入しました');
   console.log('Seeding completed.');

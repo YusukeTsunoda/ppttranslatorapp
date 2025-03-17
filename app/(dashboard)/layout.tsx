@@ -23,7 +23,8 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Activity,
+  ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
@@ -150,6 +151,27 @@ function Header() {
 function Sidebar() {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
+  const { data: session } = useSession();
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    // 管理者権限の確認
+    const checkAdminRole = async () => {
+      if (session?.user?.id) {
+        try {
+          const response = await fetch('/api/user/role');
+          if (response.ok) {
+            const data = await response.json();
+            setIsAdmin(data.isAdmin);
+          }
+        } catch (error) {
+          console.error('管理者権限の確認に失敗しました:', error);
+        }
+      }
+    };
+    
+    checkAdminRole();
+  }, [session]);
   
   const handleToggle = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -162,6 +184,8 @@ function Sidebar() {
     { name: 'プロフィール', href: '/profile', icon: User },
     { name: '設定', href: '/settings', icon: Settings },
     { name: 'API連携', href: '/integrations', icon: LinkIcon },
+    // 管理者のみ表示
+    ...(isAdmin ? [{ name: '管理者', href: '/admin', icon: ShieldAlert }] : []),
   ];
 
   return (

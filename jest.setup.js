@@ -1,13 +1,13 @@
 // jest.setup.js
 // テスト環境のグローバル設定
 
+import '@testing-library/jest-dom';
+import { jest } from '@jest/globals';
+
 // テスト用のグローバルオブジェクトを設定
 global.Request = class {};
 global.Headers = class {};
 global.Response = class {};
-
-// @testing-library/jest-dom のマッチャーを追加
-require('@testing-library/jest-dom');
 
 // テスト用のモック関数を設定
 jest.mock('next/server', () => {
@@ -31,6 +31,13 @@ jest.mock('fs/promises', () => {
     unlink: jest.fn().mockImplementation(() => Promise.resolve()),
     stat: jest.fn().mockImplementation(() => Promise.resolve({ isDirectory: () => false })),
     copyFile: jest.fn().mockImplementation(() => Promise.resolve()),
+  };
+});
+
+// fs のモックを設定
+jest.mock('fs', () => {
+  return {
+    existsSync: jest.fn().mockImplementation(() => true),
   };
 });
 
