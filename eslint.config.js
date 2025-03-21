@@ -1,7 +1,7 @@
-import nextPlugin from '@next/eslint-plugin-next';
-import js from '@eslint/js';
+const nextPlugin = require('@next/eslint-plugin-next');
+const js = require('@eslint/js');
 
-export default [
+module.exports = [
   js.configs.recommended,
   {
     plugins: {

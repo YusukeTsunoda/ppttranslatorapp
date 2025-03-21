@@ -12,7 +12,8 @@ const mockSlides = [
     title: 'テストスライド',
     content: 'これはテストスライドのコンテンツです。',
     imageUrl: '/test-image.png',
-    texts: []
+    texts: [],
+    index: 0 // 必須フィールドを追加
   }
 ];
 
@@ -39,9 +40,9 @@ describe('PreviewSection', () => {
       />
     );
     
-    // ズームインボタンを取得
-    const zoomInButton = screen.getByLabelText('拡大');
-    const zoomOutButton = screen.getByLabelText('縮小');
+    // ズームインボタンを取得（title属性を使用）
+    const zoomInButton = screen.getByTitle('拡大');
+    const zoomOutButton = screen.getByTitle('縮小');
     
     // ボタンが存在することを確認
     expect(zoomInButton).toBeInTheDocument();

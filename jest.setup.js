@@ -31,6 +31,9 @@ jest.mock('fs/promises', () => {
     unlink: jest.fn().mockImplementation(() => Promise.resolve()),
     stat: jest.fn().mockImplementation(() => Promise.resolve({ isDirectory: () => false })),
     copyFile: jest.fn().mockImplementation(() => Promise.resolve()),
+    writeFile: jest.fn().mockImplementation(() => Promise.resolve()),
+    readFile: jest.fn().mockImplementation(() => Promise.resolve(Buffer.from('test'))),
+    access: jest.fn().mockImplementation(() => Promise.resolve()),
   };
 });
 
@@ -38,6 +41,20 @@ jest.mock('fs/promises', () => {
 jest.mock('fs', () => {
   return {
     existsSync: jest.fn().mockImplementation(() => true),
+    createReadStream: jest.fn().mockImplementation(() => ({
+      pipe: jest.fn().mockReturnThis(),
+      on: jest.fn().mockImplementation(function(event, handler) {
+        if (event === 'end') handler();
+        return this;
+      }),
+    })),
+    createWriteStream: jest.fn().mockImplementation(() => ({
+      on: jest.fn().mockImplementation(function(event, handler) {
+        if (event === 'finish') handler();
+        return this;
+      }),
+      end: jest.fn(),
+    })),
   };
 });
 
@@ -58,6 +75,26 @@ jest.mock('swr', () => {
     }),
   };
 });
+
+// ファイルモックのためのユーティリティ関数を追加
+global.__mockReaddir = (files) => {
+  const { readdir } = require('fs/promises');
+  readdir.mockResolvedValue(files);
+};
+
+global.__mockExistsSync = (exists) => {
+  const { existsSync } = require('fs');
+  existsSync.mockReturnValue(exists);
+};
+
+global.__mockMkdir = (implementationFn) => {
+  const { mkdir } = require('fs/promises');
+  if (implementationFn) {
+    mkdir.mockImplementation(implementationFn);
+  } else {
+    mkdir.mockResolvedValue(undefined);
+  }
+};
 
 // コンソールエラーを抑制する設定
 beforeAll(() => {

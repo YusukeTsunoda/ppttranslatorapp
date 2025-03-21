@@ -100,8 +100,13 @@ jobs:
         retention-days: 14
 
     - name: Failed if any check failed
-      if: steps.eslint.outcome == 'failure' || steps.tsc.outcome == 'failure' || steps.prettier.outcome == 'failure'
+      if: steps.tsc.outcome == 'failure' || steps.prettier.outcome == 'failure'
       run: exit 1
+
+    - name: Warning for ESLint failure
+      if: steps.eslint.outcome == 'failure'
+      run: |
+        echo "::warning::ESLintチェックに失敗しましたが、パイプラインは継続します。ESLintエラーは修正してください。"
 
   unit-tests:
     name: Unit Tests

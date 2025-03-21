@@ -17,14 +17,29 @@ const nextConfig = {
     ],
     unoptimized: true, // 画像最適化を無効化
   },
-  output: 'standalone',
-  // SWCコンパイラを明示的に有効化
-  swcMinify: true,
+  // APIルートを動的に処理するためserverを使用
+  output: process.env.NEXT_PUBLIC_EXPORT === 'true' ? 'export' : 'standalone',
+  
+  // SWCコンパイラを有効化（テスト環境以外）
+  swcMinify: process.env.NODE_ENV !== 'test',
   compiler: {
-    // SWCコンパイラの設定
+    // SWCコンパイラの設定（テスト環境以外で使用）
     styledComponents: true,
+    // SWCのReactの設定
+    react: {
+      runtime: 'automatic',
+    },
   },
+  
+  // ESLintの設定を修正
+  eslint: {
+    ignoreDuringBuilds: false, // ビルド時にESLintを実行する
+    dirs: ['app', 'components', 'lib', 'pages'], // ESLintを実行するディレクトリ
+  },
+  
   experimental: {
+    // テスト環境ではSWC強制変換を無効化、それ以外では有効化
+    forceSwcTransforms: process.env.NODE_ENV !== 'test',
     outputFileTracingExcludes: {
       '*': [
         'node_modules/@swc/core-linux-x64-gnu',
@@ -34,6 +49,22 @@ const nextConfig = {
     },
     serverComponentsExternalPackages: ['bcryptjs'],
   },
+  
+  // 動的ルートの警告を抑制
+  onDemandEntries: {
+    // ビルド時に動的エントリを生成するための設定
+    maxInactiveAge: 60 * 60 * 1000, // 1時間
+    pagesBufferLength: 5,
+  },
+  
+  // 動的ルートの静的生成エラーを解決
+  staticPageGenerationTimeout: 120, // 2分
+  generateBuildId: async () => {
+    // 一貫したビルドIDを生成（キャッシュ効率向上）
+    return 'build-' + new Date().toISOString().replace(/[-:.TZ]/g, '');
+  },
+  poweredByHeader: false, // X-Powered-Byヘッダーを無効化
+  
   // 開発サーバーの設定
   async rewrites() {
     return [
@@ -41,15 +72,36 @@ const nextConfig = {
         source: '/api/slides/:path*',
         destination: '/api/slides/:path*',
       },
+      // 動的APIルートのリライト
+      {
+        source: '/api/activity',
+        destination: '/api/activity',
+      },
+      {
+        source: '/api/user/role',
+        destination: '/api/user/role',
+      },
+      {
+        source: '/api/history',
+        destination: '/api/history',
+      },
     ];
   },
+  
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {
       // 開発環境でのクライアントサイドキャッシュを無効化
       config.cache = false;
     }
+    
+    // テスト環境ではwebpackの設定を変更しない
+    if (process.env.NODE_ENV === 'test') {
+      return config;
+    }
+    
     return config;
   },
+  
   async redirects() {
     return [
       {
