@@ -15,7 +15,7 @@ global.fetch = jest.fn(() =>
   Promise.resolve({
     ok: true,
     json: () => Promise.resolve({}),
-  })
+  }),
 ) as jest.Mock;
 
 // SWR のモック
@@ -42,7 +42,7 @@ Object.defineProperty(window, 'navigator', {
 class LocalStorageMock implements Storage {
   store: Record<string, string>;
   length: number;
-  
+
   constructor() {
     this.store = {};
     this.length = 0;
@@ -81,4 +81,4 @@ console.error = jest.fn();
 // テスト環境のクリーンアップ
 afterEach(() => {
   jest.clearAllMocks();
-}); 
+});

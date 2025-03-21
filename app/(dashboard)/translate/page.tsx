@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { useRouter } from "next/navigation";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Download, ChevronLeft, ChevronRight, RefreshCw, FileText } from "lucide-react";
-import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Download, ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import path from 'path';
-import { Label } from "@/components/ui/label";
-import Image from "next/image";
-import { Toaster } from "@/components/ui/toaster";
-import { FileUploadComponent } from "./components/FileUpload";
-import { PreviewSectionComponent } from "./components/PreviewSection";
-import { Slide, TranslationModel, CustomSession, SessionStatus } from "./types";
+import { Label } from '@/components/ui/label';
+import Image from 'next/image';
+import { Toaster } from '@/components/ui/toaster';
+import { FileUploadComponent } from './components/FileUpload';
+import { PreviewSectionComponent } from './components/PreviewSection';
+import { Slide, TranslationModel, CustomSession, SessionStatus } from './types';
 
 function LoadingSpinner() {
   return (
@@ -30,37 +30,37 @@ function LoadingSpinner() {
 // 利用可能なモデルのリスト
 const availableModels: TranslationModel[] = [
   {
-    value: "claude-3-haiku-20240307",
-    label: "Claude 3 Haiku",
-    description: "高速で経済的な翻訳向け",
-    premium: false
+    value: 'claude-3-haiku-20240307',
+    label: 'Claude 3 Haiku',
+    description: '高速で経済的な翻訳向け',
+    premium: false,
   },
   {
-    value: "claude-3-sonnet-20240229",
-    label: "Claude 3 Sonnet",
-    description: "高品質な翻訳向け",
-    premium: true
+    value: 'claude-3-sonnet-20240229',
+    label: 'Claude 3 Sonnet',
+    description: '高品質な翻訳向け',
+    premium: true,
   },
   {
-    value: "anthropic.claude-3-haiku-20240307-v1:0",
-    label: "Claude 3 Haiku (AWS Bedrock)",
-    description: "AWS Bedrock経由の高速翻訳",
-    premium: true
-  }
+    value: 'anthropic.claude-3-haiku-20240307-v1:0',
+    label: 'Claude 3 Haiku (AWS Bedrock)',
+    description: 'AWS Bedrock経由の高速翻訳',
+    premium: true,
+  },
 ];
 
 // 利用可能な言語のリスト
 const availableLanguages = [
-  { value: "ja", label: "日本語" },
-  { value: "en", label: "英語" },
-  { value: "zh", label: "中国語" },
-  { value: "ko", label: "韓国語" },
-  { value: "fr", label: "フランス語" },
-  { value: "de", label: "ドイツ語" },
-  { value: "es", label: "スペイン語" },
-  { value: "it", label: "イタリア語" },
-  { value: "ru", label: "ロシア語" },
-  { value: "pt", label: "ポルトガル語" }
+  { value: 'ja', label: '日本語' },
+  { value: 'en', label: '英語' },
+  { value: 'zh', label: '中国語' },
+  { value: 'ko', label: '韓国語' },
+  { value: 'fr', label: 'フランス語' },
+  { value: 'de', label: 'ドイツ語' },
+  { value: 'es', label: 'スペイン語' },
+  { value: 'it', label: 'イタリア語' },
+  { value: 'ru', label: 'ロシア語' },
+  { value: 'pt', label: 'ポルトガル語' },
 ];
 
 export default function TranslatePage() {
@@ -70,8 +70,8 @@ export default function TranslatePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedTextIndex, setSelectedTextIndex] = useState<number | null>(null);
   const [hoveredTextIndex, setHoveredTextIndex] = useState<number | null>(null);
-  const [sourceLang, setSourceLang] = useState("ja");  // 翻訳元言語を日本語に
-  const [targetLang, setTargetLang] = useState("en");  // 翻訳先言語を英語に
+  const [sourceLang, setSourceLang] = useState('ja'); // 翻訳元言語を日本語に
+  const [targetLang, setTargetLang] = useState('en'); // 翻訳先言語を英語に
   const { toast } = useToast();
   const router = useRouter();
   const [isPremium, setIsPremium] = useState(false); // TODO: 実際のユーザー情報から取得
@@ -136,9 +136,9 @@ export default function TranslatePage() {
 
     if (!session?.user) {
       toast({
-        title: "エラー",
-        description: "認証が必要です",
-        variant: "destructive",
+        title: 'エラー',
+        description: '認証が必要です',
+        variant: 'destructive',
       });
       router.push('/signin');
       return;
@@ -156,211 +156,225 @@ export default function TranslatePage() {
   }
 
   // ファイルアップロード処理
-  const handleFileUpload = useCallback(async (file: File) => {
-    if (!file) return;
-    if (!file.name.endsWith(".pptx")) {
-      toast({
-        title: "エラー",
-        description: "PPTXファイルのみ対応しています",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // ファイルサイズチェック（20MB）
-    const maxSize = 20 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast({
-        title: "エラー",
-        description: "ファイルサイズは20MB以下にしてください",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setFile(file);
-    setUploading(true);
-    setIsLoading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      toast({
-        title: "アップロード中",
-        description: "ファイルを処理しています...",
-      });
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (response.status === 401) {
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      if (!file) return;
+      if (!file.name.endsWith('.pptx')) {
         toast({
-          title: "エラー",
-          description: "セッションが切れました。再度ログインしてください。",
-          variant: "destructive",
+          title: 'エラー',
+          description: 'PPTXファイルのみ対応しています',
+          variant: 'destructive',
         });
-        router.push(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'アップロードに失敗しました');
+      // ファイルサイズチェック（20MB）
+      const maxSize = 20 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast({
+          title: 'エラー',
+          description: 'ファイルサイズは20MB以下にしてください',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      const data = await response.json();
-      
-      // APIレスポンスの詳細をログ出力
-      console.log('=== API Response Debug ===');
-      console.log('Status:', response.status);
-      console.log('Response Data:', {
-        type: typeof data,
-        keys: Object.keys(data),
-        fileId: data.fileId,
-        success: data.success,
-        hasSlides: data.slides && Array.isArray(data.slides),
-        slidesLength: data.slides && Array.isArray(data.slides) ? data.slides.length : 0
-      });
+      setFile(file);
+      setUploading(true);
+      setIsLoading(true);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // ファイルIDの取得を改善
-      const fileId = data.fileId;
-      if (!fileId) {
-        console.error('=== File ID Error ===');
-        console.error('Expected fileId in response data structure:');
-        console.error('- data.fileId:', data.fileId);
-        throw new Error('ファイルIDが見つかりません');
-      }
+      try {
+        toast({
+          title: 'アップロード中',
+          description: 'ファイルを処理しています...',
+        });
 
-      // スライドデータの検証と整形を改善
-      let slides = data.slides;
-      if (!slides || !Array.isArray(slides) || slides.length === 0) {
-        console.error('=== Slides Data Error ===');
-        console.error('Expected slides data structure not found:');
-        console.error('- data.slides:', data.slides);
-        throw new Error('スライドデータの形式が不正です');
-      }
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
 
-      // スライドデータの詳細をログ出力
-      console.log('=== Slides Data Debug ===');
-      console.log('First slide keys:', Object.keys(slides[0]));
-      console.log('First slide texts sample:', slides[0].texts && slides[0].texts.length > 0 ? slides[0].texts[0] : 'No texts');
-
-      // スライドデータの整形
-      const formattedSlides = slides.map((slide: any, index: number) => {
-        if (!slide) {
-          console.error(`Invalid slide data at index ${index}:`, slide);
-          return null;
+        if (response.status === 401) {
+          toast({
+            title: 'エラー',
+            description: 'セッションが切れました。再度ログインしてください。',
+            variant: 'destructive',
+          });
+          router.push(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
+          return;
         }
 
-        // テキストデータの形式を確認
-        const texts = Array.isArray(slide.texts) 
-          ? slide.texts.map((text: any) => {
-              // TextItem型に変換
-              if (typeof text === 'string') {
-                return {
-                  text: text,
-                  position: { x: 0, y: 0, width: 0, height: 0 }
-                };
-              } else if (text && typeof text === 'object') {
-                // 位置情報を取得（APIから返されるピクセル単位の位置情報をそのまま使用）
-                const position = text.position && typeof text.position === 'object' 
-                  ? {
-                      x: typeof text.position.x === 'number' ? text.position.x : 0,
-                      y: typeof text.position.y === 'number' ? text.position.y : 0,
-                      width: typeof text.position.width === 'number' ? text.position.width : 0,
-                      height: typeof text.position.height === 'number' ? text.position.height : 0
-                    }
-                  : { x: 0, y: 0, width: 0, height: 0 };
-                
-                // デバッグ用に位置情報を出力
-                console.log(`Text position for "${text.text || text.content || ''}":`, position);
-                
-                return {
-                  text: text.text || text.content || '',
-                  position: position
-                };
-              } else {
-                console.error('Invalid text format:', text);
-                return {
-                  text: '',
-                  position: { x: 0, y: 0, width: 0, height: 0 }
-                };
-              }
-            })
-          : [];
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'アップロードに失敗しました');
+        }
 
-        // 画像パスの生成を修正
-        const imagePath = slide.image_path || `slide_${index + 1}.png`;
-        // デバッグ用にパスを出力
-        console.log(`Slide ${index} image path:`, imagePath);
-        
-        // 画像URLを生成（相対パスに戻す）
-        // 開発環境では相対パスを使用し、Next.jsのルーティングに任せる
-        const imageUrl = `/api/slides/${fileId}/${imagePath}`;
-        console.log(`Slide ${index} image URL:`, imageUrl);
-        
-        return {
-          index,
-          imageUrl: imageUrl,
-          texts: texts,
-          translations: []
-        };
-      }).filter(Boolean) as Slide[];
+        const data = await response.json();
 
-      if (formattedSlides.length === 0) {
-        console.error('=== Formatting Error ===');
-        console.error('No valid slides after formatting');
-        throw new Error('有効なスライドデータがありません');
+        // APIレスポンスの詳細をログ出力
+        console.log('=== API Response Debug ===');
+        console.log('Status:', response.status);
+        console.log('Response Data:', {
+          type: typeof data,
+          keys: Object.keys(data),
+          fileId: data.fileId,
+          success: data.success,
+          hasSlides: data.slides && Array.isArray(data.slides),
+          slidesLength: data.slides && Array.isArray(data.slides) ? data.slides.length : 0,
+        });
+
+        // ファイルIDの取得を改善
+        const fileId = data.fileId;
+        if (!fileId) {
+          console.error('=== File ID Error ===');
+          console.error('Expected fileId in response data structure:');
+          console.error('- data.fileId:', data.fileId);
+          throw new Error('ファイルIDが見つかりません');
+        }
+
+        // スライドデータの検証と整形を改善
+        let slides = data.slides;
+        if (!slides || !Array.isArray(slides) || slides.length === 0) {
+          console.error('=== Slides Data Error ===');
+          console.error('Expected slides data structure not found:');
+          console.error('- data.slides:', data.slides);
+          throw new Error('スライドデータの形式が不正です');
+        }
+
+        // スライドデータの詳細をログ出力
+        console.log('=== Slides Data Debug ===');
+        console.log('First slide keys:', Object.keys(slides[0]));
+        console.log(
+          'First slide texts sample:',
+          slides[0].texts && slides[0].texts.length > 0 ? slides[0].texts[0] : 'No texts',
+        );
+
+        // スライドデータの整形
+        const formattedSlides = slides
+          .map((slide: any, index: number) => {
+            if (!slide) {
+              console.error(`Invalid slide data at index ${index}:`, slide);
+              return null;
+            }
+
+            // テキストデータの形式を確認
+            const texts = Array.isArray(slide.texts)
+              ? slide.texts.map((text: any) => {
+                  // TextItem型に変換
+                  if (typeof text === 'string') {
+                    return {
+                      text: text,
+                      position: { x: 0, y: 0, width: 0, height: 0 },
+                    };
+                  } else if (text && typeof text === 'object') {
+                    // 位置情報を取得（APIから返されるピクセル単位の位置情報をそのまま使用）
+                    const position =
+                      text.position && typeof text.position === 'object'
+                        ? {
+                            x: typeof text.position.x === 'number' ? text.position.x : 0,
+                            y: typeof text.position.y === 'number' ? text.position.y : 0,
+                            width: typeof text.position.width === 'number' ? text.position.width : 0,
+                            height: typeof text.position.height === 'number' ? text.position.height : 0,
+                          }
+                        : { x: 0, y: 0, width: 0, height: 0 };
+
+                    // デバッグ用に位置情報を出力
+                    console.log(`Text position for "${text.text || text.content || ''}":`, position);
+
+                    return {
+                      text: text.text || text.content || '',
+                      position: position,
+                    };
+                  } else {
+                    console.error('Invalid text format:', text);
+                    return {
+                      text: '',
+                      position: { x: 0, y: 0, width: 0, height: 0 },
+                    };
+                  }
+                })
+              : [];
+
+            // 画像パスの生成を修正
+            const imagePath = slide.image_path || `slide_${index + 1}.png`;
+            // デバッグ用にパスを出力
+            console.log(`Slide ${index} image path:`, imagePath);
+
+            // 画像URLを生成（相対パスに戻す）
+            // 開発環境では相対パスを使用し、Next.jsのルーティングに任せる
+            const imageUrl = `/api/slides/${fileId}/${imagePath}`;
+            console.log(`Slide ${index} image URL:`, imageUrl);
+
+            return {
+              index,
+              imageUrl: imageUrl,
+              texts: texts,
+              translations: [],
+            };
+          })
+          .filter(Boolean) as Slide[];
+
+        if (formattedSlides.length === 0) {
+          console.error('=== Formatting Error ===');
+          console.error('No valid slides after formatting');
+          throw new Error('有効なスライドデータがありません');
+        }
+
+        // 成功時のデータ構造を確認
+        console.log('=== Success ===');
+        console.log('Formatted Slides Count:', formattedSlides.length);
+        console.log('First formatted slide:', formattedSlides[0]);
+
+        setSlides(formattedSlides);
+        setCurrentSlide(0);
+        setShouldUpdateOverlay(true);
+
+        toast({
+          title: '成功',
+          description: `${formattedSlides.length}枚のスライドの解析が完了しました`,
+          variant: 'default',
+        });
+      } catch (error) {
+        console.error('=== Upload Error ===');
+        console.error('Error details:', error);
+        toast({
+          title: 'エラー',
+          description: error instanceof Error ? error.message : 'アップロードに失敗しました',
+          variant: 'destructive',
+        });
+      } finally {
+        setUploading(false);
+        setIsLoading(false);
       }
+    },
+    [toast, router],
+  );
 
-      // 成功時のデータ構造を確認
-      console.log('=== Success ===');
-      console.log('Formatted Slides Count:', formattedSlides.length);
-      console.log('First formatted slide:', formattedSlides[0]);
-
-      setSlides(formattedSlides);
-      setCurrentSlide(0);
-      setShouldUpdateOverlay(true);
-      
-      toast({
-        title: "成功",
-        description: `${formattedSlides.length}枚のスライドの解析が完了しました`,
-        variant: "default",
-      });
-
-    } catch (error) {
-      console.error('=== Upload Error ===');
-      console.error('Error details:', error);
-      toast({
-        title: "エラー",
-        description: error instanceof Error ? error.message : "アップロードに失敗しました",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-      setIsLoading(false);
-    }
-  }, [toast, router]);
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  }, [handleFileUpload]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileUpload(file);
+    },
+    [handleFileUpload],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
   }, []);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileUpload(file);
-  }, [handleFileUpload]);
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleFileUpload(file);
+    },
+    [handleFileUpload],
+  );
 
   // 画像サイズの状態を追加
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
@@ -373,14 +387,14 @@ export default function TranslatePage() {
     if (imageRef.current && containerRef.current) {
       const imgRect = imageRef.current.getBoundingClientRect();
       const containerRect = containerRef.current.getBoundingClientRect();
-      
+
       setImageSize({
         width: imgRect.width,
-        height: imgRect.height
+        height: imgRect.height,
       });
       setContainerSize({
         width: containerRect.width,
-        height: containerRect.height
+        height: containerRect.height,
       });
     }
   }, []);
@@ -393,7 +407,7 @@ export default function TranslatePage() {
     overflow: 'hidden',
     backgroundColor: '#f3f4f6',
     cursor: isDragging ? 'grabbing' : 'grab',
-    touchAction: 'none' // タッチデバイスでのスクロールを防止
+    touchAction: 'none', // タッチデバイスでのスクロールを防止
   };
 
   // 共通のtransformスタイル
@@ -403,32 +417,38 @@ export default function TranslatePage() {
   });
 
   // ドラッグ処理の関数を修正
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  }, [position]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y,
+      });
+    },
+    [position],
+  );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-    
-    // 移動範囲を制限（オプション）
-    const maxMove = 500; // 最大移動距離
-    const limitedX = Math.max(-maxMove, Math.min(maxMove, newX));
-    const limitedY = Math.max(-maxMove, Math.min(maxMove, newY));
-    
-    setPosition({
-      x: limitedX,
-      y: limitedY
-    });
-  }, [isDragging, dragStart]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+
+      const newX = e.clientX - dragStart.x;
+      const newY = e.clientY - dragStart.y;
+
+      // 移動範囲を制限（オプション）
+      const maxMove = 500; // 最大移動距離
+      const limitedX = Math.max(-maxMove, Math.min(maxMove, newX));
+      const limitedY = Math.max(-maxMove, Math.min(maxMove, newY));
+
+      setPosition({
+        x: limitedX,
+        y: limitedY,
+      });
+    },
+    [isDragging, dragStart],
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -470,11 +490,11 @@ export default function TranslatePage() {
     setIsTranslating(true);
     try {
       // 現在のスライドのテキストを抽出
-      const textsToTranslate = slides[currentSlide].texts.map(textItem => ({
+      const textsToTranslate = slides[currentSlide].texts.map((textItem) => ({
         text: textItem.text,
-        position: textItem.position
+        position: textItem.position,
       }));
-      
+
       // 翻訳APIの呼び出し
       const response = await fetch('/api/translate', {
         method: 'POST',
@@ -486,40 +506,40 @@ export default function TranslatePage() {
           sourceLang: sourceLang,
           targetLang: targetLang,
           model: selectedModel,
-          fileName: file?.name || "スライド",
-          slides: slides // スライドデータを送信
+          fileName: file?.name || 'スライド',
+          slides: slides, // スライドデータを送信
         }),
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         throw new Error('翻訳APIの呼び出しに失敗しました');
       }
-      
+
       const data = await response.json();
-      
+
       // 翻訳結果を更新
       const updatedSlides = [...slides];
       updatedSlides[currentSlide] = {
         ...updatedSlides[currentSlide],
         translations: data.translations.map((translatedText: string, index: number) => ({
           text: translatedText,
-          position: textsToTranslate[index].position
-        }))
+          position: textsToTranslate[index].position,
+        })),
       };
-      
+
       setSlides(updatedSlides);
       setIsTranslated(true);
-      
+
       toast({
-        title: "翻訳完了",
-        description: "スライドの翻訳が完了しました",
+        title: '翻訳完了',
+        description: 'スライドの翻訳が完了しました',
       });
     } catch (error) {
       console.error('Translation error:', error);
       toast({
-        title: "エラー",
-        description: "翻訳処理中にエラーが発生しました",
+        title: 'エラー',
+        description: '翻訳処理中にエラーが発生しました',
       });
     } finally {
       setIsTranslating(false);
@@ -530,37 +550,35 @@ export default function TranslatePage() {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      
+
       // 翻訳データの準備 - 修正: 翻訳データの構造を正しく整形
-      const slidesWithTranslations = slides.map(slide => {
+      const slidesWithTranslations = slides.map((slide) => {
         // 各スライドのテキストに対応する翻訳を取得
         const textsWithTranslations = slide.texts.map((text, idx) => {
           // 編集された翻訳があればそれを使用
           const translationKey = `${slide.index}-${idx}`;
           const editedTranslation = editedTranslations[translationKey];
-          
+
           // スライドの翻訳配列から対応する翻訳を取得
-          const originalTranslation = slide.translations && slide.translations[idx] 
-            ? slide.translations[idx].text 
-            : "";
-            
+          const originalTranslation = slide.translations && slide.translations[idx] ? slide.translations[idx].text : '';
+
           // 編集された翻訳があればそれを優先、なければ元の翻訳を使用
           return {
             text: text.text,
             position: text.position,
-            translation: editedTranslation || originalTranslation
+            translation: editedTranslation || originalTranslation,
           };
         });
-        
+
         return {
           index: slide.index,
-          texts: textsWithTranslations
+          texts: textsWithTranslations,
         };
       });
-      
+
       // デバッグ用にデータ構造をログ出力
-      console.log("送信する翻訳データ:", slidesWithTranslations);
-      
+      console.log('送信する翻訳データ:', slidesWithTranslations);
+
       // ダウンロードAPIの呼び出し
       const response = await fetch('/api/download', {
         method: 'POST',
@@ -569,18 +587,18 @@ export default function TranslatePage() {
         },
         body: JSON.stringify({
           fileId: slides[0].imageUrl.split('/').slice(-2)[0], // URLからfileIdを抽出
-          slides: slidesWithTranslations
+          slides: slidesWithTranslations,
         }),
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.details || 'ダウンロードに失敗しました');
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success && data.filePath) {
         // ファイルのダウンロード
         const downloadLink = document.createElement('a');
@@ -589,10 +607,10 @@ export default function TranslatePage() {
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
-        
+
         toast({
-          title: "ダウンロード完了",
-          description: "翻訳済みファイルのダウンロードが完了しました",
+          title: 'ダウンロード完了',
+          description: '翻訳済みファイルのダウンロードが完了しました',
         });
       } else {
         throw new Error('ダウンロードリンクの取得に失敗しました');
@@ -600,9 +618,9 @@ export default function TranslatePage() {
     } catch (error) {
       console.error('Download error:', error);
       toast({
-        title: "エラー",
-        description: error instanceof Error ? error.message : "ダウンロード中にエラーが発生しました",
-        variant: "destructive",
+        title: 'エラー',
+        description: error instanceof Error ? error.message : 'ダウンロード中にエラーが発生しました',
+        variant: 'destructive',
       });
     } finally {
       setIsDownloading(false);
@@ -686,13 +704,13 @@ export default function TranslatePage() {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col space-y-4">
         <h1 className="text-2xl font-bold">プレゼンテーション翻訳</h1>
-        
+
         {!file && (
           <Card className="p-6">
             <FileUploadComponent onUploadComplete={handleFileUpload} />
           </Card>
         )}
-        
+
         {file && slides.length > 0 && (
           <>
             <div className="flex flex-col gap-4">
@@ -701,10 +719,7 @@ export default function TranslatePage() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <Label htmlFor="source-lang">翻訳元言語</Label>
-                    <Select
-                      value={sourceLang}
-                      onValueChange={setSourceLang}
-                    >
+                    <Select value={sourceLang} onValueChange={setSourceLang}>
                       <SelectTrigger id="source-lang" className="w-full">
                         <SelectValue placeholder="翻訳元言語を選択" />
                       </SelectTrigger>
@@ -719,10 +734,7 @@ export default function TranslatePage() {
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="target-lang">翻訳先言語</Label>
-                    <Select
-                      value={targetLang}
-                      onValueChange={setTargetLang}
-                    >
+                    <Select value={targetLang} onValueChange={setTargetLang}>
                       <SelectTrigger id="target-lang" className="w-full">
                         <SelectValue placeholder="翻訳先言語を選択" />
                       </SelectTrigger>
@@ -737,22 +749,15 @@ export default function TranslatePage() {
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="model-select">翻訳モデル</Label>
-                    <Select
-                      value={selectedModel}
-                      onValueChange={setSelectedModel}
-                    >
+                    <Select value={selectedModel} onValueChange={setSelectedModel}>
                       <SelectTrigger id="model-select" className="w-full">
                         <SelectValue placeholder="モデルを選択" />
                       </SelectTrigger>
                       <SelectContent>
                         {availableModels.map((model) => (
-                          <SelectItem
-                            key={model.value}
-                            value={model.value}
-                            disabled={model.premium && !isPremium}
-                          >
+                          <SelectItem key={model.value} value={model.value} disabled={model.premium && !isPremium}>
                             {model.label}
-                            {model.premium && !isPremium && " (プレミアム限定)"}
+                            {model.premium && !isPremium && ' (プレミアム限定)'}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -769,13 +774,13 @@ export default function TranslatePage() {
                           翻訳中...
                         </>
                       ) : (
-                        "翻訳する"
+                        '翻訳する'
                       )}
                     </Button>
                   </div>
                 </div>
               </Card>
-              
+
               {/* スライドナビゲーション - プレビューの上に移動 */}
               {slides.length > 1 && (
                 <Card className="p-4">
@@ -802,7 +807,7 @@ export default function TranslatePage() {
                   </div>
                 </Card>
               )}
-              
+
               {/* ダウンロードボタン */}
               {isTranslated && (
                 <div className="flex justify-end">
@@ -826,16 +831,14 @@ export default function TranslatePage() {
                   </Button>
                 </div>
               )}
-              
+
               {/* スライドプレビュー */}
-              <div className="w-full max-w-full">
-                {renderPreviewSection()}
-              </div>
+              <div className="w-full max-w-full">{renderPreviewSection()}</div>
             </div>
           </>
         )}
       </div>
-      
+
       <Toaster />
     </div>
   );

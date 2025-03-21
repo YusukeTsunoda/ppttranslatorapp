@@ -14,19 +14,13 @@ export async function POST(request: NextRequest) {
       await prisma.$connect();
     } catch (error) {
       console.error('Database connection error:', error);
-      return NextResponse.json(
-        { error: 'データベース接続エラー' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'データベース接続エラー' }, { status: 500 });
     }
 
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'メールアドレスとパスワードは必須です' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'メールアドレスとパスワードは必須です' }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -40,18 +34,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user || !user.password) {
-      return NextResponse.json(
-        { error: 'メールアドレスまたはパスワードが正しくありません' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, { status: 401 });
     }
 
     const isValid = await comparePasswords(password, user.password);
     if (!isValid) {
-      return NextResponse.json(
-        { error: 'メールアドレスまたはパスワードが正しくありません' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, { status: 401 });
     }
 
     // ログイン成功時のアクティビティログを記録
@@ -79,21 +67,18 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-      }
+      },
     });
   } catch (error) {
     console.error('Login error:', error);
-    return NextResponse.json(
-      { error: 'ログイン処理中にエラーが発生しました' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'ログイン処理中にエラーが発生しました' }, { status: 500 });
   } finally {
     await prisma.$disconnect();
   }
-} 
+}

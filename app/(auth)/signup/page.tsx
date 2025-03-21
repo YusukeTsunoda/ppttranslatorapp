@@ -55,8 +55,8 @@ function SignUpContent() {
 
       // アカウント作成成功の通知
       toast({
-        title: "アカウント作成成功",
-        description: "自動的にサインインします",
+        title: 'アカウント作成成功',
+        description: '自動的にサインインします',
       });
 
       // 登録成功後、自動的にサインイン
@@ -76,15 +76,14 @@ function SignUpContent() {
     } catch (error) {
       console.error('サインアップエラー:', error);
       // エラーメッセージを統一
-      const errorMessage = error instanceof Error ? 
-        `アカウントの作成に失敗しました: ${error.message}` : 
-        'アカウントの作成に失敗しました';
-      
+      const errorMessage =
+        error instanceof Error ? `アカウントの作成に失敗しました: ${error.message}` : 'アカウントの作成に失敗しました';
+
       setError(errorMessage);
       toast({
-        title: "エラー",
+        title: 'エラー',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -98,12 +97,8 @@ function SignUpContent() {
           <div className="flex justify-center">
             <CircleIcon className="h-12 w-12 text-orange-500" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            新規アカウント作成
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            必要な情報を入力してください
-          </p>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">新規アカウント作成</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">必要な情報を入力してください</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -112,10 +107,7 @@ function SignUpContent() {
           <input type="hidden" name="inviteId" value={inviteId || ''} />
 
           {error && (
-            <div 
-              className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md"
-              data-testid="signup-error"
-            >
+            <div className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md" data-testid="signup-error">
               {error}
             </div>
           )}
@@ -163,19 +155,8 @@ function SignUpContent() {
             />
           </div>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? (
-              <LoadingSpinner 
-                size="sm" 
-                text="アカウント作成中..."
-              />
-            ) : (
-              'アカウント作成'
-            )}
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? <LoadingSpinner size="sm" text="アカウント作成中..." /> : 'アカウント作成'}
           </Button>
 
           <div className="mt-6">
@@ -196,7 +177,13 @@ function SignUpContent() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><LoadingSpinner /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      }
+    >
       <SignUpContent />
     </Suspense>
   );

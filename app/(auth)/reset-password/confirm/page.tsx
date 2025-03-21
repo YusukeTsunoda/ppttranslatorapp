@@ -89,22 +89,12 @@ function ResetPasswordConfirmContent() {
           <div className="flex justify-center">
             <CircleIcon className="h-12 w-12 text-orange-500" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            新しいパスワードを設定
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            新しいパスワードを入力してください
-          </p>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">新しいパスワードを設定</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">新しいパスワードを入力してください</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <ErrorMessage 
-              message={error}
-              variant="destructive"
-              className="mb-4"
-            />
-          )}
+          {error && <ErrorMessage message={error} variant="destructive" className="mb-4" />}
 
           <div className="space-y-2">
             <Label htmlFor="password">新しいパスワード</Label>
@@ -136,19 +126,8 @@ function ResetPasswordConfirmContent() {
             />
           </div>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? (
-              <LoadingSpinner 
-                size="sm" 
-                text="パスワードを変更中..."
-              />
-            ) : (
-              'パスワードを変更'
-            )}
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? <LoadingSpinner size="sm" text="パスワードを変更中..." /> : 'パスワードを変更'}
           </Button>
 
           <div className="mt-6">
@@ -166,8 +145,14 @@ function ResetPasswordConfirmContent() {
 
 export default function ResetPasswordConfirmPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><LoadingSpinner /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      }
+    >
       <ResetPasswordConfirmContent />
     </Suspense>
   );
-} 
+}

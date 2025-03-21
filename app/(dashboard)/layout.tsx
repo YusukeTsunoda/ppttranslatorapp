@@ -8,7 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from 'next-auth/react';
@@ -24,7 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
-  ShieldAlert
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
@@ -40,18 +40,18 @@ function Header() {
     try {
       await signOut({
         redirect: true,
-        callbackUrl: '/signin'
+        callbackUrl: '/signin',
       });
       toast({
-        title: "ログアウト成功",
-        description: "ログアウトしました",
+        title: 'ログアウト成功',
+        description: 'ログアウトしました',
       });
     } catch (error) {
       console.error('ログアウトエラー:', error);
       toast({
-        title: "エラー",
-        description: "ログアウトに失敗しました",
-        variant: "destructive",
+        title: 'エラー',
+        description: 'ログアウトに失敗しました',
+        variant: 'destructive',
       });
     }
   }, []);
@@ -60,9 +60,9 @@ function Header() {
     if (status === 'unauthenticated') {
       console.log('Header: 未認証状態 - ログインページへリダイレクト');
       toast({
-        title: "セッションエラー",
-        description: "再度ログインしてください",
-        variant: "destructive",
+        title: 'セッションエラー',
+        description: '再度ログインしてください',
+        variant: 'destructive',
       });
       router.push('/signin');
       return;
@@ -111,9 +111,7 @@ function Header() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-menu">
                 <Avatar className="h-8 w-8">
                   <AvatarImage alt={session.user.name || ''} />
-                  <AvatarFallback>
-                    {session.user.email?.[0]?.toUpperCase() || 'U'}
-                  </AvatarFallback>
+                  <AvatarFallback>{session.user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -153,7 +151,7 @@ function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { data: session } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
-  
+
   useEffect(() => {
     // 管理者権限の確認
     const checkAdminRole = async () => {
@@ -169,12 +167,12 @@ function Sidebar() {
         }
       }
     };
-    
+
     checkAdminRole();
   }, [session]);
-  
+
   const handleToggle = useCallback(() => {
-    setIsExpanded(prev => !prev);
+    setIsExpanded((prev) => !prev);
   }, []);
 
   const navigation = [
@@ -200,34 +198,29 @@ function Sidebar() {
           <ChevronRight className="h-4 w-4 text-gray-600" />
         )}
       </button>
-      <nav className={cn(
-        "flex flex-col space-y-1 p-4 transition-all duration-300 ease-in-out",
-        isExpanded ? "w-64" : "w-16"
-      )}>
+      <nav
+        className={cn(
+          'flex flex-col space-y-1 p-4 transition-all duration-300 ease-in-out',
+          isExpanded ? 'w-64' : 'w-16',
+        )}
+      >
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              passHref
-              legacyBehavior
-            >
+            <Link key={item.name} href={item.href} passHref legacyBehavior>
               <a
                 className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative",
-                  isActive
-                    ? "bg-orange-50 text-orange-600"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                  !isExpanded && "justify-center"
+                  'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative',
+                  isActive ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                  !isExpanded && 'justify-center',
                 )}
                 title={!isExpanded ? item.name : undefined}
               >
                 <item.icon
                   className={cn(
-                    "h-5 w-5 flex-shrink-0",
-                    isExpanded ? "mr-3" : "mr-0",
-                    isActive ? "text-orange-600" : "text-gray-400"
+                    'h-5 w-5 flex-shrink-0',
+                    isExpanded ? 'mr-3' : 'mr-0',
+                    isActive ? 'text-orange-600' : 'text-gray-400',
                   )}
                   aria-hidden="true"
                 />
@@ -266,19 +259,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Header />
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {error ? (
-          <ErrorMessage 
-            message={error}
-            variant="destructive"
-            className="mb-4"
-          />
+          <ErrorMessage message={error} variant="destructive" className="mb-4" />
         ) : (
           <div className="flex gap-8 h-full">
             <aside className="bg-white shadow-sm rounded-lg h-full">
               <Sidebar />
             </aside>
-            <main className="flex-1 bg-white shadow-sm rounded-lg p-6">
-              {children}
-            </main>
+            <main className="flex-1 bg-white shadow-sm rounded-lg p-6">{children}</main>
           </div>
         )}
       </div>

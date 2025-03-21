@@ -53,8 +53,8 @@ export default function SignUpForm() {
 
       // 成功通知
       toast({
-        title: "アカウント作成成功",
-        description: "自動的にサインインします",
+        title: 'アカウント作成成功',
+        description: '自動的にサインインします',
       });
 
       // 登録成功後、自動的にサインイン
@@ -66,8 +66,8 @@ export default function SignUpForm() {
 
       if (signInResult?.ok) {
         toast({
-          title: "サインイン成功",
-          description: "ダッシュボードに移動します",
+          title: 'サインイン成功',
+          description: 'ダッシュボードに移動します',
         });
         router.push(redirect || '/translate');
       } else {
@@ -77,9 +77,9 @@ export default function SignUpForm() {
       console.error('サインアップエラー:', error);
       setError(error instanceof Error ? error.message : 'アカウントの作成に失敗しました');
       toast({
-        title: "エラー",
+        title: 'エラー',
         description: error instanceof Error ? error.message : 'アカウントの作成に失敗しました',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -92,13 +92,7 @@ export default function SignUpForm() {
       <input type="hidden" name="priceId" value={priceId || ''} />
       <input type="hidden" name="inviteId" value={inviteId || ''} />
 
-      {error && (
-        <ErrorMessage 
-          message={error}
-          variant="destructive"
-          className="mb-4"
-        />
-      )}
+      {error && <ErrorMessage message={error} variant="destructive" className="mb-4" />}
 
       <div className="space-y-2">
         <Label htmlFor="name">名前</Label>
@@ -151,14 +145,7 @@ export default function SignUpForm() {
         disabled={loading}
         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
       >
-        {loading ? (
-          <LoadingSpinner 
-            size="sm" 
-            text="アカウント作成中..."
-          />
-        ) : (
-          'アカウント作成'
-        )}
+        {loading ? <LoadingSpinner size="sm" text="アカウント作成中..." /> : 'アカウント作成'}
       </Button>
 
       <p className="text-sm text-center text-gray-600">
@@ -169,4 +156,4 @@ export default function SignUpForm() {
       </p>
     </form>
   );
-} 
+}

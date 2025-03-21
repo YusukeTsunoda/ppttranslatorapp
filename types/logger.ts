@@ -48,4 +48,4 @@ export interface AuditLog extends LogMessage {
   resource: string;
   ipAddress: string;
   userAgent?: string;
-} 
+}

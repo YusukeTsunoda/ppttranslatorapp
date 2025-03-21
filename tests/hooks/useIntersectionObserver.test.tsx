@@ -2,16 +2,27 @@ import React from 'react';
 import { renderHook } from '@testing-library/react';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
 
+// IntersectionObserverとそのコールバック型の定義
+type IntersectionObserverCallback = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => void;
+
 // IntersectionObserverのモック
 const mockObserve = jest.fn();
 const mockDisconnect = jest.fn();
-const mockIntersectionObserver = jest.fn(() => ({
+const mockIntersectionObserver = jest.fn<
+  IntersectionObserver,
+  [IntersectionObserverCallback, IntersectionObserverInit?]
+>(() => ({
   observe: mockObserve,
   disconnect: mockDisconnect,
+  unobserve: jest.fn(),
+  takeRecords: jest.fn(() => []),
+  root: null,
+  rootMargin: '',
+  thresholds: [],
 }));
 
 // グローバルにIntersectionObserverをモック
-global.IntersectionObserver = mockIntersectionObserver;
+global.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 describe('useIntersectionObserver', () => {
   beforeEach(() => {
@@ -29,7 +40,7 @@ describe('useIntersectionObserver', () => {
 
     // IntersectionObserverが正しく初期化されたか確認
     expect(mockIntersectionObserver).toHaveBeenCalledWith(mockCallback, mockOptions);
-    
+
     // 要素が監視対象に追加されたか確認
     expect(mockObserve).toHaveBeenCalledWith(mockRef.current);
   });
@@ -69,7 +80,7 @@ describe('useIntersectionObserver', () => {
     // 初回レンダリング
     const { rerender } = renderHook(
       ({ callback }) => useIntersectionObserver(mockRef as React.RefObject<Element>, callback),
-      { initialProps: { callback: mockCallback1 } }
+      { initialProps: { callback: mockCallback1 } },
     );
 
     // 再レンダリング（コールバックを変更）
@@ -80,4 +91,4 @@ describe('useIntersectionObserver', () => {
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
     expect(mockObserve).toHaveBeenCalledTimes(2);
   });
-}); 
+});

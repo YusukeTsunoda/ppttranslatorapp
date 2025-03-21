@@ -10,4 +10,4 @@ export async function generateResetToken(): Promise<string> {
       resolve(buf.toString('hex'));
     });
   });
-} 
+}

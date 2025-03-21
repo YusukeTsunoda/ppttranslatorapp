@@ -60,16 +60,16 @@ function SignInContent() {
 
       // リダイレクト処理を修正
       console.log('サインイン成功、リダイレクト先:', callbackUrl);
-      
+
       // 少し遅延を入れてからリダイレクト
       setTimeout(() => {
         console.log('リダイレクト実行:', callbackUrl);
-        
+
         try {
           // Next.jsのルーターを使用してリダイレクト
           console.log('router.pushを実行:', callbackUrl);
           router.push(callbackUrl);
-          
+
           // 念のため、少し遅延を入れてからwindow.location.hrefも使用
           setTimeout(() => {
             console.log('window.location.hrefを使用したリダイレクト:', callbackUrl);
@@ -84,12 +84,11 @@ function SignInContent() {
     } catch (error) {
       console.error('Sign in error:', error);
       // エラーメッセージを統一して「サインインに失敗しました」を含むようにする
-      const errorMessage = error instanceof Error ? 
-        `サインインに失敗しました: ${error.message}` : 
-        'サインインに失敗しました';
-      
+      const errorMessage =
+        error instanceof Error ? `サインインに失敗しました: ${error.message}` : 'サインインに失敗しました';
+
       setError(errorMessage);
-      
+
       // エラー時のトースト表示を修正
       setTimeout(() => {
         toast({
@@ -110,20 +109,13 @@ function SignInContent() {
           <div className="flex justify-center">
             <CircleIcon className="h-12 w-12 text-orange-500" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            PPT Translatorにサインイン
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            アカウント情報を入力してください
-          </p>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">PPT Translatorにサインイン</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">アカウント情報を入力してください</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div 
-              className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md" 
-              data-testid="signin-error"
-            >
+            <div className="p-3 mb-4 text-sm text-red-500 bg-red-50 rounded-md" data-testid="signin-error">
               {error}
             </div>
           )}
@@ -146,10 +138,7 @@ function SignInContent() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">パスワード</Label>
-              <Link
-                href="/reset-password"
-                className="text-sm font-medium text-orange-600 hover:text-orange-500"
-              >
+              <Link href="/reset-password" className="text-sm font-medium text-orange-600 hover:text-orange-500">
                 パスワードをお忘れの方
               </Link>
             </div>
@@ -175,14 +164,7 @@ function SignInContent() {
               e.stopPropagation();
             }}
           >
-            {loading ? (
-              <LoadingSpinner 
-                size="sm" 
-                text="サインイン中..."
-              />
-            ) : (
-              'サインイン'
-            )}
+            {loading ? <LoadingSpinner size="sm" text="サインイン中..." /> : 'サインイン'}
           </Button>
 
           <div className="mt-6">
@@ -203,8 +185,14 @@ function SignInContent() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><LoadingSpinner /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      }
+    >
       <SignInContent />
     </Suspense>
   );
-} 
+}

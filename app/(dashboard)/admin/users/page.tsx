@@ -9,21 +9,21 @@ import Link from 'next/link';
 
 export default async function UsersPage() {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || !session.user) {
     redirect('/signin');
   }
-  
+
   // 管理者権限チェック
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true }
+    select: { role: true },
   });
-  
+
   if (!user || user.role !== UserRole.ADMIN) {
     redirect('/dashboard');
   }
-  
+
   // ユーザー一覧を取得
   const users = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },
@@ -37,10 +37,10 @@ export default async function UsersPage() {
       _count: {
         select: {
           File: true,
-          TranslationHistory: true
-        }
-      }
-    }
+          TranslationHistory: true,
+        },
+      },
+    },
   });
 
   return (
@@ -51,7 +51,7 @@ export default async function UsersPage() {
           ← 管理者ダッシュボードに戻る
         </Link>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>ユーザー一覧</CardTitle>
@@ -87,4 +87,4 @@ export default async function UsersPage() {
       </Card>
     </div>
   );
-} 
+}

@@ -1,14 +1,7 @@
 import { toast } from '@/components/ui/use-toast';
 
 // エラーの種類
-export type ErrorType =
-  | 'AUTH'
-  | 'VALIDATION'
-  | 'SERVER'
-  | 'NETWORK'
-  | 'NOT_FOUND'
-  | 'PERMISSION'
-  | 'UNKNOWN';
+export type ErrorType = 'AUTH' | 'VALIDATION' | 'SERVER' | 'NETWORK' | 'NOT_FOUND' | 'PERMISSION' | 'UNKNOWN';
 
 // エラーの詳細情報
 export interface ErrorDetails {
@@ -48,7 +41,7 @@ export const ErrorCodes = {
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
 } as const;
 
-export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
+export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
@@ -102,7 +95,7 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "Unknown error occurred";
+  return 'Unknown error occurred';
 }
 
 // バリデーションエラーの作成
@@ -126,9 +119,7 @@ export function createAuthError(message: string, code?: string, context?: Record
 }
 
 // 権限エラーの作成
-export function createForbiddenError(
-  message = 'この操作を実行する権限がありません。'
-): AppError {
+export function createForbiddenError(message = 'この操作を実行する権限がありません。'): AppError {
   return new AppError({
     type: 'PERMISSION',
     message,
@@ -147,7 +138,7 @@ export function createNotFoundError(message: string): AppError {
 
 // レート制限エラーの作成
 export function createRateLimitError(
-  message = 'リクエスト制限を超えました。しばらく待ってから再試行してください。'
+  message = 'リクエスト制限を超えました。しばらく待ってから再試行してください。',
 ): AppError {
   return new AppError({
     type: 'SERVER',
@@ -195,7 +186,7 @@ export function handleClientError(error: unknown, defaultMessage = '予期しな
 
   if (error instanceof AppError) {
     errorMessage = error.message;
-    
+
     // エラータイプに応じた処理
     switch (error.type) {
       case 'AUTH':
@@ -224,7 +215,10 @@ export function handleClientError(error: unknown, defaultMessage = '予期しな
 }
 
 // エラーハンドリング関数（API側）
-export function handleApiError(error: unknown, defaultMessage = 'Internal Server Error'): {
+export function handleApiError(
+  error: unknown,
+  defaultMessage = 'Internal Server Error',
+): {
   error: string;
   code?: string;
   status: number;
@@ -234,7 +228,7 @@ export function handleApiError(error: unknown, defaultMessage = 'Internal Server
   if (error instanceof AppError) {
     // エラータイプに応じたステータスコードを設定
     let status = 500;
-    
+
     switch (error.type) {
       case 'AUTH':
         status = 401;
@@ -276,9 +270,4 @@ export function handleApiError(error: unknown, defaultMessage = 'Internal Server
 }
 
 // セッションエラーの種類
-export type SessionError =
-  | 'EXPIRED'
-  | 'INVALID'
-  | 'NETWORK'
-  | 'UNAUTHORIZED'
-  | 'UNKNOWN'; 
+export type SessionError = 'EXPIRED' | 'INVALID' | 'NETWORK' | 'UNAUTHORIZED' | 'UNKNOWN';

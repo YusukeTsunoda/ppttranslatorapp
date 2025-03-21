@@ -5,4 +5,4 @@ declare module 'pptx-parser' {
    * @returns 各スライドのテキスト配列
    */
   export function extractRawText(buffer: Buffer): Promise<string[]>;
-} 
+}

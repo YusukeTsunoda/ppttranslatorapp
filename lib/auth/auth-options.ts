@@ -30,18 +30,18 @@ const refreshToken = async (token: JWT): Promise<JWT> => {
     if (token.email) {
       try {
         const user = await prisma.user.findUnique({
-          where: { email: token.email as string }
+          where: { email: token.email as string },
         });
-        
+
         if (user) {
           // トークンの有効期限を更新
           token.exp = Math.floor(Date.now() / 1000) + SESSION_MAXAGE;
           token.iat = Math.floor(Date.now() / 1000);
-          
+
           // ユーザー情報を更新
           await prisma.user.update({
             where: { id: user.id },
-            data: { updatedAt: new Date() }
+            data: { updatedAt: new Date() },
           });
         }
       } catch (error) {
@@ -50,7 +50,7 @@ const refreshToken = async (token: JWT): Promise<JWT> => {
       }
     }
   }
-  
+
   return token;
 };
 
@@ -60,8 +60,8 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: "メールアドレス", type: "email" },
-        password: { label: "パスワード", type: "password" }
+        email: { label: 'メールアドレス', type: 'email' },
+        password: { label: 'パスワード', type: 'password' },
       },
       async authorize(credentials): Promise<any> {
         if (!credentials?.email || !credentials?.password) {
@@ -69,7 +69,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
+          where: { email: credentials.email },
         });
 
         if (!user || !user.password) {
@@ -77,7 +77,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const isValid = await comparePasswords(credentials.password, user.password);
-        
+
         if (!isValid) {
           throw new Error('メールアドレスまたはパスワードが正しくありません');
         }
@@ -86,17 +86,17 @@ export const authOptions: NextAuthOptions = {
         await prisma.user.update({
           where: { id: user.id },
           data: {
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
         return {
           id: user.id,
           email: user.email,
-          name: user.name
+          name: user.name,
         };
-      }
-    })
+      },
+    }),
   ],
   session: {
     strategy: 'jwt',
@@ -106,7 +106,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/signin',
     error: '/error',
-    newUser: '/signup'
+    newUser: '/signup',
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
@@ -117,20 +117,20 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name;
         token.iat = Math.floor(Date.now() / 1000);
         token.exp = Math.floor(Date.now() / 1000) + SESSION_MAXAGE;
-        
+
         // セキュリティ強化: ユーザーエージェント情報を追加
         if (typeof window !== 'undefined') {
           token.ua = window.navigator.userAgent;
         }
       }
-      
+
       // セッション更新時の処理
       if (trigger === 'update' && session) {
         if (session.user) {
           token.name = session.user.name;
         }
       }
-      
+
       // トークンのリフレッシュ処理
       const refreshedToken = await refreshToken(token);
       return refreshedToken;
@@ -140,12 +140,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
-        
+
         // セッションに有効期限情報を追加
         if (token.exp) {
           session.expires = new Date((token.exp as number) * 1000).toISOString();
         }
-        
+
         // セキュリティ強化: ユーザーエージェントの検証
         if (typeof window !== 'undefined' && token.ua) {
           const currentUA = window.navigator.userAgent;
@@ -156,9 +156,9 @@ export const authOptions: NextAuthOptions = {
           }
         }
       }
-      
+
       return session;
-    }
+    },
   },
   jwt: {
     // JWTの設定
@@ -167,42 +167,36 @@ export const authOptions: NextAuthOptions = {
   cookies: {
     // Cookieのセキュリティ設定
     sessionToken: {
-      name: process.env.NODE_ENV === 'production' 
-        ? `__Secure-next-auth.session-token`
-        : `next-auth.session-token`,
+      name: process.env.NODE_ENV === 'production' ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: SESSION_MAXAGE
-      }
+        maxAge: SESSION_MAXAGE,
+      },
     },
     callbackUrl: {
-      name: process.env.NODE_ENV === 'production'
-        ? `__Secure-next-auth.callback-url`
-        : `next-auth.callback-url`,
+      name: process.env.NODE_ENV === 'production' ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-      }
+      },
     },
     csrfToken: {
-      name: process.env.NODE_ENV === 'production'
-        ? `__Host-next-auth.csrf-token`
-        : `next-auth.csrf-token`,
+      name: process.env.NODE_ENV === 'production' ? `__Host-next-auth.csrf-token` : `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-      }
+      },
     },
   },
   // CSRF対策を有効化
   useSecureCookies: process.env.NODE_ENV === 'production',
   secret: process.env.NEXTAUTH_SECRET,
-  debug: false
-}; 
+  debug: false,
+};

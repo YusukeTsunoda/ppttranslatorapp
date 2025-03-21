@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth-options";
-import { prisma } from "@/lib/db/prisma";
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
+import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,13 +9,13 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     // URLからクエリパラメータを取得
     const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
     const skip = (page - 1) * limit;
 
     // ユーザーIDを取得
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
         userId: userId,
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
       skip,
       take: limit,
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
         // ファイルアクセスまたはファイルアップロードの場合
         if (log.type === 'file_access' || log.type === 'file_upload') {
           const metadata = log.metadata as any;
-          
+
           // ファイルIDがメタデータに含まれている場合
           if (metadata?.fileId) {
             try {
@@ -77,9 +77,9 @@ export async function GET(req: Request) {
 
               if (fileInfo) {
                 // 翻訳済みのスライド番号を抽出
-                const translatedSlides = fileInfo.Slide
-                  .filter(slide => slide.Text.some(text => text.Translation.length > 0))
-                  .map(slide => slide.index + 1); // インデックスは0始まりなので+1
+                const translatedSlides = fileInfo.Slide.filter((slide) =>
+                  slide.Text.some((text) => text.Translation.length > 0),
+                ).map((slide) => slide.index + 1); // インデックスは0始まりなので+1
 
                 // スライド数（ページ数）を計算
                 const pageCount = fileInfo.Slide.length;
@@ -100,9 +100,9 @@ export async function GET(req: Request) {
             }
           }
         }
-        
+
         return log;
-      })
+      }),
     );
 
     // 総件数を取得
@@ -123,10 +123,7 @@ export async function GET(req: Request) {
       },
     });
   } catch (error) {
-    console.error("アクティビティログ取得エラー:", error);
-    return NextResponse.json(
-      { error: "アクティビティログの取得中にエラーが発生しました" },
-      { status: 500 }
-    );
+    console.error('アクティビティログ取得エラー:', error);
+    return NextResponse.json({ error: 'アクティビティログの取得中にエラーが発生しました' }, { status: 500 });
   }
-} 
+}

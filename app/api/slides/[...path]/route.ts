@@ -11,7 +11,7 @@ async function checkFileDetails(path: string) {
   try {
     const exists = existsSync(path);
     console.log(`File check: ${path} - exists: ${exists}`);
-    
+
     if (exists) {
       const stats = await require('fs/promises').stat(path);
       console.log(`File stats: size=${stats.size}, created=${stats.birthtime}, modified=${stats.mtime}`);
@@ -24,37 +24,37 @@ async function checkFileDetails(path: string) {
   }
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { path: string[] } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
   try {
     console.log('=== Slide Image Request ===');
     console.log('Request URL:', request.url);
     console.log('Path params:', params.path);
-    
+
     // パスパラメータの検証
     if (!params.path || params.path.length < 2) {
       console.error('Invalid path parameters:', params.path);
-      return new NextResponse(JSON.stringify({
-        error: 'Invalid path parameters',
-        details: 'Path should contain fileId and imageName'
-      }), { 
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      });
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Invalid path parameters',
+          details: 'Path should contain fileId and imageName',
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        },
+      );
     }
-    
+
     const fileId = params.path[0];
     const imageName = params.path[1];
-    
+
     console.log(`Requested file: fileId=${fileId}, imageName=${imageName}`);
-    
+
     const session = await getServerSession(authOptions);
     console.log('Session user:', session?.user?.id || 'No session');
 
@@ -62,25 +62,24 @@ export async function GET(
     if (!session?.user?.id) {
       if (process.env.NODE_ENV === 'development') {
         console.log('Development mode: attempting to bypass authentication');
-        
+
         // ユーザーディレクトリを探索
-        const userDirs = existsSync(FILE_CONFIG.tempDir) ? 
-          require('fs').readdirSync(FILE_CONFIG.tempDir) : [];
-        
+        const userDirs = existsSync(FILE_CONFIG.tempDir) ? require('fs').readdirSync(FILE_CONFIG.tempDir) : [];
+
         console.log(`Found user directories: ${userDirs.length}`);
-        
+
         for (const userId of userDirs) {
           const possiblePath = join(FILE_CONFIG.tempDir, userId, 'slides', ...params.path);
           console.log(`Checking path: ${possiblePath}`);
-          
+
           if (await checkFileDetails(possiblePath)) {
             try {
               console.log(`Found file at: ${possiblePath}, attempting to serve`);
               const imageBuffer = await readFile(possiblePath);
               const contentType = possiblePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-              
+
               console.log(`Successfully read file: ${possiblePath}, size=${imageBuffer.length} bytes`);
-              
+
               return new NextResponse(imageBuffer, {
                 headers: {
                   'Content-Type': contentType,
@@ -96,22 +95,25 @@ export async function GET(
             }
           }
         }
-        
+
         console.log('No matching file found in any user directory');
       }
-      
-      return new NextResponse(JSON.stringify({
-        error: 'Unauthorized',
-        details: 'Authentication required'
-      }), { 
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      });
+
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Unauthorized',
+          details: 'Authentication required',
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        },
+      );
     }
 
     // パスパラメータを結合して画像パスを作成
@@ -121,28 +123,31 @@ export async function GET(
     try {
       // ファイルパスのデバッグ情報
       const fileExists = await checkFileDetails(imagePath);
-      
+
       if (!fileExists) {
         console.error(`File not found: ${imagePath}`);
-        return new NextResponse(JSON.stringify({
-          error: 'Image not found',
-          path: imagePath,
-        }), { 
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        });
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Image not found',
+            path: imagePath,
+          }),
+          {
+            status: 404,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            },
+          },
+        );
       }
-      
+
       const imageBuffer = await readFile(imagePath);
-      
+
       // Content-Typeの設定
       const contentType = imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-      
+
       console.log(`Successfully served image: ${imagePath}, size=${imageBuffer.length} bytes`);
       return new NextResponse(imageBuffer, {
         headers: {
@@ -156,34 +161,40 @@ export async function GET(
     } catch (error) {
       console.error('Failed to read image file:', imagePath, error);
       // 詳細なエラーメッセージを返す
-      return new NextResponse(JSON.stringify({
-        error: 'Image not found',
-        path: imagePath,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      }), { 
-        status: 404,
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Image not found',
+          path: imagePath,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        }),
+        {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        },
+      );
+    }
+  } catch (error) {
+    console.error('Error in slide image API:', error);
+    return new NextResponse(
+      JSON.stringify({
+        error: 'Internal Server Error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 500,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Error in slide image API:', error);
-    return new NextResponse(JSON.stringify({
-      error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }), { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      }
-    });
+        },
+      },
+    );
   }
 }
 
@@ -197,4 +208,4 @@ export async function OPTIONS(request: NextRequest) {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
-} 
+}

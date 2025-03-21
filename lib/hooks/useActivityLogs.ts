@@ -27,7 +27,7 @@ export function useActivityLogs(userId?: string) {
       revalidateOnReconnect: true,
       dedupingInterval: STALE_TIME,
       keepPreviousData: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -56,4 +56,4 @@ export function useActivityLogs(userId?: string) {
     loadMore,
     isLoadingMore,
   };
-} 
+}

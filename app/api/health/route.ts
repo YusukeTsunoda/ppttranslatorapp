@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json(
-    { 
+    {
       status: 'ok',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     },
-    { status: 200 }
+    { status: 200 },
   );
-} 
+}

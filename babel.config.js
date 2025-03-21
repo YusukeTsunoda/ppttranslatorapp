@@ -3,7 +3,7 @@ module.exports = {
   presets: [
     ['@babel/preset-env', { targets: { node: 'current' } }],
     '@babel/preset-typescript',
-    ['@babel/preset-react', { runtime: 'automatic' }]
+    ['@babel/preset-react', { runtime: 'automatic' }],
   ],
   plugins: [],
   // NODE_ENV=testの場合のみBabelを適用
@@ -12,9 +12,9 @@ module.exports = {
       presets: [
         ['@babel/preset-env', { targets: { node: 'current' } }],
         '@babel/preset-typescript',
-        ['@babel/preset-react', { runtime: 'automatic' }]
+        ['@babel/preset-react', { runtime: 'automatic' }],
       ],
-    }
+    },
   },
   // テスト環境以外ではBabelを無効化
   only: [
@@ -22,9 +22,5 @@ module.exports = {
     // その他、テスト用のファイル
   ],
   // next/jestで使用されるファイルは処理しない
-  ignore: [
-    './.next',
-    './node_modules',
-    './out',
-  ]
-}; 
+  ignore: ['./.next', './node_modules', './out'],
+};

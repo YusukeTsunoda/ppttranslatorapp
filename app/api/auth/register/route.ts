@@ -17,10 +17,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'このメールアドレスは既に登録されています' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'このメールアドレスは既に登録されています' }, { status: 400 });
     }
 
     // パスワードのハッシュ化
@@ -60,15 +57,12 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       action: 'sign_up',
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      email: user.email
+      email: user.email,
     });
 
     return NextResponse.json({ success: true, userId: user.id });
   } catch (error) {
     console.error('Registration error:', error);
-    return NextResponse.json(
-      { error: 'ユーザー登録中にエラーが発生しました' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'ユーザー登録中にエラーが発生しました' }, { status: 500 });
   }
-} 
+}

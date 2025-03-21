@@ -82,9 +82,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">プロフィール設定</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          アカウント情報の確認と更新ができます。
-        </p>
+        <p className="mt-1 text-sm text-gray-500">アカウント情報の確認と更新ができます。</p>
       </div>
 
       <Card>
@@ -95,13 +93,7 @@ export default function ProfilePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">名前</Label>
-              <Input
-                id="name"
-                name="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1"
-              />
+              <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
             </div>
             <div>
               <Label htmlFor="email">メールアドレス</Label>
@@ -113,9 +105,7 @@ export default function ProfilePage() {
                 disabled
                 className="mt-1 bg-gray-50"
               />
-              <p className="mt-1 text-sm text-gray-500">
-                メールアドレスの変更はサポートまでお問い合わせください。
-              </p>
+              <p className="mt-1 text-sm text-gray-500">メールアドレスの変更はサポートまでお問い合わせください。</p>
             </div>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (

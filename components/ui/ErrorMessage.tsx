@@ -14,4 +14,4 @@ export function ErrorMessage({ title, message, code }: ErrorMessageProps) {
       {code && <pre className="mt-2 text-xs text-red-500">{code}</pre>}
     </div>
   );
-} 
+}

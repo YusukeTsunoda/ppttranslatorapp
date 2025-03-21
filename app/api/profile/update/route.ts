@@ -17,9 +17,9 @@ export async function POST(req: Request) {
 
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: { 
+      data: {
         name,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
     });
 
@@ -33,9 +33,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Profile update error:', error);
-    return NextResponse.json(
-      { error: 'プロフィールの更新に失敗しました' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'プロフィールの更新に失敗しました' }, { status: 500 });
   }
-} 
+}

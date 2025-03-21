@@ -1,12 +1,12 @@
 import { getServerSession } from 'next-auth';
-import type { DefaultSession, Session } from "next-auth";
-import type { JWT } from "next-auth/jwt";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
-import GoogleProvider from "next-auth/providers/google";
+import type { DefaultSession, Session } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { PrismaClient } from '@prisma/client';
+import GoogleProvider from 'next-auth/providers/google';
 import { authOptions } from './auth-options';
-import { compare } from "bcrypt";
-import { sign, verify } from "jsonwebtoken";
+import { compare } from 'bcrypt';
+import { sign, verify } from 'jsonwebtoken';
 
 // Node.jsランタイムを明示的に指定
 // bcryptjsはNode.js APIに依存しているため、Edge Runtimeでは使用できません
@@ -48,7 +48,7 @@ export async function verifyToken(token: string): Promise<SessionType | null> {
   if (tokenIsValid(token)) {
     const session: SessionType = {
       user: {
-        id: "example-user-id",
+        id: 'example-user-id',
         // 他のプロパティ
       },
       // 他のセッション情報
@@ -60,5 +60,5 @@ export async function verifyToken(token: string): Promise<SessionType | null> {
 
 function tokenIsValid(token: string): boolean {
   // トークンの検証ロジック（仮実装）
-  return token === "valid-token";
+  return token === 'valid-token';
 }

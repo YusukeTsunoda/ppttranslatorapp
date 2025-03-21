@@ -7,43 +7,40 @@ describe('Avatar Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
-  
+
   it('Avatarコンポーネントをレンダリングする', () => {
     render(<Avatar data-testid="avatar" />);
-    
+
     const avatar = screen.getByTestId('avatar');
     expect(avatar).toBeInTheDocument();
     expect(avatar).toHaveClass('relative');
   });
-  
+
   it('AvatarFallbackをレンダリングする', () => {
     render(
       <Avatar>
         <AvatarFallback data-testid="avatar-fallback">TS</AvatarFallback>
-      </Avatar>
+      </Avatar>,
     );
-    
+
     const avatarFallback = screen.getByTestId('avatar-fallback');
     expect(avatarFallback).toBeInTheDocument();
     expect(avatarFallback).toHaveTextContent('TS');
   });
-  
+
   it('カスタムクラス名を適用する', () => {
     render(
       <Avatar className="custom-avatar" data-testid="avatar">
-        <AvatarFallback 
-          className="custom-fallback"
-          data-testid="avatar-fallback"
-        >
+        <AvatarFallback className="custom-fallback" data-testid="avatar-fallback">
           TS
         </AvatarFallback>
-      </Avatar>
+      </Avatar>,
     );
-    
+
     const avatar = screen.getByTestId('avatar');
     const avatarFallback = screen.getByTestId('avatar-fallback');
-    
+
     expect(avatar).toHaveClass('custom-avatar');
     expect(avatarFallback).toHaveClass('custom-fallback');
   });
-}); 
+});

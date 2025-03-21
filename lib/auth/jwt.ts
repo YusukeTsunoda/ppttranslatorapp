@@ -38,4 +38,4 @@ export function verifyJwtAccessToken(token: string) {
     console.error('JWT verification error:', error);
     return null;
   }
-} 
+}

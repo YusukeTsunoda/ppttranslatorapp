@@ -48,7 +48,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
 
     console.log('Password reset email sent successfully:', {
       to: email,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return result;
@@ -57,8 +57,8 @@ export async function sendPasswordResetEmail(email: string, token: string) {
       error,
       to: email,
       timestamp: new Date().toISOString(),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw new Error('Failed to send password reset email');
   }
-} 
+}

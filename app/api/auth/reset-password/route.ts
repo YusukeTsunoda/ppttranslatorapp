@@ -13,10 +13,7 @@ export async function POST(req: Request) {
     // 環境変数のチェック
     if (!process.env.RESEND_API_KEY) {
       console.error('RESEND_API_KEY is not set in the environment');
-      return NextResponse.json(
-        { error: 'Email service configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Email service configuration error' }, { status: 500 });
     }
 
     const body = await req.json();
@@ -70,9 +67,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Password reset request error:', error);
-    return NextResponse.json(
-      { error: 'パスワードリセットの要求に失敗しました' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'パスワードリセットの要求に失敗しました' }, { status: 500 });
   }
-} 
+}

@@ -137,7 +137,7 @@ export enum ActivityAction {
   translation = 'translation',
   download = 'download',
   settings_change = 'settings_change',
-  file_access = 'file_access'
+  file_access = 'file_access',
 }
 
 export interface ActivityLogData {
@@ -155,6 +155,6 @@ export async function getUserActivityLogs(userId: string, limit = 50, cursor?: s
   console.log('Get user activity logs (dummy):', { userId, limit, cursor });
   return {
     logs: [],
-    nextCursor: undefined
+    nextCursor: undefined,
   };
 }

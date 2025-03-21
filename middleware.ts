@@ -12,24 +12,24 @@ export default withAuth(
     if (req.nextauth.token) {
       return NextResponse.next();
     }
-    
+
     // 認証されていない場合は、サインインページへリダイレクト
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    
+
     const signInUrl = new URL('/signin', baseUrl);
     const fullCallbackUrl = `${baseUrl}${req.nextUrl.pathname}`;
     signInUrl.searchParams.set('callbackUrl', fullCallbackUrl);
-    
+
     return NextResponse.redirect(signInUrl);
   },
   {
     callbacks: {
       authorized: ({ token }) => {
         return !!token;
-      }
+      },
     },
-  }
-)
+  },
+);
 
 // 保護するパスを指定
 export const config = {
@@ -41,6 +41,6 @@ export const config = {
     '/activity/:path*',
     '/integrations/:path*',
     '/dashboard/:path*',
-    '/api/protected/:path*'
-  ]
+    '/api/protected/:path*',
+  ],
 };

@@ -108,12 +108,7 @@ export default function CheckoutPage() {
               />
             </div>
           </div>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-            data-testid="submit-payment"
-          >
+          <Button type="submit" className="w-full" disabled={loading} data-testid="submit-payment">
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -127,4 +122,4 @@ export default function CheckoutPage() {
       </Card>
     </div>
   );
-} 
+}

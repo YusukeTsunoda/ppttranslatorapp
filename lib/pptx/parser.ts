@@ -2,13 +2,7 @@ import { PythonShell, PythonShellError } from 'python-shell';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  PPTXParseResult,
-  ParseAPIResponse,
-  SlideContent,
-  TextElement,
-  Position
-} from './types';
+import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
 
 export class PPTXParser {
   private static instance: PPTXParser;
@@ -43,16 +37,16 @@ export class PPTXParser {
       pythonPath: process.env.VERCEL ? 'python3' : 'python3',
       pythonOptions: ['-u'],
       scriptPath: path.dirname(this.pythonScriptPath),
-      args: [filePath, outputDir]
+      args: [filePath, outputDir],
     };
 
     try {
       const results = await new Promise<any>((resolve, reject) => {
         const pyshell = new PythonShell(path.basename(this.pythonScriptPath), options);
-        
+
         let result: any = null;
-        let rawOutput = ''; 
-        
+        let rawOutput = '';
+
         pyshell.on('message', (message) => {
           if (typeof message === 'object') {
             if (message.slides) {
@@ -79,7 +73,12 @@ export class PPTXParser {
 
         pyshell.on('stderr', (stderr) => {
           // 重要なエラー情報のみをフィルタリング
-          if (stderr.includes('Error') || stderr.includes('Exception') || stderr.includes('Traceback') || stderr.includes('failed')) {
+          if (
+            stderr.includes('Error') ||
+            stderr.includes('Exception') ||
+            stderr.includes('Traceback') ||
+            stderr.includes('failed')
+          ) {
             console.error(`Python stderr: ${stderr}`);
           }
         });
@@ -95,7 +94,7 @@ export class PPTXParser {
             reject(err);
             return;
           }
-          
+
           if (!result) {
             if (rawOutput) {
               console.error('Pythonからの出力をJSONとして解析できません');
@@ -105,7 +104,7 @@ export class PPTXParser {
             }
             return;
           }
-          
+
           resolve(result);
         });
       });
@@ -123,7 +122,7 @@ export class PPTXParser {
 
       // Pythonスクリプトからの戻り値を適切な形式に変換
       const slides = results.slides;
-      
+
       const parseResult: PPTXParseResult = {
         slides: slides.map((slide: any, index: number) => {
           // テキスト要素を適切な形式に変換
@@ -132,37 +131,37 @@ export class PPTXParser {
                 // テキスト要素の型チェックと変換を改善
                 let content = '';
                 let position: Position = { x: 0, y: 0, width: 0, height: 0 };
-                
+
                 if (typeof text === 'string') {
                   content = text;
                 } else if (typeof text === 'object') {
                   // text.textまたはtext.contentを取得
-                  content = typeof text.text === 'string' ? text.text : 
-                           (typeof text.content === 'string' ? text.content : '');
-                  
+                  content =
+                    typeof text.text === 'string' ? text.text : typeof text.content === 'string' ? text.content : '';
+
                   // 位置情報の取得
                   if (text.position && typeof text.position === 'object') {
                     position = {
                       x: typeof text.position.x === 'number' ? text.position.x : 0,
                       y: typeof text.position.y === 'number' ? text.position.y : 0,
                       width: typeof text.position.width === 'number' ? text.position.width : 0,
-                      height: typeof text.position.height === 'number' ? text.position.height : 0
+                      height: typeof text.position.height === 'number' ? text.position.height : 0,
                     };
                   }
                 }
-                
+
                 // スタイル情報の取得
                 const style = text && typeof text === 'object' && text.style ? text.style : {};
-                
+
                 return {
                   id: `text_${index}_${textIndex}`,
                   content,
                   position,
-                  style
+                  style,
                 };
               })
             : [];
-          
+
           return {
             id: `slide_${index}`,
             index: slide.index ?? index,
@@ -170,15 +169,15 @@ export class PPTXParser {
             image_path: slide.image_path || `slide_${index + 1}.png`,
             layout: {
               masterLayout: 'default',
-              elements: []
-            }
+              elements: [],
+            },
           };
         }),
         metadata: {
           totalSlides: slides.length,
           title: path.basename(filePath, '.pptx'),
-          lastModified: new Date().toISOString()
-        }
+          lastModified: new Date().toISOString(),
+        },
       };
 
       return parseResult;
@@ -189,9 +188,7 @@ export class PPTXParser {
   }
 
   public extractTexts(parseResult: PPTXParseResult): string[] {
-    return parseResult.slides.flatMap(slide => 
-      slide.texts.map(text => text.content)
-    );
+    return parseResult.slides.flatMap((slide) => slide.texts.map((text) => text.content));
   }
 
   public getTextWithPositions(parseResult: PPTXParseResult): SlideContent[] {

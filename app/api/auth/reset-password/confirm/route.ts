@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     // 注意: 現在のスキーマでは resetToken と resetTokenExpires フィールドが存在しない可能性があります
     // 実際のスキーマに合わせて修正が必要です
-    
+
     // トークンの検証 - ダミー実装
     // 実際のアプリケーションでは、別の方法でトークンを検証する必要があります
     const user = await prisma.user.findFirst({
@@ -25,10 +25,7 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'トークンが無効か有効期限が切れています' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'トークンが無効か有効期限が切れています' }, { status: 400 });
     }
 
     // パスワードのハッシュ化
@@ -61,15 +58,12 @@ export async function POST(req: Request) {
     console.log('Password reset:', {
       userId: user.id,
       action: 'update_password',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Password reset confirmation error:', error);
-    return NextResponse.json(
-      { error: 'パスワードのリセットに失敗しました' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'パスワードのリセットに失敗しました' }, { status: 500 });
   }
-} 
+}

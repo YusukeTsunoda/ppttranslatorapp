@@ -1,11 +1,11 @@
 // セッション関連の型定義
 export interface CustomSession {
-    user: {
-        id: string;
-        name?: string | null;
-        email?: string | null;
-    };
-    expires: string;
+  user: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  };
+  expires: string;
 }
 
 export type SessionStatus = 'authenticated' | 'loading' | 'unauthenticated';
@@ -61,4 +61,4 @@ export interface TranslationModel {
   label: string;
   description: string;
   premium: boolean;
-} 
+}

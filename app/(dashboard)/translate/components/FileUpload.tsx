@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
-import { FileText, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import { FileText, Loader2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface FileUploadProps {
   onUploadComplete: (file: File) => void;
@@ -40,11 +40,9 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
   };
 
   return (
-    <div 
+    <div
       className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-all duration-200 ${
-        isDragOver 
-          ? 'border-primary bg-primary/5' 
-          : 'border-gray-300 hover:border-gray-400'
+        isDragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400'
       }`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -64,12 +62,14 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
           <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-primary/10 flex items-center justify-center">
             <FileText className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-medium" data-testid="upload-text">ファイルをアップロード</h3>
+          <h3 className="text-lg font-medium" data-testid="upload-text">
+            ファイルをアップロード
+          </h3>
           <p className="text-sm text-gray-500 mt-1">
             PPTXファイルをドラッグ＆ドロップするか、クリックして選択してください
           </p>
         </div>
-        <Button 
+        <Button
           onClick={handleButtonClick}
           disabled={uploading}
           data-testid="file-select-button"
@@ -88,10 +88,8 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
             </>
           )}
         </Button>
-        <p className="text-xs text-gray-500 mt-2">
-          最大ファイルサイズ: 20MB
-        </p>
+        <p className="text-xs text-gray-500 mt-2">最大ファイルサイズ: 20MB</p>
       </div>
     </div>
   );
-}; 
+};

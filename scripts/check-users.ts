@@ -7,9 +7,9 @@ async function checkUsers() {
         id: true,
         email: true,
         name: true,
-      }
+      },
     });
-    
+
     console.log('登録されているユーザー:');
     console.table(users);
   } catch (error: any) {
@@ -19,4 +19,4 @@ async function checkUsers() {
   }
 }
 
-checkUsers(); 
+checkUsers();

@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
-import { filePathManager } from "@/lib/utils/file-utils";
+import { filePathManager } from '@/lib/utils/file-utils';
 
 const execAsync = promisify(exec);
 
@@ -26,10 +26,7 @@ export async function POST(req: NextRequest) {
     const { fileId, translations } = body;
 
     if (!fileId || !translations) {
-      return NextResponse.json(
-        { error: 'Missing required parameters' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
     // ユーザーIDを取得
@@ -38,18 +35,24 @@ export async function POST(req: NextRequest) {
     // ディレクトリパスを設定
     const userDir = path.join(process.cwd(), 'tmp', 'users', userId);
     const uploadsDir = path.join(userDir, 'uploads');
-    
+
     // デバッグ用のログ出力
     console.log('Debug info:', {
       userDir,
       uploadsDir,
       fileId,
       exists: {
-        userDir: await fs.access(userDir).then(() => true).catch(() => false),
-        uploadsDir: await fs.access(uploadsDir).then(() => true).catch(() => false)
-      }
+        userDir: await fs
+          .access(userDir)
+          .then(() => true)
+          .catch(() => false),
+        uploadsDir: await fs
+          .access(uploadsDir)
+          .then(() => true)
+          .catch(() => false),
+      },
     });
-    
+
     // filePathManagerを使用して実際のファイルを検索 - 修正部分
     const actualOriginalFilePath = await filePathManager.findActualFilePath(userId, fileId, 'original');
     if (!actualOriginalFilePath) {
@@ -60,14 +63,11 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error('Failed to read uploads directory:', e);
       }
-      return NextResponse.json(
-        { error: 'Original PPTX file not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Original PPTX file not found' }, { status: 404 });
     }
-    
+
     console.log('Found original file:', actualOriginalFilePath);
-    
+
     const translationsJsonPath = path.join(uploadsDir, `${fileId}_translations.json`);
     const outputPath = path.join(uploadsDir, `${fileId}_translated.pptx`);
 
@@ -86,10 +86,7 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error('Failed to read uploads directory:', e);
       }
-      return NextResponse.json(
-        { error: 'Original PPTX file not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Original PPTX file not found' }, { status: 404 });
     }
 
     // 翻訳データをJSONファイルとして保存
@@ -124,7 +121,7 @@ export async function POST(req: NextRequest) {
         pythonScript,
         actualOriginalFilePath, // 実際のファイルパスを使用
         translationsJsonPath,
-        outputPath
+        outputPath,
       });
 
       // 翻訳データの内容をログ出力
@@ -132,9 +129,9 @@ export async function POST(req: NextRequest) {
       console.log('Sample translation from first slide:', translations[0]?.texts?.[0]);
 
       const { stdout, stderr } = await execAsync(
-        `python3 "${pythonScript}" "${actualOriginalFilePath}" "${translationsJsonPath}" "${outputPath}"`
+        `python3 "${pythonScript}" "${actualOriginalFilePath}" "${translationsJsonPath}" "${outputPath}"`,
       );
-      
+
       if (stderr) {
         console.error('Python script stderr:', stderr);
       }
@@ -165,21 +162,17 @@ export async function POST(req: NextRequest) {
       // 成功レスポンスを返す
       return NextResponse.json({
         success: true,
-        downloadUrl: `/api/download/${userId}/${fileId}_translated.pptx`
+        downloadUrl: `/api/download/${userId}/${fileId}_translated.pptx`,
       });
-
     } catch (error) {
       console.error('Error executing Python script:', error instanceof Error ? error.message : String(error));
       return NextResponse.json(
         { error: 'Failed to generate PPTX: ' + (error instanceof Error ? error.message : String(error)) },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
     console.error('Error generating PPTX:', error instanceof Error ? error.message : String(error));
-    return NextResponse.json(
-      { error: 'Failed to generate PPTX' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate PPTX' }, { status: 500 });
   }
 }

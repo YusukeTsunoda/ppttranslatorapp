@@ -12,47 +12,47 @@ async function getMonthlyTranslations() {
   const now = new Date();
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(now.getMonth() - 5);
-  
+
   // 過去6ヶ月分のデータを取得
   const translations = await prisma.translationHistory.findMany({
     where: {
       createdAt: {
-        gte: sixMonthsAgo
-      }
+        gte: sixMonthsAgo,
+      },
     },
     select: {
       createdAt: true,
-      creditsUsed: true
-    }
+      creditsUsed: true,
+    },
   });
-  
+
   // 月ごとに集計
-  const monthlyData: Record<string, { count: number, credits: number }> = {};
-  
+  const monthlyData: Record<string, { count: number; credits: number }> = {};
+
   for (let i = 0; i < 6; i++) {
     const date = new Date();
     date.setMonth(now.getMonth() - i);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     monthlyData[monthKey] = { count: 0, credits: 0 };
   }
-  
-  translations.forEach(translation => {
+
+  translations.forEach((translation) => {
     const date = new Date(translation.createdAt);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    
+
     if (monthlyData[monthKey]) {
       monthlyData[monthKey].count += 1;
       monthlyData[monthKey].credits += translation.creditsUsed;
     }
   });
-  
+
   // 表示用に整形
   return Object.entries(monthlyData)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, data]) => ({
       month,
       count: data.count,
-      credits: data.credits
+      credits: data.credits,
     }));
 }
 
@@ -62,21 +62,21 @@ async function getLanguageStats() {
     select: {
       sourceLang: true,
       targetLang: true,
-      creditsUsed: true
-    }
+      creditsUsed: true,
+    },
   });
-  
-  const sourceStats: Record<string, { count: number, credits: number }> = {};
-  const targetStats: Record<string, { count: number, credits: number }> = {};
-  
-  translations.forEach(translation => {
+
+  const sourceStats: Record<string, { count: number; credits: number }> = {};
+  const targetStats: Record<string, { count: number; credits: number }> = {};
+
+  translations.forEach((translation) => {
     // ソース言語の集計
     if (!sourceStats[translation.sourceLang]) {
       sourceStats[translation.sourceLang] = { count: 0, credits: 0 };
     }
     sourceStats[translation.sourceLang].count += 1;
     sourceStats[translation.sourceLang].credits += translation.creditsUsed;
-    
+
     // ターゲット言語の集計
     if (!targetStats[translation.targetLang]) {
       targetStats[translation.targetLang] = { count: 0, credits: 0 };
@@ -84,61 +84,61 @@ async function getLanguageStats() {
     targetStats[translation.targetLang].count += 1;
     targetStats[translation.targetLang].credits += translation.creditsUsed;
   });
-  
+
   return {
     sourceLanguages: Object.entries(sourceStats).map(([lang, data]) => ({
       language: lang,
       count: data.count,
-      credits: data.credits
+      credits: data.credits,
     })),
     targetLanguages: Object.entries(targetStats).map(([lang, data]) => ({
       language: lang,
       count: data.count,
-      credits: data.credits
-    }))
+      credits: data.credits,
+    })),
   };
 }
 
 export default async function StatisticsPage() {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || !session.user) {
     redirect('/signin');
   }
-  
+
   // 管理者権限チェック
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true }
+    select: { role: true },
   });
-  
+
   if (!user || user.role !== UserRole.ADMIN) {
     redirect('/dashboard');
   }
-  
+
   // 統計データを取得
   const monthlyTranslations = await getMonthlyTranslations();
   const languageStats = await getLanguageStats();
-  
+
   // 総計を計算
   const totalTranslations = await prisma.translationHistory.count();
   const totalCreditsUsed = await prisma.translationHistory.aggregate({
     _sum: {
-      creditsUsed: true
-    }
+      creditsUsed: true,
+    },
   });
-  
+
   // アクティブユーザー数
   const activeUsers = await prisma.user.count({
     where: {
       TranslationHistory: {
         some: {
           createdAt: {
-            gte: new Date(new Date().setMonth(new Date().getMonth() - 1))
-          }
-        }
-      }
-    }
+            gte: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+          },
+        },
+      },
+    },
   });
 
   return (
@@ -149,7 +149,7 @@ export default async function StatisticsPage() {
           ← 管理者ダッシュボードに戻る
         </Link>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
@@ -159,7 +159,7 @@ export default async function StatisticsPage() {
             <p className="text-4xl font-bold">{totalTranslations}</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>総消費クレジット</CardTitle>
@@ -168,7 +168,7 @@ export default async function StatisticsPage() {
             <p className="text-4xl font-bold">{totalCreditsUsed._sum.creditsUsed || 0}</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>アクティブユーザー</CardTitle>
@@ -179,13 +179,13 @@ export default async function StatisticsPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <Tabs defaultValue="monthly" className="mb-8">
         <TabsList>
           <TabsTrigger value="monthly">月別統計</TabsTrigger>
           <TabsTrigger value="language">言語別統計</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="monthly">
           <Card>
             <CardHeader>
@@ -215,7 +215,7 @@ export default async function StatisticsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="language">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
@@ -245,7 +245,7 @@ export default async function StatisticsPage() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>ターゲット言語</CardTitle>
@@ -278,4 +278,4 @@ export default async function StatisticsPage() {
       </Tabs>
     </div>
   );
-} 
+}

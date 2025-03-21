@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useToast } from '@/components/ui/use-toast';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 // ... 他のインポート
 
 export function TranslateClient(): ReactNode {
@@ -15,14 +15,14 @@ export function TranslateClient(): ReactNode {
   const [slides, setSlides] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [editedTranslations, setEditedTranslations] = useState<{ [key: string]: string }>({});
-  
+
   // セッション状態を監視
   useEffect(() => {
     if (status === 'unauthenticated') {
       toast({
-        title: "エラー",
-        description: "ログインが必要です",
-        variant: "destructive",
+        title: 'エラー',
+        description: 'ログインが必要です',
+        variant: 'destructive',
       });
       router.push('/signin');
     }
@@ -41,22 +41,22 @@ export function TranslateClient(): ReactNode {
   const handleSave = async () => {
     try {
       console.log('Current session:', session); // セッション情報をログ出力
-      
+
       if (!session?.user) {
         throw new Error('ユーザー認証が必要です');
       }
-      
+
       setIsSaving(true);
-      
+
       // リクエストデータをログ出力
       const requestData = {
         slides: slides,
         translations: editedTranslations,
         currentSlide: currentSlide,
-        userId: session.user.id  // ユーザーIDを追加
+        userId: session.user.id, // ユーザーIDを追加
       };
       console.log('Save request data:', requestData);
-      
+
       const response = await fetch('/api/translations/save', {
         method: 'POST',
         headers: {
@@ -80,16 +80,15 @@ export function TranslateClient(): ReactNode {
       console.log('Save success response:', data);
 
       toast({
-        title: "成功",
-        description: "翻訳が保存されました",
+        title: '成功',
+        description: '翻訳が保存されました',
       });
-
     } catch (error) {
       console.error('Save error details:', error);
       toast({
-        title: "エラー",
-        description: error instanceof Error ? error.message : "保存に失敗しました",
-        variant: "destructive",
+        title: 'エラー',
+        description: error instanceof Error ? error.message : '保存に失敗しました',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -101,13 +100,13 @@ export function TranslateClient(): ReactNode {
     console.log('Translation change:', {
       slideIndex: currentSlide,
       textIndex: index,
-      newTranslation: newTranslation
+      newTranslation: newTranslation,
     });
 
-    setEditedTranslations(prev => {
+    setEditedTranslations((prev) => {
       const updated = {
         ...prev,
-        [`${currentSlide}-${index}`]: newTranslation
+        [`${currentSlide}-${index}`]: newTranslation,
       };
       console.log('Updated translations:', updated);
       return updated;
@@ -122,9 +121,5 @@ export function TranslateClient(): ReactNode {
     setSlides(updatedSlides);
   };
 
-  return (
-    <div>
-      {/* コンポーネントの内容 */}
-    </div>
-  );
-} 
+  return <div>{/* コンポーネントの内容 */}</div>;
+}

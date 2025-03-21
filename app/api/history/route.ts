@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth-options";
-import { prisma } from "@/lib/db/prisma";
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
+import { prisma } from '@/lib/db/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     // ユーザーIDを取得
@@ -36,14 +36,14 @@ export async function GET(req: Request) {
         },
         select: {
           credits: true,
-        }
+        },
       });
       console.log('ユーザーのクレジット情報:', user);
 
       // 今月の翻訳数を取得
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
+
       const monthlyCount = await prisma.translationHistory.count({
         where: {
           userId: userId,
@@ -67,10 +67,7 @@ export async function GET(req: Request) {
       throw dbError;
     }
   } catch (error) {
-    console.error("履歴取得エラー:", error);
-    return NextResponse.json(
-      { error: "履歴の取得中にエラーが発生しました" },
-      { status: 500 }
-    );
+    console.error('履歴取得エラー:', error);
+    return NextResponse.json({ error: '履歴の取得中にエラーが発生しました' }, { status: 500 });
   }
-} 
+}

@@ -8,10 +8,10 @@ async function createAdminUser() {
   try {
     const email = 'test@test.com';
     const password = 'admin123';
-    
+
     // パスワードをハッシュ化
     const hashedPassword = await hashPassword(password);
-    
+
     // ユーザーを作成
     // @ts-ignore - Prismaの型定義と実際のプロパティの間に不一致があるため
     const user = await prisma.user.create({
@@ -32,4 +32,4 @@ async function createAdminUser() {
   }
 }
 
-createAdminUser(); 
+createAdminUser();

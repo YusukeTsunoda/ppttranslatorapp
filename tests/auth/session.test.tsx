@@ -35,7 +35,7 @@ const mockUseAuth = () => {
   const login = async (email: string, password: string, callbackUrl?: string) => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: undefined }));
-      
+
       const result = await signIn('credentials', {
         email,
         password,
@@ -81,12 +81,12 @@ const mockUseAuth = () => {
   const logout = async (callbackUrl?: string) => {
     try {
       setState((prev) => ({ ...prev, loading: true }));
-      
+
       await signOut({
         redirect: false,
         callbackUrl,
       });
-      
+
       setState({
         isAuthenticated: false,
         user: null,
@@ -125,7 +125,7 @@ const MockSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children
 // セッション有効性チェック関数
 const mockIsSessionValid = (session: any): boolean => {
   if (!session) return false;
-  
+
   // セッションの有効期限をチェック
   if (session.expires) {
     const expiresDate = new Date(session.expires);
@@ -133,12 +133,12 @@ const mockIsSessionValid = (session: any): boolean => {
       return false;
     }
   }
-  
+
   // ユーザー情報の存在をチェック
   if (!session.user || !session.user.id || !session.user.email) {
     return false;
   }
-  
+
   return true;
 };
 
@@ -309,4 +309,4 @@ describe('セッション管理', () => {
       expect(mockIsSessionValid(null)).toBe(false);
     });
   });
-}); 
+});

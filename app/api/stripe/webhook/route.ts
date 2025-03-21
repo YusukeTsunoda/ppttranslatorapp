@@ -1,6 +1,11 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { stripe, validateStripeSignature, handleSubscriptionUpdated, handleSubscriptionDeleted } from '@/lib/payments/stripe';
+import {
+  stripe,
+  validateStripeSignature,
+  handleSubscriptionUpdated,
+  handleSubscriptionDeleted,
+} from '@/lib/payments/stripe';
 import { prisma } from '@/lib/db/prisma';
 
 export const runtime = 'nodejs';
@@ -19,11 +24,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const event = await validateStripeSignature(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    const event = await validateStripeSignature(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
 
     console.log('Stripe webhook event:', event.type);
 
@@ -44,8 +45,8 @@ export async function POST(req: Request) {
           where: { id: userId },
           data: {
             // stripeCustomerId: customerId, // このフィールドが存在しない場合はコメントアウト
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
         break;
@@ -68,9 +69,8 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   } catch (error) {
     console.error('Stripe webhook error:', error);
-    return new NextResponse(
-      'Webhook Error: ' + (error instanceof Error ? error.message : 'Unknown error'),
-      { status: 400 }
-    );
+    return new NextResponse('Webhook Error: ' + (error instanceof Error ? error.message : 'Unknown error'), {
+      status: 400,
+    });
   }
 }

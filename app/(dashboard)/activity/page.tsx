@@ -35,19 +35,19 @@ export default function ActivityPage() {
       }
 
       const response = await fetch(`/api/activity?page=${pageNum}&limit=10`);
-      
+
       if (!response.ok) {
         throw new Error('アクティビティログの取得に失敗しました');
       }
-      
+
       const data = await response.json();
-      
+
       if (pageNum === 1) {
         setLogs(data.logs || []);
       } else {
-        setLogs(prev => [...prev, ...(data.logs || [])]);
+        setLogs((prev) => [...prev, ...(data.logs || [])]);
       }
-      
+
       setHasMore(data.pagination?.hasMore || false);
     } catch (err) {
       console.error('アクティビティログ取得エラー:', err);
@@ -72,10 +72,10 @@ export default function ActivityPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          setPage(prev => prev + 1);
+          setPage((prev) => prev + 1);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
 
     if (loadMoreRef.current) {
@@ -102,9 +102,7 @@ export default function ActivityPage() {
     return (
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">アクティビティログ</h1>
-        <div className="p-4 bg-red-50 text-red-800 rounded-md">
-          エラーが発生しました: {error}
-        </div>
+        <div className="p-4 bg-red-50 text-red-800 rounded-md">エラーが発生しました: {error}</div>
       </div>
     );
   }
@@ -138,9 +136,7 @@ export default function ActivityPage() {
               ))}
             </div>
           ) : logs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              アクティビティログがありません
-            </div>
+            <div className="text-center py-8 text-gray-500">アクティビティログがありません</div>
           ) : (
             <div className="space-y-4">
               {logs.map((log) => (
@@ -148,30 +144,27 @@ export default function ActivityPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <Badge className={getBadgeVariant(log.type)}>
-                        {log.type === 'translation' ? '翻訳' : 
-                         log.type === 'login' ? 'ログイン' : 
-                         log.type === 'signup' ? '登録' : log.type}
+                        {log.type === 'translation'
+                          ? '翻訳'
+                          : log.type === 'login'
+                            ? 'ログイン'
+                            : log.type === 'signup'
+                              ? '登録'
+                              : log.type}
                       </Badge>
                       <p className="mt-2">{log.description}</p>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {formatDate(new Date(log.createdAt))}
-                    </span>
+                    <span className="text-sm text-gray-500">{formatDate(new Date(log.createdAt))}</span>
                   </div>
                 </div>
               ))}
-              
+
               {hasMore && (
-                <div
-                  ref={loadMoreRef}
-                  className="h-16 flex items-center justify-center"
-                >
+                <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
                   {isLoadingMore ? (
                     <Skeleton className="h-8 w-32" />
                   ) : (
-                    <span className="text-sm text-gray-500">
-                      スクロールして更に読み込む
-                    </span>
+                    <span className="text-sm text-gray-500">スクロールして更に読み込む</span>
                   )}
                 </div>
               )}
@@ -181,4 +174,4 @@ export default function ActivityPage() {
       </Card>
     </div>
   );
-} 
+}

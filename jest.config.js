@@ -35,10 +35,7 @@ const customJestConfig = {
     '!**/prettier.config.js',
   ],
   // パスの中に以下の文字列を含むモジュールはトランスフォームしない
-  transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$',
-  ],
+  transformIgnorePatterns: ['/node_modules/(?!(openid-client|jose)/).*/', '^.+\\.module\\.(css|sass|scss)$'],
   // テスト対象の最小カバレッジを設定
   coverageThreshold: {
     global: {
@@ -61,10 +58,10 @@ const customJestConfig = {
   ],
   // Babelの代わりにトランスフォームを使用
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: '<rootDir>/babel.config.js' }]
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: '<rootDir>/babel.config.js' }],
   },
 };
 
 // createJestConfigは、次の処理のためにこのcustomConfigを使用します
 // https://nextjs.org/docs/testing#setting-up-jest-with-the-rust-compiler
-module.exports = createJestConfig(customJestConfig); 
+module.exports = createJestConfig(customJestConfig);

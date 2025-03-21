@@ -5,4 +5,4 @@ export interface User {
   // 必要なプロパティを追加
 }
 
-// TeamDataWithMembers型は削除しました 
+// TeamDataWithMembers型は削除しました

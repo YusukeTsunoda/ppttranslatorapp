@@ -13,4 +13,4 @@ export async function GET() {
     console.error('Error in session API:', error);
     return NextResponse.json({ user: null });
   }
-} 
+}

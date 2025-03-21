@@ -10,30 +10,30 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     const { priceId } = await request.json();
     if (!priceId) {
-      return NextResponse.json({ error: "価格IDが必要です" }, { status: 400 });
+      return NextResponse.json({ error: '価格IDが必要です' }, { status: 400 });
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BASE_URL || 'http://localhost:3000';
-    
+
     const checkoutSession = await createCheckoutSession({
       userId: session.user.id,
       priceId: priceId,
       email: session.user.email || '',
       successUrl: `${baseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${baseUrl}/pricing`
+      cancelUrl: `${baseUrl}/pricing`,
     });
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
     console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "チェックアウトの作成に失敗しました" },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : 'チェックアウトの作成に失敗しました' },
+      { status: 500 },
     );
   }
 }

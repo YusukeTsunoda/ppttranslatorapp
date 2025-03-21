@@ -55,10 +55,10 @@ export const ActivityAction = {
   FILE_UPLOAD: 'file_upload',
   TRANSLATION: 'translation',
   DOWNLOAD: 'download',
-  SETTINGS_CHANGE: 'settings_change'
+  SETTINGS_CHANGE: 'settings_change',
 } as const;
 
-export type ActivityAction = typeof ActivityAction[keyof typeof ActivityAction];
+export type ActivityAction = (typeof ActivityAction)[keyof typeof ActivityAction];
 export type UserRole = 'user' | 'admin';
 export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'trial';
 
@@ -69,4 +69,4 @@ export type PrismaDB = PrismaClient;
 
 // Prisma型のエクスポート
 export type PrismaUser = Prisma.UserGetPayload<{}>;
-export type PrismaTranslation = Prisma.TranslationGetPayload<{}>; 
+export type PrismaTranslation = Prisma.TranslationGetPayload<{}>;

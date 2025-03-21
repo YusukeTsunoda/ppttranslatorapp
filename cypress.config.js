@@ -16,7 +16,7 @@ module.exports = defineConfig({
     taskTimeout: 10000,
     retries: {
       runMode: 1,
-      openMode: 0
+      openMode: 0,
     },
     viewportWidth: 1280,
     viewportHeight: 720,
@@ -29,13 +29,13 @@ module.exports = defineConfig({
       charts: true,
       embeddedScreenshots: true,
       inlineAssets: true,
-      saveAllAttempts: false
+      saveAllAttempts: false,
     },
     env: {
       NEXT_PUBLIC_API_URL: 'http://localhost:3003/api',
       TEST_USER_EMAIL: process.env.TEST_USER_EMAIL || 'tsunotsunoda@gmail.com',
       TEST_USER_PASSWORD: process.env.TEST_USER_PASSWORD || 'Tsuno202502',
-      failOnStatusCode: false
+      failOnStatusCode: false,
     },
     setupNodeEvents(on, config) {
       on('before:browser:launch', (browser, launchOptions) => {
@@ -62,7 +62,7 @@ module.exports = defineConfig({
         log(message) {
           console.log(message);
           return null;
-        }
+        },
       });
 
       // テスト実行前にレポートディレクトリを作成
@@ -70,10 +70,10 @@ module.exports = defineConfig({
         try {
           const resultsDir = path.resolve(process.cwd(), 'cypress/results');
           const reportsDir = path.resolve(process.cwd(), 'cypress/reports');
-          
+
           await fs.mkdir(resultsDir, { recursive: true });
           await fs.mkdir(reportsDir, { recursive: true });
-          
+
           console.log('レポートディレクトリを作成しました');
         } catch (error) {
           console.error('レポートディレクトリの作成に失敗しました:', error);
@@ -81,6 +81,6 @@ module.exports = defineConfig({
       });
 
       return config;
-    }
-  }
-}); 
+    },
+  },
+});

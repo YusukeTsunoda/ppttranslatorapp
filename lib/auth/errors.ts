@@ -4,11 +4,11 @@ import { type LogLevel, type ErrorLog } from '@/types/logger';
  * セッション関連のエラー型定義
  */
 export type SessionError =
-  | "RefreshAccessTokenError"
-  | "SessionExpiredError"
-  | "AuthenticationError"
-  | "InvalidCredentialsError"
-  | "DatabaseError";
+  | 'RefreshAccessTokenError'
+  | 'SessionExpiredError'
+  | 'AuthenticationError'
+  | 'InvalidCredentialsError'
+  | 'DatabaseError';
 
 /**
  * エラーメッセージの定義
@@ -48,7 +48,7 @@ export function getAuthErrorMessage(error: SessionError | string): string {
 export function createAuthErrorLog(
   error: SessionError | Error,
   userId?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): ErrorLog {
   const now = new Date();
   const errorName = error instanceof Error ? error.name : error;
@@ -68,7 +68,7 @@ export function createAuthErrorLog(
     context: {
       action: 'authentication',
       component: 'auth',
-      ...(metadata?.context as Record<string, string> || {}),
+      ...((metadata?.context as Record<string, string>) || {}),
     },
     metadata: {
       ...metadata,
@@ -83,14 +83,14 @@ export function createAuthErrorLog(
 export async function handleAuthError(
   error: SessionError | Error,
   userId?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<{
   message: string;
   level: LogLevel;
   timestamp: string;
 }> {
   const errorLog = createAuthErrorLog(error, userId, metadata);
-  
+
   // エラーログを出力
   console.error('認証エラー:', errorLog);
 
@@ -100,4 +100,4 @@ export async function handleAuthError(
     level: errorLog.level,
     timestamp: errorLog.timestamp,
   };
-} 
+}

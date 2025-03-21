@@ -30,23 +30,12 @@ interface ApiOptions<Data, Error> extends SWRConfiguration<Data, Error> {
 export function useApi<Data = any, Error = any>(
   key: string | null,
   fetcher: Fetcher<Data>,
-  options: ApiOptions<Data, Error> = {}
+  options: ApiOptions<Data, Error> = {},
 ): ApiState<Data, Error> {
-  const {
-    onSuccess,
-    onError,
-    errorHandler = handleClientError,
-    ...swrOptions
-  } = options;
+  const { onSuccess, onError, errorHandler = handleClientError, ...swrOptions } = options;
 
   // SWRフックを使用
-  const {
-    data,
-    error,
-    isLoading,
-    isValidating,
-    mutate,
-  } = useSWR<Data, Error>(key, fetcher, {
+  const { data, error, isLoading, isValidating, mutate } = useSWR<Data, Error>(key, fetcher, {
     ...swrOptions,
     onSuccess: (data) => {
       onSuccess?.(data);
@@ -78,14 +67,9 @@ export function useApiRequest<Data = any, Error = any>(
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
     body?: any;
     headers?: Record<string, string>;
-  } = {}
+  } = {},
 ): ApiState<Data, Error> {
-  const {
-    method = 'GET',
-    body,
-    headers,
-    ...apiOptions
-  } = options;
+  const { method = 'GET', body, headers, ...apiOptions } = options;
 
   // キャッシュキーの生成
   const cacheKey = method === 'GET' ? url : null;
@@ -104,9 +88,7 @@ export function useApiRequest<Data = any, Error = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error || `Request failed with status ${response.status}`
-      );
+      throw new Error(errorData.error || `Request failed with status ${response.status}`);
     }
 
     return response.json();
@@ -125,7 +107,7 @@ export function useApiMutation<Data = any, Error = any>(
   options: Omit<ApiOptions<Data, Error>, 'onSuccess' | 'onError'> & {
     method?: 'POST' | 'PUT' | 'DELETE';
     headers?: Record<string, string>;
-  } = {}
+  } = {},
 ) {
   const { method = 'POST', headers, errorHandler = handleClientError } = options;
   const [isLoading, setIsLoading] = useState(false);
@@ -138,7 +120,7 @@ export function useApiMutation<Data = any, Error = any>(
     callbacks?: {
       onSuccess?: (data: Data) => void;
       onError?: (error: Error) => void;
-    }
+    },
   ): Promise<Data | undefined> => {
     setIsLoading(true);
     setError(undefined);
@@ -156,9 +138,7 @@ export function useApiMutation<Data = any, Error = any>(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Request failed with status ${response.status}`
-        );
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
       }
 
       const responseData = await response.json();
@@ -213,4 +193,4 @@ export function useUpdateProfile() {
  */
 export function useTranslate() {
   return useApiMutation('/api/translate');
-} 
+}

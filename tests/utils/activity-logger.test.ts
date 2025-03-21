@@ -36,9 +36,9 @@ describe('ActivityLogger', () => {
 
     it('有効なデータでアクティビティを記録する', async () => {
       const consoleSpy = jest.spyOn(console, 'log');
-      
+
       await logActivity(validActivityData);
-      
+
       // コンソールログが呼ばれたことを確認
       expect(consoleSpy).toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -46,7 +46,7 @@ describe('ActivityLogger', () => {
         expect.objectContaining({
           userId,
           action: validActivityData.action,
-        })
+        }),
       );
     });
 
@@ -54,9 +54,9 @@ describe('ActivityLogger', () => {
       // 実際の実装がエラーをスローしない場合はスキップ
       const invalidData = { userId: '' } as any;
       const consoleSpy = jest.spyOn(console, 'log');
-      
+
       await logActivity(invalidData);
-      
+
       // コンソールログが呼ばれたことを確認
       expect(consoleSpy).toHaveBeenCalled();
     });
@@ -68,16 +68,16 @@ describe('ActivityLogger', () => {
         metadata: testMetadata,
       };
       const consoleSpy = jest.spyOn(console, 'log');
-      
+
       await logActivity(dataWithMetadata);
-      
+
       // メタデータを含むログが出力されたことを確認
       expect(consoleSpy).toHaveBeenCalledWith(
         'Activity logged (dummy):',
         expect.objectContaining({
           metadata: testMetadata,
-        })
+        }),
       );
     });
   });
-}); 
+});

@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth-options";
-import Anthropic from "@anthropic-ai/sdk";
-import { prisma } from "@/lib/db/prisma";
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
+import Anthropic from '@anthropic-ai/sdk';
+import { prisma } from '@/lib/db/prisma';
 
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     // APIキーが設定されているか確認
@@ -39,16 +39,13 @@ export async function GET(req: Request) {
     return NextResponse.json({
       anthropic: {
         isConnected,
-        apiEndpoint: process.env.NEXT_PUBLIC_ANTHROPIC_API_URL || "https://api.anthropic.com/v1",
+        apiEndpoint: process.env.NEXT_PUBLIC_ANTHROPIC_API_URL || 'https://api.anthropic.com/v1',
       },
       usage: usageData,
     });
   } catch (error) {
-    console.error("統合情報取得エラー:", error);
-    return NextResponse.json(
-      { error: "統合情報の取得中にエラーが発生しました" },
-      { status: 500 }
-    );
+    console.error('統合情報取得エラー:', error);
+    return NextResponse.json({ error: '統合情報の取得中にエラーが発生しました' }, { status: 500 });
   }
 }
 
@@ -56,15 +53,12 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
     // APIキーが設定されているか確認
     if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { success: false, message: "Anthropic APIキーが設定されていません" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Anthropic APIキーが設定されていません' }, { status: 400 });
     }
 
     // Anthropic APIの接続テスト
@@ -75,31 +69,28 @@ export async function POST(req: Request) {
 
       // 簡単なメッセージを送信してテスト
       await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
+        model: 'claude-3-haiku-20240307',
         max_tokens: 10,
-        messages: [{ role: "user", content: "Hello" }],
+        messages: [{ role: 'user', content: 'Hello' }],
       });
 
       return NextResponse.json({
         success: true,
-        message: "Anthropic APIとの接続に成功しました",
+        message: 'Anthropic APIとの接続に成功しました',
       });
     } catch (apiError) {
-      console.error("Anthropic API接続テストエラー:", apiError);
+      console.error('Anthropic API接続テストエラー:', apiError);
       return NextResponse.json(
         {
           success: false,
-          message: "Anthropic APIとの接続に失敗しました",
+          message: 'Anthropic APIとの接続に失敗しました',
           error: (apiError as Error).message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
-    console.error("統合情報テストエラー:", error);
-    return NextResponse.json(
-      { success: false, error: "統合情報のテスト中にエラーが発生しました" },
-      { status: 500 }
-    );
+    console.error('統合情報テストエラー:', error);
+    return NextResponse.json({ success: false, error: '統合情報のテスト中にエラーが発生しました' }, { status: 500 });
   }
-} 
+}

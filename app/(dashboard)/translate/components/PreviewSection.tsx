@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { Card } from "@/components/ui/card";
-import { Slide, TextItem, TranslationItem, TextPosition, SlideData, ImageSize } from "../types";
-import { useState, useRef, useEffect, useCallback } from "react";
-import Image from "next/image";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Edit2, Save, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Plus, Minus } from "lucide-react";
+import { Card } from '@/components/ui/card';
+import { Slide, TextItem, TranslationItem, TextPosition, SlideData, ImageSize } from '../types';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Edit2, Save, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 
 export interface PreviewSectionProps {
   currentSlide: number;
@@ -33,14 +33,18 @@ export const PreviewSectionComponent = ({
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editValue, setEditValue] = useState('');
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const previewRef = useRef<HTMLDivElement>(null);
-  const [internalSelectedTextIndex, setInternalSelectedTextIndex] = useState<number | null>(externalSelectedTextIndex || null);
-  const [internalHoveredTextIndex, setInternalHoveredTextIndex] = useState<number | null>(externalHoveredTextIndex || null);
+  const [internalSelectedTextIndex, setInternalSelectedTextIndex] = useState<number | null>(
+    externalSelectedTextIndex || null,
+  );
+  const [internalHoveredTextIndex, setInternalHoveredTextIndex] = useState<number | null>(
+    externalHoveredTextIndex || null,
+  );
   const [imageSize, setImageSize] = useState<ImageSize>({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -50,7 +54,7 @@ export const PreviewSectionComponent = ({
       setInternalSelectedTextIndex(externalSelectedTextIndex);
     }
   }, [externalSelectedTextIndex]);
-  
+
   // 外部から渡されたhoveredTextIndexが変更されたら内部状態を更新
   useEffect(() => {
     if (externalHoveredTextIndex !== undefined) {
@@ -84,11 +88,11 @@ export const PreviewSectionComponent = ({
   };
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.1, 2));
+    setScale((prev) => Math.min(prev + 0.1, 2));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.1, 0.5));
+    setScale((prev) => Math.max(prev - 0.1, 0.5));
   };
 
   const handleZoomReset = () => {
@@ -98,7 +102,8 @@ export const PreviewSectionComponent = ({
 
   // ドラッグ開始
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (scale > 1) { // 拡大時のみドラッグ操作を有効にする
+    if (scale > 1) {
+      // 拡大時のみドラッグ操作を有効にする
       e.preventDefault(); // デフォルトの選択動作を防止
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
@@ -111,13 +116,13 @@ export const PreviewSectionComponent = ({
       e.preventDefault(); // デフォルトの選択動作を防止
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
-      
+
       // 移動の感度を調整（scale値で割ることでズームレベルに応じた移動量に調整）
-      setPosition(prev => ({
+      setPosition((prev) => ({
         x: prev.x + deltaX / scale,
-        y: prev.y + deltaY / scale
+        y: prev.y + deltaY / scale,
       }));
-      
+
       setDragStart({ x: e.clientX, y: e.clientY });
     }
   };
@@ -152,27 +157,27 @@ export const PreviewSectionComponent = ({
     if (imageRef.current && previewRef.current) {
       const { naturalWidth, naturalHeight, width, height } = imageRef.current;
       const containerRect = previewRef.current.getBoundingClientRect();
-      
+
       // 画像の実際の表示位置を取得
       const rect = imageRef.current.getBoundingClientRect();
-      
+
       // 画像の相対位置を計算
       const offsetX = rect.left - containerRect.left;
       const offsetY = rect.top - containerRect.top;
-      
+
       console.log('画像サイズ:', { naturalWidth, naturalHeight, width, height });
       console.log('画像オフセット:', { offsetX, offsetY });
       console.log('コンテナサイズ:', { width: containerRect.width, height: containerRect.height });
-      
-      setImageSize({ 
-        width, 
+
+      setImageSize({
+        width,
         height,
         offsetX,
         offsetY,
         naturalWidth,
         naturalHeight,
         containerWidth: containerRect.width,
-        containerHeight: containerRect.height
+        containerHeight: containerRect.height,
       });
       setImageError(false);
     }
@@ -181,11 +186,11 @@ export const PreviewSectionComponent = ({
   // 画像読み込みエラー時の再試行
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     console.error('画像読み込みエラー:', currentSlideData?.imageUrl, e);
-    
+
     if (retryCount < maxRetries) {
       // 再試行カウントを増やす
-      setRetryCount(prev => prev + 1);
-      
+      setRetryCount((prev) => prev + 1);
+
       // 少し待ってから再読み込み
       setTimeout(() => {
         if (imageRef.current) {
@@ -217,13 +222,13 @@ export const PreviewSectionComponent = ({
     // 画像サイズが変更されたときにログ出力
     if (imageSize.width > 0 && imageSize.height > 0) {
       console.log('画像サイズが更新されました:', imageSize);
-      
+
       // 画像コンテナのサイズも取得
       if (previewRef.current) {
         const containerRect = previewRef.current.getBoundingClientRect();
         console.log('コンテナサイズ:', {
           width: containerRect.width,
-          height: containerRect.height
+          height: containerRect.height,
         });
       }
     }
@@ -234,39 +239,39 @@ export const PreviewSectionComponent = ({
     if (imageRef.current && scale !== 1) {
       console.log('ズーム変更:', scale);
       // 強制的に再レンダリングを促す
-      setImageSize(prev => ({ ...prev }));
+      setImageSize((prev) => ({ ...prev }));
     }
   }, [scale]);
 
   // 位置情報を画像サイズに合わせて調整
   const adjustPositionToImageSize = (position: TextPosition) => {
     if (!position || !imageSize.width || !imageSize.height) return position;
-    
+
     // 画像の実際の表示サイズと位置を取得
-    const { 
-      width, 
-      height, 
-      offsetX = 0, 
-      offsetY = 0, 
-      naturalWidth = 1, 
+    const {
+      width,
+      height,
+      offsetX = 0,
+      offsetY = 0,
+      naturalWidth = 1,
       naturalHeight = 1,
-      containerWidth = 1
+      containerWidth = 1,
     } = imageSize;
-    
+
     // スケール係数を計算（画像の実際の表示サイズに基づく）
     // PPTの横幅に合わせるため、コンテナ幅を基準にスケールを計算
     const containerScale = containerWidth / naturalWidth;
-    
+
     // 実際の表示スケールを計算
     const scaleX = width / naturalWidth;
     const scaleY = height / naturalHeight;
-    
+
     // 位置を調整（画像のオフセットを考慮）
     return {
       x: position.x * scaleX,
       y: position.y * scaleY,
       width: position.width * scaleX,
-      height: position.height * scaleY
+      height: position.height * scaleY,
     };
   };
 
@@ -276,10 +281,10 @@ export const PreviewSectionComponent = ({
       console.log('位置情報がありません');
       return {};
     }
-    
+
     // 画像サイズに合わせて位置を調整
     const adjustedPosition = adjustPositionToImageSize(position);
-    
+
     // 位置情報をログ出力（デバッグ用）
     if (isSelected || isHovered) {
       console.log('Original position:', position);
@@ -298,7 +303,7 @@ export const PreviewSectionComponent = ({
       transition: 'all 0.2s ease',
       zIndex: 30, // 高いz-indexを設定してクリック可能にする
       // transformOriginを追加して、ズーム時の位置を正確に保持
-      transformOrigin: 'top left'
+      transformOrigin: 'top left',
     };
 
     // 選択されている場合
@@ -343,10 +348,9 @@ export const PreviewSectionComponent = ({
   }, [slides, currentSlide, internalSelectedTextIndex]);
 
   // 現在のスライドデータを取得（安全に）
-  const currentSlideData = slides && slides.length > 0 && currentSlide >= 0 && currentSlide < slides.length 
-    ? slides[currentSlide] 
-    : undefined;
-  
+  const currentSlideData =
+    slides && slides.length > 0 && currentSlide >= 0 && currentSlide < slides.length ? slides[currentSlide] : undefined;
+
   // デバッグ情報
   useEffect(() => {
     console.log('currentSlideData:', currentSlideData);
@@ -365,13 +369,7 @@ export const PreviewSectionComponent = ({
         <div className="flex items-center space-x-2">
           {/* ズームコントロール */}
           <div className="flex items-center mr-4 space-x-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomOut}
-              title="縮小"
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={handleZoomOut} title="縮小" className="h-8 w-8 p-0">
               <Minus className="h-4 w-4" />
             </Button>
             <Button
@@ -383,17 +381,11 @@ export const PreviewSectionComponent = ({
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomIn}
-              title="拡大"
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="outline" size="sm" onClick={handleZoomIn} title="拡大" className="h-8 w-8 p-0">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          
+
           {/* スライド切り替えコントロール */}
           <Button
             variant="outline"
@@ -418,36 +410,36 @@ export const PreviewSectionComponent = ({
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 h-full">
-        <div 
+        <div
           ref={previewRef}
-          className="relative flex-1 border rounded-md overflow-hidden bg-gray-100" 
+          className="relative flex-1 border rounded-md overflow-hidden bg-gray-100"
           data-testid="slide-preview"
-          style={{ 
-            cursor: isDragging ? 'grabbing' : (scale > 1 ? 'grab' : 'default'),
+          style={{
+            cursor: isDragging ? 'grabbing' : scale > 1 ? 'grab' : 'default',
             minHeight: '400px', // 最小高さを設定
             height: '60vh', // 画面の60%の高さを確保
             display: 'flex',
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
           }}
         >
           {currentSlideData ? (
-            <div 
+            <div
               className="relative w-full h-full flex justify-center items-center"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
             >
-              <div 
+              <div
                 className="relative"
-                style={{ 
-                  transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`, 
-                  transformOrigin: 'center', 
+                style={{
+                  transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
+                  transformOrigin: 'center',
                   transition: isDragging ? 'none' : 'transform 0.2s ease',
                   pointerEvents: 'auto', // イベントを確実に受け取る
                   maxWidth: '100%',
-                  maxHeight: '100%'
+                  maxHeight: '100%',
                 }}
               >
                 <img
@@ -457,11 +449,11 @@ export const PreviewSectionComponent = ({
                   className="object-contain"
                   data-testid="slide-image"
                   draggable={false}
-                  style={{ 
+                  style={{
                     pointerEvents: 'none', // 画像自体のイベントを無効化して親要素に伝播
                     maxWidth: '100%',
                     maxHeight: '100%',
-                    display: 'block'
+                    display: 'block',
                   }}
                   onLoad={handleImageLoad}
                   onError={handleImageError}
@@ -471,7 +463,7 @@ export const PreviewSectionComponent = ({
                     <div className="text-center p-4">
                       <p className="text-red-500 font-medium">画像の読み込みに失敗しました</p>
                       <p className="text-sm text-gray-600 mt-2">URL: {currentSlideData.imageUrl}</p>
-                      <button 
+                      <button
                         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                         onClick={() => {
                           setRetryCount(0);
@@ -492,13 +484,13 @@ export const PreviewSectionComponent = ({
                     </div>
                   </div>
                 )}
-                
+
                 {/* テキスト位置のハイライト表示 */}
                 <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
                   {textItems.map((text, index) => {
                     const isHovered = internalHoveredTextIndex === index;
                     const isSelected = internalSelectedTextIndex === index;
-                    
+
                     return (
                       <div
                         key={`highlight-${index}`}
@@ -506,7 +498,7 @@ export const PreviewSectionComponent = ({
                           ...getHighlightStyle(text.position, isHovered, isSelected),
                           // ハイライト要素は常にドラッグよりも優先してクリックできるように
                           pointerEvents: 'auto',
-                          zIndex: isSelected ? 50 : (isHovered ? 40 : 30)
+                          zIndex: isSelected ? 50 : isHovered ? 40 : 30,
                         }}
                         onClick={() => handleTextClick(index)}
                         onMouseEnter={() => handleTextHover(index)}
@@ -538,11 +530,11 @@ export const PreviewSectionComponent = ({
                 {textItems.map((text, index) => {
                   const isSelected = internalSelectedTextIndex === index;
                   return (
-                    <div 
-                      key={`text-item-${index}`} 
+                    <div
+                      key={`text-item-${index}`}
                       className={`p-2 rounded-md transition-colors duration-200 ${
-                        isSelected 
-                          ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' 
+                        isSelected
+                          ? 'bg-blue-50 border-2 border-blue-300 shadow-sm'
                           : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
                       }`}
                       onClick={() => handleTextClick(index)}
@@ -551,19 +543,20 @@ export const PreviewSectionComponent = ({
                         <div>
                           <p className="text-xs font-medium text-gray-500 mb-1 flex justify-between items-center">
                             <span>原文:</span>
-                            {isSelected && <span className="text-blue-600 text-xs px-2 py-0.5 bg-blue-100 rounded-full">選択中</span>}
+                            {isSelected && (
+                              <span className="text-blue-600 text-xs px-2 py-0.5 bg-blue-100 rounded-full">選択中</span>
+                            )}
                           </p>
                           <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
-                            {text.text || "テキストがありません"}
+                            {text.text || 'テキストがありません'}
                           </div>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-gray-500 mb-1">翻訳:</p>
                           <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
-                            {currentSlideData.translations && 
-                             currentSlideData.translations[index] ? 
-                             currentSlideData.translations[index].text : 
-                             "翻訳がありません"}
+                            {currentSlideData.translations && currentSlideData.translations[index]
+                              ? currentSlideData.translations[index].text
+                              : '翻訳がありません'}
                           </div>
                         </div>
                       </div>
@@ -577,4 +570,4 @@ export const PreviewSectionComponent = ({
       </div>
     </div>
   );
-}; 
+};

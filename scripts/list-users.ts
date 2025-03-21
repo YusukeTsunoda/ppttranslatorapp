@@ -17,4 +17,4 @@ async function listUsers() {
   }
 }
 
-listUsers(); 
+listUsers();

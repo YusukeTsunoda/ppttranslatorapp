@@ -43,13 +43,13 @@ jest.mock('fs', () => {
     existsSync: jest.fn().mockImplementation(() => true),
     createReadStream: jest.fn().mockImplementation(() => ({
       pipe: jest.fn().mockReturnThis(),
-      on: jest.fn().mockImplementation(function(event, handler) {
+      on: jest.fn().mockImplementation(function (event, handler) {
         if (event === 'end') handler();
         return this;
       }),
     })),
     createWriteStream: jest.fn().mockImplementation(() => ({
-      on: jest.fn().mockImplementation(function(event, handler) {
+      on: jest.fn().mockImplementation(function (event, handler) {
         if (event === 'finish') handler();
         return this;
       }),
@@ -106,4 +106,4 @@ afterAll(() => {
 });
 
 // テスト用のユーティリティ関数
-global.waitForNextTick = () => new Promise(resolve => setTimeout(resolve, 0)); 
+global.waitForNextTick = () => new Promise((resolve) => setTimeout(resolve, 0));

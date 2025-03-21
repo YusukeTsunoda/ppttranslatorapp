@@ -20,17 +20,17 @@ describe('DropdownMenu', () => {
           <DropdownMenuItem>アイテム1</DropdownMenuItem>
           <DropdownMenuItem>アイテム2</DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     );
-    
+
     // トリガーが表示されていることを確認
     expect(screen.getByTestId('trigger')).toBeInTheDocument();
     expect(screen.getByText('メニューを開く')).toBeInTheDocument();
   });
-  
+
   it('メニューアイテムにクリックハンドラーを設定できる', () => {
     const handleClick = jest.fn();
-    
+
     render(
       <DropdownMenu>
         <DropdownMenuTrigger>メニューを開く</DropdownMenuTrigger>
@@ -39,28 +39,28 @@ describe('DropdownMenu', () => {
             クリック可能なアイテム
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>,
     );
-    
+
     // クリックハンドラーが設定されていることを確認（実際のクリックはテストしない）
     const menuItem = document.createElement('div');
     menuItem.setAttribute('data-testid', 'menu-item');
-    
+
     // onClickプロパティが設定されていることを確認
     expect(handleClick).toBeDefined();
   });
-  
+
   it('ラベルとセパレーターが正しくレンダリングされる', () => {
     render(
       <div>
         <DropdownMenuLabel data-testid="label">メニューラベル</DropdownMenuLabel>
         <DropdownMenuSeparator data-testid="separator" />
-      </div>
+      </div>,
     );
-    
+
     // ラベルとセパレーターが存在することを確認
     expect(screen.getByTestId('label')).toBeInTheDocument();
     expect(screen.getByTestId('separator')).toBeInTheDocument();
     expect(screen.getByText('メニューラベル')).toBeInTheDocument();
   });
-}); 
+});

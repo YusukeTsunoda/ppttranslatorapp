@@ -60,7 +60,7 @@ interface Assertion {
   toThrow(expected?: string | Error | RegExp): void;
   toThrowError(expected?: string | Error | RegExp): void;
   not: Assertion;
-  
+
   // モック関数用のアサーション
   toHaveBeenCalled(): void;
   toHaveBeenCalledTimes(times: number): void;
@@ -75,6 +75,25 @@ interface Assertion {
 
   // DOM関連
   toBeInTheDocument(): void;
+  toHaveAttribute(attr: string, value?: string): void;
+  toHaveTextContent(text: string | RegExp): void;
+  toHaveValue(value: string | RegExp): void;
+  toHaveStyle(style: Record<string, any>): void;
+  toBeVisible(): void;
+  toBeDisabled(): void;
+  toBeEnabled(): void;
+  toBeChecked(): void;
+  toBeEmpty(): void;
+  toBeEmptyDOMElement(): void;
+  toBeInvalid(): void;
+  toBeRequired(): void;
+  toBeValid(): void;
+  toContainElement(element: HTMLElement | null): void;
+  toContainHTML(html: string): void;
+  toHaveClass(...classNames: string[]): void;
+  toHaveFocus(): void;
+  toHaveFormValues(values: Record<string, any>): void;
+  toBeInTheDOM(): void;
 }
 
 interface AsyncAssertion {
@@ -95,7 +114,7 @@ interface AsyncAssertion {
   toThrow(expected?: string | Error | RegExp): void;
   toThrowError(expected?: string | Error | RegExp): void;
   not: AsyncAssertion;
-  
+
   // モック関数用のアサーション
   toHaveBeenCalled(): void;
   toHaveBeenCalledTimes(times: number): void;
@@ -107,6 +126,28 @@ interface AsyncAssertion {
   toHaveReturnedWith(value: any): void;
   toHaveLastReturnedWith(value: any): void;
   toHaveNthReturnedWith(time: number, value: any): void;
+
+  // DOM関連のアサーション
+  toBeInTheDocument(): void;
+  toHaveAttribute(attr: string, value?: string): void;
+  toHaveTextContent(text: string | RegExp): void;
+  toHaveValue(value: string | RegExp): void;
+  toHaveStyle(style: Record<string, any>): void;
+  toBeVisible(): void;
+  toBeDisabled(): void;
+  toBeEnabled(): void;
+  toBeChecked(): void;
+  toBeEmpty(): void;
+  toBeEmptyDOMElement(): void;
+  toBeInvalid(): void;
+  toBeRequired(): void;
+  toBeValid(): void;
+  toContainElement(element: HTMLElement | null): void;
+  toContainHTML(html: string): void;
+  toHaveClass(...classNames: string[]): void;
+  toHaveFocus(): void;
+  toHaveFormValues(values: Record<string, any>): void;
+  toBeInTheDOM(): void;
 
   // 非同期アサーション専用
   rejects: Assertion;
@@ -132,7 +173,7 @@ declare global {
         stringContaining(str: string): any;
         stringMatching(str: string | RegExp): any;
       };
-      
+
       // 基本的なアサーション関数
       (value: any): Assertion & AsyncAssertion;
     }

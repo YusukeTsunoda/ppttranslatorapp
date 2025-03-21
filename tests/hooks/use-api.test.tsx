@@ -28,14 +28,17 @@ describe('APIフック', () => {
         await result.current.mutate(updateData);
       });
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/test',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify(updateData),
+          credentials: 'include',
         }),
-        body: JSON.stringify(updateData),
-        credentials: 'include',
-      }));
+      );
       expect(result.current.data).toEqual(mockData);
       expect(result.current.error).toBeUndefined();
     });
@@ -72,14 +75,17 @@ describe('APIフック', () => {
         await result.current.mutate({ name: 'テスト' });
       });
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
-        method: 'PUT',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/test',
+        expect.objectContaining({
+          method: 'PUT',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify({ name: 'テスト' }),
+          credentials: 'include',
         }),
-        body: JSON.stringify({ name: 'テスト' }),
-        credentials: 'include',
-      }));
+      );
     });
   });
-}); 
+});

@@ -3,13 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPage() {
@@ -17,9 +11,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">翻訳設定</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          翻訳の品質と言語に関する設定をカスタマイズできます。
-        </p>
+        <p className="mt-1 text-sm text-gray-500">翻訳の品質と言語に関する設定をカスタマイズできます。</p>
       </div>
 
       <Card>
@@ -65,9 +57,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>フォーマットを保持</Label>
-              <p className="text-sm text-gray-500">
-                元のスライドのフォーマットとレイアウトを維持します
-              </p>
+              <p className="text-sm text-gray-500">元のスライドのフォーマットとレイアウトを維持します</p>
             </div>
             <Switch defaultChecked />
           </div>
@@ -75,9 +65,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>専門用語の翻訳</Label>
-              <p className="text-sm text-gray-500">
-                業界固有の専門用語を適切に翻訳します
-              </p>
+              <p className="text-sm text-gray-500">業界固有の専門用語を適切に翻訳します</p>
             </div>
             <Switch defaultChecked />
           </div>
@@ -85,9 +73,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>自動校正</Label>
-              <p className="text-sm text-gray-500">
-                翻訳後のテキストを自動的に校正します
-              </p>
+              <p className="text-sm text-gray-500">翻訳後のテキストを自動的に校正します</p>
             </div>
             <Switch defaultChecked />
           </div>
@@ -95,9 +81,7 @@ export default function SettingsPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button>
-          設定を保存
-        </Button>
+        <Button>設定を保存</Button>
       </div>
     </div>
   );

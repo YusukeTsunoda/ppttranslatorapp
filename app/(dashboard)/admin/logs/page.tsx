@@ -8,21 +8,21 @@ import { UserRole } from '@prisma/client';
 
 export default async function LogsPage() {
   const session = await getServerSession(authOptions);
-  
+
   if (!session || !session.user) {
     redirect('/signin');
   }
-  
+
   // 管理者権限チェック
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true }
+    select: { role: true },
   });
-  
+
   if (!user || user.role !== UserRole.ADMIN) {
     redirect('/dashboard');
   }
-  
+
   // アクティビティログを取得
   const logs = await prisma.activityLog.findMany({
     orderBy: { createdAt: 'desc' },
@@ -31,10 +31,10 @@ export default async function LogsPage() {
       user: {
         select: {
           name: true,
-          email: true
-        }
-      }
-    }
+          email: true,
+        },
+      },
+    },
   });
 
   return (
@@ -45,7 +45,7 @@ export default async function LogsPage() {
           ← 管理者ダッシュボードに戻る
         </Link>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>システムアクティビティ（最新100件）</CardTitle>
@@ -64,9 +64,7 @@ export default async function LogsPage() {
               <tbody>
                 {logs.map((log) => (
                   <tr key={log.id} className="border-t">
-                    <td className="p-2 whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString('ja-JP')}
-                    </td>
+                    <td className="p-2 whitespace-nowrap">{new Date(log.createdAt).toLocaleString('ja-JP')}</td>
                     <td className="p-2">{log.user.name || log.user.email}</td>
                     <td className="p-2">{log.type}</td>
                     <td className="p-2">{log.description}</td>
@@ -79,4 +77,4 @@ export default async function LogsPage() {
       </Card>
     </div>
   );
-} 
+}

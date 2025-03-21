@@ -67,22 +67,12 @@ export default function ResetPasswordPage() {
           <div className="flex justify-center">
             <CircleIcon className="h-12 w-12 text-orange-500" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            パスワードをリセット
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            登録済みのメールアドレスを入力してください
-          </p>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">パスワードをリセット</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">登録済みのメールアドレスを入力してください</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <ErrorMessage 
-              message={error}
-              variant="destructive"
-              className="mb-4"
-            />
-          )}
+          {error && <ErrorMessage message={error} variant="destructive" className="mb-4" />}
 
           <div className="space-y-2">
             <Label htmlFor="email">メールアドレス</Label>
@@ -98,19 +88,8 @@ export default function ResetPasswordPage() {
             />
           </div>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? (
-              <LoadingSpinner 
-                size="sm" 
-                text="送信中..."
-              />
-            ) : (
-              'パスワードリセットメールを送信'
-            )}
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? <LoadingSpinner size="sm" text="送信中..." /> : 'パスワードリセットメールを送信'}
           </Button>
 
           <div className="mt-6">
@@ -124,4 +103,4 @@ export default function ResetPasswordPage() {
       </div>
     </div>
   );
-} 
+}

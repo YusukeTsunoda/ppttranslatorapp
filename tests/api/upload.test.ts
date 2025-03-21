@@ -12,7 +12,7 @@ jest.mock('@/lib/utils/file-utils', () => ({
   filePathManager: {
     ensurePath: jest.fn().mockResolvedValue(undefined),
     getTempPath: jest.fn().mockReturnValue('tmp/users/test-user/uploads/test-file_original.pptx'),
-  }
+  },
 }));
 
 // fs/promisesのモック
@@ -27,34 +27,34 @@ jest.mock('@/lib/auth/session', () => ({
     user: {
       id: 'test-user',
       email: 'test@example.com',
-    }
+    },
   }),
 }));
 
 // モックレスポンスの作成
 const mockSuccessResponse = {
   status: 200,
-  json: async () => ({ 
+  json: async () => ({
     success: true,
     fileId: 'test-file-id',
     fileName: 'test.pptx',
-    fileSize: 123
-  })
+    fileSize: 123,
+  }),
 };
 
 const mockErrorResponse = {
   status: 400,
-  json: async () => ({ error: 'No file uploaded' })
+  json: async () => ({ error: 'No file uploaded' }),
 };
 
 // FormDataのモック
 class MockFormData {
   private data = new Map();
-  
+
   append(key: string, value: any) {
     this.data.set(key, value);
   }
-  
+
   get(key: string) {
     return this.data.get(key);
   }
@@ -66,13 +66,13 @@ jest.mock('@/app/api/upload/route', () => ({
     // モックの実装
     const formData = await req.formData();
     const file = formData.get('file');
-    
+
     if (!file) {
       return mockErrorResponse;
     }
-    
+
     return mockSuccessResponse;
-  })
+  }),
 }));
 
 // インポートはモックの後に行う
@@ -82,55 +82,55 @@ describe('Upload API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
-  
+
   it('ファイルがアップロードされた場合、成功レスポンスを返す', async () => {
     // モックのFormDataを作成
     const formData = new MockFormData();
     formData.append('file', {
       name: 'test.pptx',
       size: 123,
-      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     });
-    
+
     // モックのリクエストオブジェクトを作成
     const mockReq = {
-      formData: jest.fn().mockResolvedValue(formData)
+      formData: jest.fn().mockResolvedValue(formData),
     };
-    
+
     // APIハンドラを呼び出す
     const response = await POST(mockReq as unknown as NextRequest);
-    
+
     // レスポンスを検証
     expect(response.status).toBe(200);
-    
+
     // レスポンスボディを取得
     const data = await response.json();
-    
+
     // レスポンスボディを検証
     expect(data.success).toBe(true);
     expect(data.fileId).toBeDefined();
     expect(data.fileName).toBe('test.pptx');
   });
-  
+
   it('ファイルがアップロードされていない場合、エラーレスポンスを返す', async () => {
     // 空のFormDataを作成
     const formData = new MockFormData();
-    
+
     // モックのリクエストオブジェクトを作成
     const mockReq = {
-      formData: jest.fn().mockResolvedValue(formData)
+      formData: jest.fn().mockResolvedValue(formData),
     };
-    
+
     // APIハンドラを呼び出す
     const response = await POST(mockReq as unknown as NextRequest);
-    
+
     // レスポンスを検証
     expect(response.status).toBe(400);
-    
+
     // レスポンスボディを取得
     const data = await response.json();
-    
+
     // レスポンスボディを検証
     expect(data.error).toBe('No file uploaded');
   });
-}); 
+});

@@ -1,41 +1,41 @@
 'use client';
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 
 const plans = [
   {
-    id: "price_H5UGwpxnJVWdmh", // Stripeの価格ID
-    name: "ベーシックプラン",
-    price: "¥1,000",
-    description: "個人向け有料プラン",
+    id: 'price_H5UGwpxnJVWdmh', // Stripeの価格ID
+    name: 'ベーシックプラン',
+    price: '¥1,000',
+    description: '個人向け有料プラン',
     features: [
-      "月100ページ分（約10万文字）まで翻訳可能",
-      "月10件までのファイル翻訳",
-      "ファイルサイズ上限10MB",
-      "年間契約で最大20%割引"
+      '月100ページ分（約10万文字）まで翻訳可能',
+      '月10件までのファイル翻訳',
+      'ファイルサイズ上限10MB',
+      '年間契約で最大20%割引',
     ],
-    buttonText: "無料で始める",
+    buttonText: '無料で始める',
   },
   {
-    id: "price_H5UGxyzABCDefg", // Stripeの価格ID
-    name: "プレミアムプラン",
-    price: "¥3,000",
-    description: "ヘビーユーザー向け",
+    id: 'price_H5UGxyzABCDefg', // Stripeの価格ID
+    name: 'プレミアムプラン',
+    price: '¥3,000',
+    description: 'ヘビーユーザー向け',
     features: [
-      "月500ページ分（約50万文字）まで翻訳可能",
-      "月50〜100件のファイル翻訳",
-      "ファイルサイズ上限25MB",
-      "Glossary機能強化",
-      "チーム利用対応（用語集10件まで共有可）"
+      '月500ページ分（約50万文字）まで翻訳可能',
+      '月50〜100件のファイル翻訳',
+      'ファイルサイズ上限25MB',
+      'Glossary機能強化',
+      'チーム利用対応（用語集10件まで共有可）',
     ],
-    buttonText: "無料で始める",
+    buttonText: '無料で始める',
     featured: true,
-  }
+  },
 ];
 
 export default function PricingPage() {
@@ -46,7 +46,7 @@ export default function PricingPage() {
   const handleSubscribe = async (priceId: string) => {
     try {
       setLoading(priceId);
-      
+
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: {
@@ -67,9 +67,9 @@ export default function PricingPage() {
     } catch (error) {
       console.error('Checkout error:', error);
       toast({
-        title: "エラー",
-        description: error instanceof Error ? error.message : "チェックアウトの作成に失敗しました",
-        variant: "destructive",
+        title: 'エラー',
+        description: error instanceof Error ? error.message : 'チェックアウトの作成に失敗しました',
+        variant: 'destructive',
       });
     } finally {
       setLoading(null);
@@ -89,9 +89,7 @@ export default function PricingPage() {
           {plans.map((plan) => (
             <Card
               key={plan.name}
-              className={`relative ring-1 ring-gray-200 rounded-3xl p-8 xl:p-10 ${
-                plan.featured ? "bg-orange-50" : ""
-              }`}
+              className={`relative ring-1 ring-gray-200 rounded-3xl p-8 xl:p-10 ${plan.featured ? 'bg-orange-50' : ''}`}
             >
               {plan.featured && (
                 <div className="absolute -top-4 right-8">
@@ -121,12 +119,10 @@ export default function PricingPage() {
                   <Button
                     onClick={() => handleSubscribe(plan.id)}
                     disabled={loading === plan.id}
-                    className={`w-full ${
-                      plan.featured ? "bg-orange-600 hover:bg-orange-500" : ""
-                    }`}
+                    className={`w-full ${plan.featured ? 'bg-orange-600 hover:bg-orange-500' : ''}`}
                     data-testid={`select-plan-${plan.name.toLowerCase()}`}
                   >
-                    {loading === plan.id ? "処理中..." : plan.buttonText}
+                    {loading === plan.id ? '処理中...' : plan.buttonText}
                   </Button>
                 </div>
               </div>
@@ -136,4 +132,4 @@ export default function PricingPage() {
       </div>
     </div>
   );
-} 
+}

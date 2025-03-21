@@ -12,25 +12,37 @@ describe('Button', () => {
   it('クリックイベントを処理する', () => {
     const handleClick = jest.fn();
     render(<Button onClick={handleClick}>クリック</Button>);
-    
+
     const button = screen.getByRole('button', { name: 'クリック' });
     fireEvent.click(button);
-    
+
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
   it('異なるバリアントをレンダリングする', () => {
     render(
       <>
-        <Button variant="default" data-testid="default">デフォルト</Button>
-        <Button variant="destructive" data-testid="destructive">破壊的</Button>
-        <Button variant="outline" data-testid="outline">アウトライン</Button>
-        <Button variant="secondary" data-testid="secondary">セカンダリ</Button>
-        <Button variant="ghost" data-testid="ghost">ゴースト</Button>
-        <Button variant="link" data-testid="link">リンク</Button>
-      </>
+        <Button variant="default" data-testid="default">
+          デフォルト
+        </Button>
+        <Button variant="destructive" data-testid="destructive">
+          破壊的
+        </Button>
+        <Button variant="outline" data-testid="outline">
+          アウトライン
+        </Button>
+        <Button variant="secondary" data-testid="secondary">
+          セカンダリ
+        </Button>
+        <Button variant="ghost" data-testid="ghost">
+          ゴースト
+        </Button>
+        <Button variant="link" data-testid="link">
+          リンク
+        </Button>
+      </>,
     );
-    
+
     expect(screen.getByTestId('default')).toHaveClass('bg-primary');
     expect(screen.getByTestId('destructive')).toHaveClass('bg-destructive');
     expect(screen.getByTestId('outline')).toHaveClass('border-input');
@@ -42,13 +54,21 @@ describe('Button', () => {
   it('異なるサイズをレンダリングする', () => {
     render(
       <>
-        <Button size="default" data-testid="default">デフォルト</Button>
-        <Button size="sm" data-testid="sm">小</Button>
-        <Button size="lg" data-testid="lg">大</Button>
-        <Button size="icon" data-testid="icon">アイコン</Button>
-      </>
+        <Button size="default" data-testid="default">
+          デフォルト
+        </Button>
+        <Button size="sm" data-testid="sm">
+          小
+        </Button>
+        <Button size="lg" data-testid="lg">
+          大
+        </Button>
+        <Button size="icon" data-testid="icon">
+          アイコン
+        </Button>
+      </>,
     );
-    
+
     expect(screen.getByTestId('default')).toHaveClass('h-9');
     expect(screen.getByTestId('sm')).toHaveClass('h-8');
     expect(screen.getByTestId('lg')).toHaveClass('h-10');
@@ -56,16 +76,24 @@ describe('Button', () => {
   });
 
   it('無効状態をレンダリングする', () => {
-    render(<Button disabled data-testid="disabled">無効</Button>);
-    
+    render(
+      <Button disabled data-testid="disabled">
+        無効
+      </Button>,
+    );
+
     const button = screen.getByTestId('disabled');
     expect(button).toBeDisabled();
     expect(button).toHaveClass('disabled:opacity-50');
   });
 
   it('カスタムクラス名を適用する', () => {
-    render(<Button className="custom-class" data-testid="custom">カスタム</Button>);
-    
+    render(
+      <Button className="custom-class" data-testid="custom">
+        カスタム
+      </Button>,
+    );
+
     const button = screen.getByTestId('custom');
     expect(button).toHaveClass('custom-class');
   });
@@ -73,13 +101,15 @@ describe('Button', () => {
   it('asChildプロパティを使用して別の要素としてレンダリングする', () => {
     render(
       <Button asChild>
-        <a href="#" data-testid="link-button">リンクボタン</a>
-      </Button>
+        <a href="#" data-testid="link-button">
+          リンクボタン
+        </a>
+      </Button>,
     );
-    
+
     const link = screen.getByTestId('link-button');
     expect(link).toBeInTheDocument();
     expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('href', '#');
   });
-}); 
+});

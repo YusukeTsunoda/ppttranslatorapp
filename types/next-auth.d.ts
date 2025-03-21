@@ -43,4 +43,4 @@ declare module 'next-auth' {
     accessTokenExpires: number;
     error?: SessionError;
   }
-} 
+}

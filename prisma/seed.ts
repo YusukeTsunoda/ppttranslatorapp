@@ -141,9 +141,9 @@ async function main() {
   // 管理者ユーザーの作成
   const adminEmail = 'admin@example.com';
   const adminExists = await prisma.user.findUnique({
-    where: { email: adminEmail }
+    where: { email: adminEmail },
   });
-  
+
   if (!adminExists) {
     await prisma.user.create({
       data: {
@@ -152,8 +152,8 @@ async function main() {
         email: adminEmail,
         password: await hash('admin123', 10), // 本番環境では強力なパスワードを使用してください
         role: 'ADMIN',
-        credits: 1000
-      }
+        credits: 1000,
+      },
     });
     console.log('管理者ユーザーを作成しました');
   }
@@ -169,4 +169,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  }); 
+  });

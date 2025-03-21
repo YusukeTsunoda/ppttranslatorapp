@@ -17,7 +17,7 @@ export async function createCheckoutSession({
   priceId,
   email,
   successUrl,
-  cancelUrl
+  cancelUrl,
 }: {
   userId: string;
   priceId: string;
@@ -39,7 +39,7 @@ export async function handleSubscriptionUpdated(subscription: any) {
   return {
     userId: subscription.metadata?.userId || 'dummy-user-id',
     status: 'active',
-    priceId: 'dummy-price-id'
+    priceId: 'dummy-price-id',
   };
 }
 
@@ -51,7 +51,7 @@ export async function handleSubscriptionDeleted(subscription: any) {
 export async function validateStripeSignature(
   payload: string | Buffer,
   signature: string,
-  webhookSecret: string
+  webhookSecret: string,
 ): Promise<any> {
   console.log('Dummy stripe signature validation');
   return { type: 'dummy.event' };
@@ -64,15 +64,15 @@ export async function getStripePrices() {
       product: { name: 'Basic Plan' },
       unit_amount: 1000,
       currency: 'jpy',
-      recurring: { interval: 'month' }
+      recurring: { interval: 'month' },
     },
     {
       id: 'price_dummy_yearly',
       product: { name: 'Premium Plan' },
       unit_amount: 10000,
       currency: 'jpy',
-      recurring: { interval: 'year' }
-    }
+      recurring: { interval: 'year' },
+    },
   ];
 }
 
@@ -81,12 +81,12 @@ export async function getStripeProducts() {
     {
       id: 'prod_dummy_basic',
       name: 'Basic Plan',
-      description: 'Basic features'
+      description: 'Basic features',
     },
     {
       id: 'prod_dummy_premium',
       name: 'Premium Plan',
-      description: 'All features'
-    }
+      description: 'All features',
+    },
   ];
 }

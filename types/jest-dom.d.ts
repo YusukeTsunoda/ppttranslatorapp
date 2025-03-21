@@ -17,4 +17,4 @@ declare namespace jest {
     toHaveFocus(): R;
     toHaveTextContent(text: string | RegExp, options?: { normalizeWhitespace: boolean }): R;
   }
-} 
+}

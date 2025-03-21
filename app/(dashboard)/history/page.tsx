@@ -1,14 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -37,32 +30,33 @@ export default function HistoryPage() {
       try {
         setIsLoading(true);
         const response = await fetch('/api/history');
-        
+
         if (!response.ok) {
           throw new Error('履歴の取得に失敗しました');
         }
-        
+
         const data = await response.json();
         console.log('履歴データ詳細:', {
           history: data.history,
           credits: data.credits,
           monthlyCount: data.monthlyCount,
-          historyLength: data.history?.length || 0
+          historyLength: data.history?.length || 0,
         });
-        
+
         // データを整形
-        const formattedHistory = data.history?.map((item: any) => ({
-          id: item.id || 'unknown-id',
-          fileName: item.fileName || 'unknown.pptx',
-          createdAt: item.createdAt || new Date().toISOString(),
-          status: item.status || '完了',
-          credits: item.creditsUsed || 0,
-          creditsUsed: item.creditsUsed || 0,
-          pageCount: item.pageCount || 0,
-        })) || [];
-        
+        const formattedHistory =
+          data.history?.map((item: any) => ({
+            id: item.id || 'unknown-id',
+            fileName: item.fileName || 'unknown.pptx',
+            createdAt: item.createdAt || new Date().toISOString(),
+            status: item.status || '完了',
+            credits: item.creditsUsed || 0,
+            creditsUsed: item.creditsUsed || 0,
+            pageCount: item.pageCount || 0,
+          })) || [];
+
         console.log('整形後の履歴データ:', formattedHistory);
-        
+
         setHistory(formattedHistory);
         setCredits(data.credits || 0);
         setMonthlyCount(data.monthlyCount || 0);
@@ -73,7 +67,7 @@ export default function HistoryPage() {
         setIsLoading(false);
       }
     };
-    
+
     fetchHistory();
   }, []);
 
@@ -82,9 +76,7 @@ export default function HistoryPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">履歴とクレジット</h1>
-          <p className="mt-1 text-sm text-red-500">
-            エラーが発生しました: {error}
-          </p>
+          <p className="mt-1 text-sm text-red-500">エラーが発生しました: {error}</p>
         </div>
       </div>
     );
@@ -94,9 +86,7 @@ export default function HistoryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">履歴とクレジット</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          翻訳履歴と利用可能なクレジットを確認できます。
-        </p>
+        <p className="mt-1 text-sm text-gray-500">翻訳履歴と利用可能なクレジットを確認できます。</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -113,9 +103,7 @@ export default function HistoryPage() {
             ) : (
               <>
                 <div className="text-3xl font-bold text-gray-900">{credits}</div>
-                <p className="text-sm text-gray-500 mt-1">
-                  1回の翻訳につき約10-20クレジットを消費します
-                </p>
+                <p className="text-sm text-gray-500 mt-1">1回の翻訳につき約10-20クレジットを消費します</p>
               </>
             )}
           </CardContent>
@@ -134,9 +122,7 @@ export default function HistoryPage() {
             ) : (
               <>
                 <div className="text-3xl font-bold text-gray-900">{monthlyCount}</div>
-                <p className="text-sm text-gray-500 mt-1">
-                  過去30日間の翻訳ファイル数
-                </p>
+                <p className="text-sm text-gray-500 mt-1">過去30日間の翻訳ファイル数</p>
               </>
             )}
           </CardContent>

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         // ユーザーの存在確認
         const user = await tx.user.findUnique({
           where: { email: userEmail },
-          select: { id: true }
+          select: { id: true },
         });
 
         if (!user) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
             sourceLang: sourceLang || 'ja',
             targetLang: targetLang || 'en',
             model: 'claude-3-haiku-20240307',
-          }
+          },
         });
 
         // アクティビティログの記録
@@ -62,17 +62,17 @@ export async function POST(request: Request) {
             description: '翻訳を保存しました',
             metadata: {
               translationId: translationHistory.id,
-              timestamp: new Date().toISOString()
-            }
-          }
+              timestamp: new Date().toISOString(),
+            },
+          },
         });
 
         return translationHistory;
       });
 
-      return NextResponse.json({ 
-        success: true, 
-        data: result 
+      return NextResponse.json({
+        success: true,
+        data: result,
       });
     } catch (txError) {
       console.error('Transaction error:', txError);
@@ -81,13 +81,13 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Save translation error:', error);
     return NextResponse.json(
-      { 
+      {
         error: '翻訳の保存に失敗しました',
-        details: error instanceof Error ? error.message : '不明なエラー'
+        details: error instanceof Error ? error.message : '不明なエラー',
       },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();
   }
-} 
+}

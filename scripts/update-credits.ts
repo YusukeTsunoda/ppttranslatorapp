@@ -6,14 +6,14 @@ async function updateCredits() {
     const result = await prisma.$executeRaw`
       UPDATE "User" SET credits = 15 WHERE credits = 0 OR credits IS NULL
     `;
-    
+
     console.log(`${result}人のユーザーのクレジットを更新しました`);
-    
+
     // 更新後のユーザー一覧を表示
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, credits: true }
+      select: { id: true, email: true, credits: true },
     });
-    
+
     console.log('ユーザー一覧:');
     console.table(users);
   } catch (error) {
@@ -25,4 +25,4 @@ async function updateCredits() {
 
 updateCredits()
   .then(() => console.log('完了'))
-  .catch(console.error); 
+  .catch(console.error);

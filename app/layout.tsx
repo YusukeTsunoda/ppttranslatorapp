@@ -11,11 +11,7 @@ export const metadata: Metadata = {
   description: 'Translate your PowerPoint presentations with AI',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
       <body>
