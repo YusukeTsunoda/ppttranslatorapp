@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # 手動実行も可能に
+  schedule:
+    - cron: '0 0 * * 0'  # 毎週日曜日の午前0時に実行
 
 env:
   NODE_VERSION: '20'
@@ -19,10 +21,93 @@ env:
   STRIPE_SECRET_KEY: dummy_key_for_tests
 
 jobs:
-  lint-and-test:
-    name: Lint and Unit Tests
+  code-quality:
+    name: Code Quality Check
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # タイムアウト設定を追加
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run ESLint
+      id: eslint
+      run: npm run lint
+      continue-on-error: true
+
+    - name: TypeScript type check
+      id: tsc
+      run: npx tsc --noEmit
+      continue-on-error: true
+
+    - name: Prettier Check
+      id: prettier
+      run: npx prettier --check "**/*.{js,jsx,ts,tsx}"
+      continue-on-error: true
+
+    - name: Generate code quality report
+      if: always()
+      run: |
+        echo "## コード品質チェック結果" > code-quality-report.md
+        echo "### ESLint" >> code-quality-report.md
+        if [ "${{ steps.eslint.outcome }}" == "success" ]; then
+          echo "✅ ESLintチェック成功" >> code-quality-report.md
+        else
+          echo "❌ ESLintチェック失敗" >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+          npm run lint 2>&1 | head -n 20 >> code-quality-report.md
+          echo '... (省略)' >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+        fi
+        
+        echo "### TypeScript" >> code-quality-report.md
+        if [ "${{ steps.tsc.outcome }}" == "success" ]; then
+          echo "✅ TypeScriptチェック成功" >> code-quality-report.md
+        else
+          echo "❌ TypeScriptチェック失敗" >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+          npx tsc --noEmit 2>&1 | head -n 20 >> code-quality-report.md
+          echo '... (省略)' >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+        fi
+        
+        echo "### Prettier" >> code-quality-report.md
+        if [ "${{ steps.prettier.outcome }}" == "success" ]; then
+          echo "✅ Prettierチェック成功" >> code-quality-report.md
+        else
+          echo "❌ Prettierチェック失敗" >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+          npx prettier --check "**/*.{js,jsx,ts,tsx}" 2>&1 | head -n 20 >> code-quality-report.md
+          echo '... (省略)' >> code-quality-report.md
+          echo '```' >> code-quality-report.md
+        fi
+
+    - name: Upload code quality report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: code-quality-report
+        path: code-quality-report.md
+        retention-days: 14
+
+    - name: Failed if any check failed
+      if: steps.eslint.outcome == 'failure' || steps.tsc.outcome == 'failure' || steps.prettier.outcome == 'failure'
+      run: exit 1
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: code-quality
 
     services:
       postgres:
@@ -66,9 +151,6 @@ jobs:
       run: npx prisma generate
       env:
         DATABASE_URL: ${{ env.DATABASE_URL }}
-
-    - name: Run ESLint
-      run: npm run lint
       
     - name: Cache Jest
       uses: actions/cache@v3
@@ -80,7 +162,8 @@ jobs:
           ${{ runner.os }}-jest-
 
     - name: Run unit tests with coverage
-      run: npm run test:coverage
+      id: unit_tests
+      run: npm run test:ci
       env:
         DATABASE_URL: ${{ env.DATABASE_URL }}
         NEXTAUTH_URL: ${{ env.NEXTAUTH_URL }}
@@ -98,11 +181,50 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-    - name: Generate test report
+    - name: Generate detailed test report
       if: always()
       run: |
-        npx jest --json --outputFile=jest-results.json || true
-        npx jest-html-reporter --json=jest-results.json --outputPath=./reports/jest-report.html
+        npm run reports:create-dirs
+        npx jest --json --outputFile=reports/jest-results.json || true
+        npx jest-html-reporter --json=reports/jest-results.json --outputPath=reports/jest-report.html
+
+    - name: Analyze test results
+      if: always()
+      run: |
+        echo "## ユニットテスト結果" > test-summary.md
+        echo "### テスト統計" >> test-summary.md
+        if [ -f "reports/jest-results.json" ]; then
+          total=$(jq '.numTotalTests' reports/jest-results.json)
+          passed=$(jq '.numPassedTests' reports/jest-results.json)
+          failed=$(jq '.numFailedTests' reports/jest-results.json)
+          echo "- 総テスト数: $total" >> test-summary.md
+          echo "- 成功: $passed" >> test-summary.md
+          echo "- 失敗: $failed" >> test-summary.md
+          
+          if [ "$failed" -gt 0 ]; then
+            echo "### 失敗したテスト" >> test-summary.md
+            jq -r '.testResults[].assertionResults[] | select(.status=="failed") | "- " + .ancestorTitles[0] + ": " + .title + " (" + .failureMessages[0] + ")"' reports/jest-results.json | head -n 10 >> test-summary.md
+            if [ "$(jq '.testResults[].assertionResults[] | select(.status=="failed") | .title' reports/jest-results.json | wc -l)" -gt 10 ]; then
+              echo "... (他の失敗したテストは省略)" >> test-summary.md
+            fi
+          fi
+          
+          echo "### カバレッジ" >> test-summary.md
+          if [ -f "coverage/coverage-summary.json" ]; then
+            statements=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+            branches=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+            functions=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+            lines=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+            echo "- Statements: $statements%" >> test-summary.md
+            echo "- Branches: $branches%" >> test-summary.md
+            echo "- Functions: $functions%" >> test-summary.md
+            echo "- Lines: $lines%" >> test-summary.md
+          else
+            echo "カバレッジ情報が見つかりません" >> test-summary.md
+          fi
+        else
+          echo "テスト結果が見つかりません" >> test-summary.md
+        fi
 
     - name: Upload test reports
       uses: actions/upload-artifact@v4
@@ -112,14 +234,14 @@ jobs:
         path: |
           coverage
           reports
-          jest-results.json
+          test-summary.md
         retention-days: 14
 
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: lint-and-test
-    timeout-minutes: 30  # E2Eテストは時間がかかるので長めに設定
+    needs: unit-tests
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -166,8 +288,10 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r python_backend/requirements.txt
+        if [ -f "python_backend/requirements.txt" ]; then
+          python -m pip install --upgrade pip
+          pip install -r python_backend/requirements.txt
+        fi
 
     - name: Setup Database
       run: |
@@ -200,13 +324,14 @@ jobs:
         while ! nc -z localhost 3000; do
           sleep 1
         done
+        echo "Next.js is running on port 3000"
 
     - name: Create directories for Cypress reports
       run: |
-        mkdir -p cypress/results
-        mkdir -p cypress/reports
+        npm run reports:create-dirs
 
     - name: Run Cypress tests
+      id: cypress
       uses: cypress-io/github-action@v6
       with:
         browser: chrome
@@ -221,12 +346,12 @@ jobs:
         STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
         TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
         TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      continue-on-error: true
 
     - name: Generate Cypress report
       if: always()
       run: |
-        npx mochawesome-merge cypress/results/*.json > cypress/results/report.json || true
-        npx mochawesome-report-generator cypress/results/report.json --reportDir cypress/reports || true
+        npm run cypress:generate-report
 
     - name: Upload Cypress results
       uses: actions/upload-artifact@v4
@@ -236,37 +361,43 @@ jobs:
         path: |
           cypress/videos
           cypress/screenshots
-          cypress/results
           cypress/reports
         retention-days: 14
 
     - name: Analyze test failures
-      if: failure()
+      if: steps.cypress.outcome == 'failure'
       run: |
-        echo "## E2E Test Failures Analysis" > test-failures.md
-        echo "### Failed Tests" >> test-failures.md
+        echo "## E2Eテスト失敗分析" > e2e-failures.md
+        echo "### 失敗したテスト" >> e2e-failures.md
         find cypress/screenshots -type f | while read -r screenshot; do
           test_name=$(basename "$screenshot" .png | sed 's/ -- .*$//')
-          echo "- $test_name" >> test-failures.md
-          echo "  ![Screenshot]($screenshot)" >> test-failures.md
+          echo "- $test_name" >> e2e-failures.md
         done
-        cat test-failures.md
+        
+        if [ -f "cypress/reports/report.json" ]; then
+          echo "### 詳細エラー" >> e2e-failures.md
+          jq -r '.results[] | .suites[] | .tests[] | select(.state == "failed") | "- " + .title + ":\n  " + .error' cypress/reports/report.json >> e2e-failures.md
+        fi
 
-    - name: Upload test failure analysis
+    - name: Upload E2E failure analysis
       uses: actions/upload-artifact@v4
-      if: failure()
+      if: steps.cypress.outcome == 'failure'
       with:
-        name: test-failure-analysis
-        path: test-failures.md
+        name: e2e-failures
+        path: e2e-failures.md
         retention-days: 14
+
+    - name: Failed if Cypress tests failed
+      if: steps.cypress.outcome == 'failure'
+      run: exit 1
 
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-    needs: [lint-and-test, e2e-tests]
-    if: github.ref == 'refs/heads/main'
-    timeout-minutes: 15
-
+    needs: [unit-tests, e2e-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 20
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -279,9 +410,20 @@ jobs:
 
     - name: Install dependencies
       run: npm ci
+      
+    - name: Cache Next.js build
+      uses: actions/cache@v3
+      with:
+        path: |
+          .next/cache
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-
 
     - name: Generate Prisma client
       run: npx prisma generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     - name: Build Next.js
       run: npm run build
@@ -289,42 +431,62 @@ jobs:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        BASE_URL: ${{ secrets.BASE_URL }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+
+    - name: Install Vercel CLI
+      run: npm install -g vercel
 
     - name: Deploy to Vercel
-      uses: amondnet/vercel-action@v25
+      run: |
+        vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 
+
+    - name: Create deployment summary
+      run: |
+        echo "## デプロイ情報" > deployment-summary.md
+        echo "### ビルド情報" >> deployment-summary.md
+        echo "- ブランチ: ${{ github.ref_name }}" >> deployment-summary.md
+        echo "- コミット: ${{ github.sha }}" >> deployment-summary.md
+        echo "- デプロイ時間: $(date)" >> deployment-summary.md
+        echo "- デプロイURL: ${{ secrets.NEXTAUTH_URL }}" >> deployment-summary.md
+
+    - name: Upload deployment summary
+      uses: actions/upload-artifact@v4
       with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod'
+        name: deployment-summary
+        path: deployment-summary.md
+        retention-days: 14
 
   notify:
-    name: Notify Results
+    name: Notify
     runs-on: ubuntu-latest
-    needs: [lint-and-test, e2e-tests, build-and-deploy]
-    if: always()
+    needs: [build-and-deploy]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
     steps:
-      - name: Check build status
-        id: status
-        run: |
-          if [[ "${{ needs.lint-and-test.result }}" == "success" && "${{ needs.e2e-tests.result }}" == "success" && "${{ needs.build-and-deploy.result }}" == "success" ]]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          else
-            echo "status=failure" >> $GITHUB_OUTPUT
-          fi
+    - name: Notification Status
+      run: |
+        if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
+          echo "status=success" >> $GITHUB_ENV
+          echo "color=good" >> $GITHUB_ENV
+          echo "title=✅ デプロイ成功" >> $GITHUB_ENV
+        else
+          echo "status=failure" >> $GITHUB_ENV
+          echo "color=danger" >> $GITHUB_ENV
+          echo "title=❌ デプロイ失敗" >> $GITHUB_ENV
+        fi
 
-      - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
-        if: always()
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: ci-cd
-          SLACK_COLOR: ${{ steps.status.outputs.status == 'success' && 'good' || 'danger' }}
-          SLACK_TITLE: ${{ steps.status.outputs.status == 'success' && '✅ CI/CD Pipeline Succeeded' || '❌ CI/CD Pipeline Failed' }}
-          SLACK_MESSAGE: |
-            *Repository:* ${{ github.repository }}
-            *Branch:* ${{ github.ref_name }}
-            *Commit:* ${{ github.event.head_commit.message }}
-            *Triggered by:* ${{ github.actor }}
-            *Status:* ${{ steps.status.outputs.status == 'success' && 'Success ✅' || 'Failure ❌' }}
-            *Details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 
+    - name: Send Slack notification
+      uses: rtCamp/action-slack-notify@v2
+      if: env.SLACK_WEBHOOK != ''
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_CHANNEL: deployments
+        SLACK_COLOR: ${{ env.color }}
+        SLACK_TITLE: ${{ env.title }}
+        SLACK_MESSAGE: |
+          *リポジトリ:* ${{ github.repository }}
+          *ブランチ:* ${{ github.ref_name }}
+          *コミット:* ${{ github.event.head_commit.message }}
+          *デプロイURL:* ${{ secrets.NEXTAUTH_URL }}
+          *ワークフロー詳細:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 

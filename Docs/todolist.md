@@ -76,13 +76,16 @@ Vercelダッシュボードで以下の環境変数を設定:
 
 ---
 
-# タスクリスト（2024年3月16日更新）
+# タスクリスト（2024年3月17日更新）
+
+## 解決済みの問題
+- [x] モジュール形式の問題
+  - [x] ES Modules (ESM) と CommonJS の混在による問題を解決
+  - [x] すべての設定ファイルをCommonJS形式に統一（.js拡張子）
+  - [x] package.jsonから "type": "module" を削除
+  - [x] Jest、Babel、Next.js、Cypressの設定ファイルを修正
 
 ## 優先度: 高
-- [ ] マウスクリックが動作しない問題の修正
-  - [ ] イベント伝播の問題を調査
-  - [ ] クリックハンドラーの最適化
-  - [ ] モバイルデバイスでのタッチイベント対応
 - [ ] 翻訳履歴機能の実装
   - [ ] 履歴一覧表示の改善
   - [ ] 詳細表示機能の追加
@@ -151,7 +154,7 @@ Vercelダッシュボードで以下の環境変数を設定:
   - [ ] エンドポイントの詳細説明
   - [ ] サンプルコード
 
-## E2Eテスト改善計画（2024年3月16日更新）
+## E2Eテスト改善計画（2024年3月17日更新）
 
 ### 実装済み
 - [x] 認証テストの実装
@@ -190,8 +193,8 @@ Vercelダッシュボードで以下の環境変数を設定:
   - [x] 各テストケースの独立性確保（テスト間の依存関係排除）
   - [x] 失敗時のリトライ戦略の改善
 - [x] テスト実行環境の改善
-  - [x] Cypressの設定ファイルをESMに対応（cypress.config.mjs）
-  - [x] サポートファイルをESMに対応（e2e.mjs）
+  - [x] Cypressの設定ファイルをCommonJS形式に変更（cypress.config.js）
+  - [x] サポートファイルをCommonJS形式に変更（e2e.js）
   - [x] テスト実行スクリプトの最適化
   - [x] テストレポート生成機能の追加（mochawesome）
   - [x] ポート設定の修正（3000に統一）
@@ -228,6 +231,30 @@ Vercelダッシュボードで以下の環境変数を設定:
    - [ ] タッチ操作のテスト
    - [ ] モバイル特有の問題の検出
 
+## PPTXファイル処理エラー修正計画（2024年3月17日更新）
+
+### 解決済みの問題
+- [x] クライアントとサーバー間のリクエストデータの不一致
+  - [x] APIエンドポイントの期待値と実際の送信データの調整
+  - [x] ファイルパスの正しい管理と受け渡し
+  - [x] エラーハンドリングの改善
+
+### 次に修正すべき問題
+1. **ファイルパス管理の最適化**
+   - [ ] ファイルパス管理を一元化するユーティリティの作成
+   - [ ] 一時ファイルの適切なクリーンアップ処理
+   - [ ] ファイル名の一貫性と重複防止
+
+2. **PPTXパーサーの安定性向上**
+   - [ ] 大きなファイル処理時のメモリ最適化
+   - [ ] エラーハンドリングの強化とリトライメカニズム
+   - [ ] 複雑なフォーマットへの対応強化
+
+3. **テキスト位置の正確な保持**
+   - [ ] 座標変換アルゴリズムの精度向上
+   - [ ] フォントサイズと行間の自動調整
+   - [ ] 言語固有のレイアウト調整
+
 ## Supabase連携計画
 ### Phase 1: 基本設定とデータベース移行
 - [ ] Supabase プロジェクトのセットアップ
@@ -263,213 +290,65 @@ Vercelダッシュボードで以下の環境変数を設定:
   - [ ] ファイル処理の最適化
   - [ ] CDN設定の最適化
 
-# PPTXファイル処理エラーの原因と解決策
-
-## 現在のエラー
-
-```
-Error: Loading presentation from: /Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/tmp/users/cm7j3hlru0000q9p52ircao6q/uploads/1740485731542_q09harqiie_original.pptx
-Error: Package not found at '/Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/tmp/users/cm7j3hlru0000q9p52ircao6q/uploads/1740485731542_q09harqiie_original.pptx'
-```
-
-このエラーは、Python の `python-pptx` ライブラリが指定されたパスにあるPPTXファイルを開けないことを示しています。「Package not found」というエラーは、ファイルが見つからないか、ファイル形式が正しくないことを意味します。
-
-## エラーの根本原因
-
-このエラーが発生している根本的な原因は、**クライアントとサーバー間のリクエストデータの不一致**です。具体的には以下の問題があります：
-
-1. **クライアント側の変更**: `app/(dashboard)/translate/page.tsx` の `handleDownload` 関数で、リクエストデータの形式が変更されました。
-   ```javascript
-   // 変更後のリクエストデータ
-   const requestData = {
-     fileId, // ファイルIDのみを送信
-     slides: slides.map(slide => ({
-       index: slide.index,
-       texts: slide.texts.map((text: any, index: number) => ({
-         text: text.text,
-         translation: (
-           editedTranslations[`${slide.index}-${index}`] || 
-           slide.translations?.[index]?.text || 
-           text.text
-         ).trim()
-       }))
-     }))
-   };
-   ```
-
-2. **サーバー側の期待**: `app/api/download/route.ts` では、異なる形式のリクエストデータを期待しています。
-   ```javascript
-   const { originalFilePath, slides } = body;
-   
-   // リクエストデータの検証
-   if (!originalFilePath || !slides || !Array.isArray(slides)) {
-     console.error("無効なリクエストデータ:", {
-       hasOriginalFilePath: !!originalFilePath,
-       hasSlides: !!slides,
-       slidesIsArray: Array.isArray(slides),
-       userId: session.user.id,
-       timestamp: new Date().toISOString()
-     });
-     return NextResponse.json({
-       error: 'Invalid request data',
-       details: 'リクエストデータが不正です',
-       timestamp: new Date().toISOString()
-     }, { status: 400 });
-   }
-   ```
-
-3. **不一致の結果**: クライアントは `fileId` を送信していますが、サーバーは `originalFilePath` を期待しているため、サーバー側の検証で「リクエストデータが不正です」というエラーが発生しています。
-
-## 処理フロー図
-
-```
-【現在の問題のあるフロー】
-1. クライアント側: fileIdとslidesを含むリクエストデータを送信
-   ↓
-2. サーバー側: originalFilePathとslidesを期待
-   ↓
-3. サーバー側: originalFilePathが存在しないため検証エラー
-   ↓
-4. サーバー側: 「リクエストデータが不正です」エラーを返す
-```
-
-```
-【修正後のあるべきフロー】
-1. クライアント側: fileIdとslidesを含むリクエストデータを送信
-   ↓
-2. サーバー側: fileIdからoriginalFilePathを構築
-   ↓
-3. サーバー側: 実際のファイルパスを検索
-   ↓
-4. サーバー側: Pythonスクリプトを実行して翻訳済みPPTXを生成
-   ↓
-5. クライアント側: 生成されたファイルをダウンロード
-```
-
-## 必要な修正
-
-### 1. サーバー側の修正 (`app/api/download/route.ts`)
-
-```javascript
-// リクエストボディを取得
-const body = await req.json();
-const { fileId, slides } = body; // originalFilePathの代わりにfileIdを受け取る
-
-// リクエストデータの検証
-if (!fileId || !slides || !Array.isArray(slides)) {
-  console.error("無効なリクエストデータ:", {
-    hasFileId: !!fileId,
-    hasSlides: !!slides,
-    slidesIsArray: Array.isArray(slides),
-    userId: session.user.id,
-    timestamp: new Date().toISOString()
-  });
-  return NextResponse.json({
-    error: 'Invalid request data',
-    details: 'リクエストデータが不正です',
-    timestamp: new Date().toISOString()
-  }, { status: 400 });
-}
-
-// fileIdから元のファイルパスを構築
-const originalFilePath = filePathManager.getTempPath(session.user.id, fileId, 'original');
-```
-
-### 2. クライアント側とサーバー側の整合性確保
-
-クライアント側とサーバー側で一貫したデータ形式を使用するために、以下の点に注意する必要があります：
-
-1. リクエストとレスポンスの形式を明確に文書化する
-2. 変更を行う場合は、クライアント側とサーバー側を同時に更新する
-3. APIエンドポイントのテストを実施して、互換性を確認する
-
-### 3. エラーハンドリングの強化
-
-サーバー側でより詳細なエラーメッセージを提供し、クライアント側でそれを適切に表示することで、問題の診断と解決を容易にします：
-
-```javascript
-// サーバー側
-return NextResponse.json({
-  error: 'Invalid request data',
-  details: `リクエストデータが不正です。必要なフィールド: fileId=${!!fileId}, slides=${!!slides}`,
-  expectedFormat: { fileId: "string", slides: "array" },
-  receivedFormat: { fileId: typeof fileId, slides: typeof slides },
-  timestamp: new Date().toISOString()
-}, { status: 400 });
-
-// クライアント側
-if (!response.ok) {
-  const errorData = await response.json();
-  console.error("詳細なエラー情報:", errorData);
-  throw new Error(errorData.details || errorData.error || 'ダウンロードに失敗しました');
-}
-```
-
-# 今後の実装計画
+# 今後の実装計画（2024年3月17日更新）
 
 ## 優先度: 最高
-1. **PPTXファイル処理エラーの修正**
-   - クライアント側とサーバー側のリクエスト形式の不一致を解消
-   - ファイルパス管理の一貫性確保
-   - エラーハンドリングの強化
+1. **GitHub Actions CI/CD構築**
+   - [ ] テスト自動実行ワークフロー作成
+   - [ ] ビルド＆デプロイ自動化
+   - [ ] コードチェック・リンター連携
+   - [ ] テストレポート自動生成
+   - [ ] Slackへの通知連携
 
-2. **CI/CD統合**
-   - GitHub Actionsでのテスト自動化
-   - テスト結果レポートの生成
-   - テストカバレッジの計測
+2. **Pythonバックエンドとの連携強化**
+   - [ ] API応答形式の標準化
+   - [ ] エラーハンドリングの統一
+   - [ ] 認証トークンの受け渡し
+   - [ ] ファイル処理の並列化
 
-3. **テスト実行環境の整備**
-   - Docker環境でのE2Eテスト実行設定
-   - テスト用の独立したデータベース環境の構築
-   - 本番環境に影響を与えないテスト実行の仕組み
-
-4. **デプロイ自動化**
-   - Vercelへの自動デプロイ設定
-   - デプロイ前テストの実行
-   - デプロイ後の自動検証
+3. **PPTXプレビュー機能の改善**
+   - [ ] プレビュー表示の精度向上
+   - [ ] 編集中テキストのリアルタイムプレビュー
+   - [ ] スライドナビゲーションの改善
+   - [ ] ズーム機能の追加
 
 ## 優先度: 高
 1. **パフォーマンス最適化**
-   - 大きなファイルの処理速度改善
-   - 画像処理の最適化
-   - クライアント側のレンダリング最適化
+   - [ ] SSRとCSRの適切な使い分け
+   - [ ] 画像最適化
+   - [ ] コンポーネントの遅延ロード
+   - [ ] API応答のキャッシュ戦略
 
 2. **翻訳履歴機能の実装**
-   - 過去の翻訳履歴の保存
-   - 翻訳メモリの活用
-   - ユーザー別の翻訳履歴管理
+   - [ ] 履歴保存機能の実装
+   - [ ] 履歴一覧表示
+   - [ ] 過去の翻訳の再利用機能
+   - [ ] 翻訳メモリの構築
 
 3. **ドキュメント作成**
-   - 開発者向けドキュメント
-   - APIドキュメント
-   - セキュリティドキュメント
+   - [ ] API仕様書
+   - [ ] 開発者向けセットアップガイド
+   - [ ] コントリビューションガイドライン
+   - [ ] セキュリティポリシー
 
 ## 優先度: 中
-1. **バッチ翻訳機能の実装**
-   - 複数ファイルの一括翻訳
-   - バックグラウンド処理
-   - 進捗状況の表示
+1. **バッチ処理機能の実装**
+   - [ ] 複数ファイルの一括処理
+   - [ ] バックグラウンド処理
+   - [ ] 進捗表示
+   - [ ] 処理結果のレポート
 
-2. **API連携機能の実装**
-   - 外部翻訳APIとの連携
-   - WebhookによるイベントトリガーのサポートS
-   - APIキー管理
+2. **UI/UX改善**
+   - [ ] ダークモード実装
+   - [ ] モバイル対応強化
+   - [ ] アクセシビリティ改善
+   - [ ] 多言語UI対応
 
-3. **統計・分析機能の実装**
-   - 翻訳量の統計
-   - 使用頻度の高い単語の分析
-   - ユーザー活動の分析
-
-## 優先度: 低
-1. **多言語対応の拡充**
-   - サポート言語の追加
-   - 言語固有の翻訳ルールの実装
-   - 多言語UIの改善
-
-2. **カスタムテーマ機能**
-   - ユーザー別のテーマ設定
-   - カラーパレットのカスタマイズ
-   - テーマの保存と共有
+3. **エラー監視とログ分析**
+   - [ ] エラー通知システム
+   - [ ] ユーザー行動分析
+   - [ ] パフォーマンスモニタリング
+   - [ ] セキュリティ監視
 
 ## UI/UX改善
 - [ ] ダークモードの実装
@@ -510,9 +389,9 @@ if (!response.ok) {
    - [ ] バリデーション関数の境界値テスト
 
 4. **テスト環境の整備**
-   - [x] Jest設定をESMに対応（jest.config.mjs）
+   - [x] Jest設定をCommonJS形式に対応
    - [x] テスト実行スクリプトの最適化
-   - [x] ESLint設定の修正（eslint.config.js）
+   - [x] ESLint設定の修正
    - [x] TypeScriptの型定義問題の解決
    - [x] テスト実行時の警告解消
 

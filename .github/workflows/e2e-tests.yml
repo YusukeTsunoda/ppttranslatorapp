@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 0 * * *'  # 毎日UTCの0時（深夜）に実行
+    - cron: '0 0 * * 1,4'  # 毎週月曜日と木曜日の午前0時に実行
   workflow_dispatch:  # 手動実行も可能に
 
 env:
@@ -21,9 +21,10 @@ env:
   STRIPE_SECRET_KEY: dummy_key_for_tests
 
 jobs:
-  test:
+  e2e-tests:
+    name: E2E Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # タイムアウト設定
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -41,7 +42,10 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 履歴を全て取得（テスト変更の追跡用）
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -61,13 +65,38 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nextjs-
 
+    - name: Cache Prisma
+      uses: actions/cache@v3
+      with:
+        path: node_modules/.prisma
+        key: ${{ runner.os }}-prisma-${{ hashFiles('prisma/schema.prisma') }}
+        restore-keys: |
+          ${{ runner.os }}-prisma-
+
+    - name: Generate Prisma client
+      run: npx prisma generate
+      env:
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+
     - name: Setup Database
       run: |
-        npx prisma generate
         npx prisma migrate deploy
         npm run db:seed
       env:
         DATABASE_URL: ${{ env.DATABASE_URL }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        if [ -f "python_backend/requirements.txt" ]; then
+          python -m pip install --upgrade pip
+          pip install -r python_backend/requirements.txt
+        fi
 
     - name: Start Next.js
       run: npm run dev &
@@ -80,15 +109,15 @@ jobs:
 
     - name: Wait for Next.js
       run: |
+        echo "Next.jsが起動するのを待機しています..."
         while ! nc -z localhost 3000; do
           sleep 1
         done
-        echo "Next.js is running on port 3000"
+        echo "Next.jsはポート3000で起動しています"
 
-    - name: Create directories for Cypress reports
+    - name: Create directories for reports
       run: |
-        mkdir -p cypress/results
-        mkdir -p cypress/reports
+        npm run reports:create-dirs
 
     - name: Run Cypress tests
       id: cypress
@@ -111,65 +140,170 @@ jobs:
     - name: Generate Cypress report
       if: always()
       run: |
-        npx mochawesome-merge cypress/results/*.json > cypress/results/report.json || true
-        npx mochawesome-report-generator cypress/results/report.json --reportDir cypress/reports || true
+        npm run cypress:generate-report
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: cypress-results
+        name: cypress-results-${{ github.run_id }}
         path: |
           cypress/videos
           cypress/screenshots
-          cypress/results
           cypress/reports
         retention-days: 30
         
     - name: Analyze test failures
       if: steps.cypress.outcome == 'failure'
       run: |
-        echo "## E2E Test Failures Analysis" > test-failures.md
-        echo "### Failed Tests" >> test-failures.md
-        find cypress/screenshots -type f | while read -r screenshot; do
-          test_name=$(basename "$screenshot" .png | sed 's/ -- .*$//')
-          echo "- $test_name" >> test-failures.md
-          echo "  ![Screenshot]($screenshot)" >> test-failures.md
-        done
-        cat test-failures.md
+        echo "## E2Eテスト失敗分析" > e2e-failures.md
+        echo "### 失敗したテスト" >> e2e-failures.md
+        
+        # スクリーンショットから失敗したテストを抽出
+        if [ -d "cypress/screenshots" ]; then
+          echo "#### スクリーンショット" >> e2e-failures.md
+          find cypress/screenshots -type f | while read -r screenshot; do
+            test_name=$(basename "$screenshot" .png | sed 's/ -- .*$//')
+            spec_file=$(echo "$screenshot" | sed -E 's|cypress/screenshots/([^/]+)/.*|\1|')
+            echo "- **$spec_file**: $test_name" >> e2e-failures.md
+          done
+        else
+          echo "スクリーンショットが見つかりません" >> e2e-failures.md
+        fi
+        
+        # レポートファイルからエラー詳細を抽出
+        if [ -f "cypress/reports/report.json" ]; then
+          echo "#### エラー詳細" >> e2e-failures.md
+          jq -r '.results[] | .suites[] | .tests[] | select(.state == "failed") | "- **" + .title + "**:\n  ```\n  " + .error + "\n  ```"' cypress/reports/report.json >> e2e-failures.md || echo "レポートのJSONパースに失敗しました" >> e2e-failures.md
+        else
+          echo "レポートJSONファイルが見つかりません" >> e2e-failures.md
+        fi
+        
+        # エラー数の集計
+        if [ -f "cypress/reports/report.json" ]; then
+          echo "#### エラー統計" >> e2e-failures.md
+          total=$(jq '.stats.tests' cypress/reports/report.json)
+          passed=$(jq '.stats.passes' cypress/reports/report.json)
+          failed=$(jq '.stats.failures' cypress/reports/report.json)
+          skipped=$(jq '.stats.skipped' cypress/reports/report.json)
+          echo "- 総テスト数: $total" >> e2e-failures.md
+          echo "- 成功: $passed" >> e2e-failures.md
+          echo "- 失敗: $failed" >> e2e-failures.md
+          echo "- スキップ: $skipped" >> e2e-failures.md
+          
+          # 失敗率の計算
+          if [ "$total" -gt 0 ]; then
+            failure_rate=$(echo "scale=2; $failed * 100 / $total" | bc)
+            echo "- 失敗率: ${failure_rate}%" >> e2e-failures.md
+          fi
+        fi
+        
+        cat e2e-failures.md
 
-    - name: Upload test failure analysis
+    - name: Upload failure analysis
       uses: actions/upload-artifact@v4
       if: steps.cypress.outcome == 'failure'
       with:
-        name: test-failure-analysis
-        path: test-failures.md
+        name: e2e-failures-${{ github.run_id }}
+        path: e2e-failures.md
         retention-days: 30
         
     - name: Calculate test execution time
       if: always()
       run: |
-        echo "## E2E Test Execution Time" > test-timing.md
-        echo "### Test Duration" >> test-timing.md
-        if [ -f "cypress/results/report.json" ]; then
-          duration=$(jq '.stats.duration' cypress/results/report.json)
-          echo "- Total duration: $duration ms" >> test-timing.md
-          echo "- Average test duration: $(jq '.stats.duration / .stats.tests' cypress/results/report.json) ms" >> test-timing.md
-          echo "- Slowest tests:" >> test-timing.md
-          jq -r '.results[] | .suites[] | .tests[] | select(.duration != null) | "\(.duration)ms: \(.title)"' cypress/results/report.json | sort -nr | head -5 | while read -r line; do
-            echo "  - $line" >> test-timing.md
-          done
+        echo "## E2Eテスト実行時間分析" > test-timing.md
+        echo "### テスト実行時間" >> test-timing.md
+        
+        if [ -f "cypress/reports/report.json" ]; then
+          # 総実行時間
+          duration=$(jq '.stats.duration' cypress/reports/report.json)
+          minutes=$((duration / 60000))
+          seconds=$(((duration % 60000) / 1000))
+          echo "- 総実行時間: ${minutes}分${seconds}秒 (${duration}ms)" >> test-timing.md
+          
+          # テスト数から平均時間を計算
+          tests=$(jq '.stats.tests' cypress/reports/report.json)
+          if [ "$tests" -gt 0 ]; then
+            avg_ms=$(jq -r "(.stats.duration / .stats.tests)" cypress/reports/report.json)
+            avg_s=$(echo "scale=2; $avg_ms/1000" | bc)
+            echo "- 平均テスト実行時間: ${avg_s}秒 (${avg_ms}ms)" >> test-timing.md
+          fi
+          
+          # 最も遅いテスト5件を抽出
+          echo "- 最も遅いテスト:" >> test-timing.md
+          jq -r '.results[] | .suites[] | .tests[] | select(.duration != null) | {title: .title, file: .file, duration: .duration}' cypress/reports/report.json | \
+          jq -s 'sort_by(-.duration) | .[0:5] | .[] | "  - **" + (.duration/1000 | tostring | .[0:5]) + "秒**: " + .title + " (" + (.file | split("/") | .[-1]) + ")"' >> test-timing.md || \
+          echo "  - テスト時間の抽出に失敗しました" >> test-timing.md
+          
+          # スイート別の実行時間集計
+          echo "- スイート別実行時間:" >> test-timing.md
+          jq -r '.results[] | {file: .file, duration: .stats.duration}' cypress/reports/report.json | \
+          jq -s 'group_by(.file) | map({file: .[0].file, duration: map(.duration) | add}) | sort_by(-.duration) | .[] | "  - **" + (.duration/1000 | tostring | .[0:5]) + "秒**: " + (.file | split("/") | .[-1])' >> test-timing.md || \
+          echo "  - スイート別時間の集計に失敗しました" >> test-timing.md
         else
-          echo "- No timing information available" >> test-timing.md
+          echo "テスト実行時間情報が見つかりません" >> test-timing.md
         fi
+        
         cat test-timing.md
 
-    - name: Upload test timing analysis
+    - name: Upload timing analysis
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-timing-analysis
+        name: test-timing-${{ github.run_id }}
         path: test-timing.md
+        retention-days: 30
+        
+    - name: Generate test report summary
+      if: always()
+      run: |
+        echo "## E2Eテスト実行サマリー" > test-summary.md
+        echo "### 実行情報" >> test-summary.md
+        echo "- ブランチ: ${{ github.ref_name }}" >> test-summary.md
+        echo "- コミット: ${{ github.sha }}" >> test-summary.md
+        echo "- 実行者: ${{ github.actor }}" >> test-summary.md
+        echo "- 実行日時: $(date)" >> test-summary.md
+        
+        if [ -f "cypress/reports/report.json" ]; then
+          # 総合結果
+          echo "### テスト結果" >> test-summary.md
+          total=$(jq '.stats.tests' cypress/reports/report.json)
+          passed=$(jq '.stats.passes' cypress/reports/report.json)
+          failed=$(jq '.stats.failures' cypress/reports/report.json)
+          skipped=$(jq '.stats.skipped' cypress/reports/report.json)
+          duration=$(jq '.stats.duration' cypress/reports/report.json)
+          minutes=$((duration / 60000))
+          seconds=$(((duration % 60000) / 1000))
+          
+          echo "- テスト総数: $total" >> test-summary.md
+          echo "- 成功: $passed" >> test-summary.md
+          echo "- 失敗: $failed" >> test-summary.md
+          echo "- スキップ: $skipped" >> test-summary.md
+          echo "- 実行時間: ${minutes}分${seconds}秒" >> test-summary.md
+          
+          # 成功率
+          if [ "$total" -gt 0 ]; then
+            success_rate=$(echo "scale=2; $passed * 100 / $total" | bc)
+            echo "- 成功率: ${success_rate}%" >> test-summary.md
+          fi
+          
+          # スイートごとの結果
+          echo "### スイート別結果" >> test-summary.md
+          jq -r '.results[] | {file: .file, tests: .stats.tests, passes: .stats.passes, failures: .stats.failures, skipped: .stats.skipped}' cypress/reports/report.json | \
+          jq -s '.[] | "- **" + (.file | split("/") | .[-1]) + "**: テスト数:" + (.tests | tostring) + ", 成功:" + (.passes | tostring) + ", 失敗:" + (.failures | tostring) + ", スキップ:" + (.skipped | tostring)' >> test-summary.md || \
+          echo "スイート別結果の集計に失敗しました" >> test-summary.md
+        else
+          echo "テスト結果が見つかりません" >> test-summary.md
+        fi
+        
+        cat test-summary.md
+
+    - name: Upload test summary
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-summary-${{ github.run_id }}
+        path: test-summary.md
         retention-days: 30
         
     - name: Notify on failure
@@ -179,13 +313,28 @@ jobs:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         SLACK_CHANNEL: e2e-tests
         SLACK_COLOR: 'danger'
-        SLACK_TITLE: '❌ E2E Tests Failed'
+        SLACK_TITLE: '❌ E2Eテスト失敗'
         SLACK_MESSAGE: |
-          *Repository:* ${{ github.repository }}
-          *Branch:* ${{ github.ref_name }}
-          *Commit:* ${{ github.event.head_commit.message }}
-          *Triggered by:* ${{ github.actor }}
-          *Details:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          *リポジトリ:* ${{ github.repository }}
+          *ブランチ:* ${{ github.ref_name }}
+          *コミット:* ${{ github.event.head_commit.message }}
+          *実行者:* ${{ github.actor }}
+          *詳細:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+    - name: Notify on success
+      if: steps.cypress.outcome == 'success' && github.event_name != 'pull_request' && github.event_name != 'schedule'
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_CHANNEL: e2e-tests
+        SLACK_COLOR: 'good'
+        SLACK_TITLE: '✅ E2Eテスト成功'
+        SLACK_MESSAGE: |
+          *リポジトリ:* ${{ github.repository }}
+          *ブランチ:* ${{ github.ref_name }}
+          *コミット:* ${{ github.event.head_commit.message }}
+          *実行者:* ${{ github.actor }}
+          *詳細:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           
     - name: Fail the workflow if Cypress tests failed
       if: steps.cypress.outcome == 'failure'

@@ -156,3 +156,125 @@ While this template is intentionally minimal and to be used as a learning resour
 - https://makerkit.dev
 
 stripe link is under construction.
+
+# CI/CD構築について
+
+## 概要
+
+GitHub Actionsを使用した自動CI/CDパイプラインを実装しました。このパイプラインは以下の機能を提供します：
+
+- **コード品質チェック**: ESLint、TypeScript型チェック、Prettierによるコードフォーマットチェック
+- **自動テスト実行**: ユニットテストとE2Eテストの自動実行
+- **テストレポート生成**: 詳細なテスト結果レポートとカバレッジレポートの自動生成
+- **ビルド＆デプロイ自動化**: 本番環境へのVercelデプロイの自動化
+- **通知機能**: Slackへのデプロイ結果通知
+
+## ワークフローの詳細
+
+### 1. コード品質チェックワークフロー
+
+```yaml
+jobs:
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run ESLint
+        id: eslint
+        run: npm run lint
+      - name: TypeScript type check
+        id: tsc
+        run: npx tsc --noEmit
+      - name: Prettier Check
+        id: prettier
+        run: npx prettier --check "**/*.{js,jsx,ts,tsx}"
+```
+
+### 2. テスト自動実行ワークフロー
+
+```yaml
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - name: Run unit tests with coverage
+        id: unit_tests
+        run: npm run test:ci
+        
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - name: Run Cypress tests
+        id: cypress
+        uses: cypress-io/github-action@v6
+```
+
+### 3. ビルド＆デプロイ自動化
+
+```yaml
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: [unit-tests, e2e-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - name: Build Next.js
+        run: npm run build
+      - name: Deploy to Vercel
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+```
+
+## スケジュール実行
+
+- **CI/CDパイプライン**: 毎週日曜日の午前0時に自動実行
+- **E2Eテスト**: 毎週月曜日と木曜日の午前0時に自動実行
+
+## テストレポート
+
+自動生成される主なレポート：
+
+1. **コード品質レポート**: ESLint、TypeScript、Prettierのチェック結果
+2. **ユニットテストレポート**: テスト結果とカバレッジ情報
+3. **E2Eテストレポート**: テスト結果、スクリーンショット、ビデオ
+4. **失敗分析レポート**: テスト失敗時の詳細分析
+5. **実行時間分析**: テスト実行パフォーマンス分析
+
+## 使用方法
+
+### 手動でワークフローを実行
+
+1. GitHubリポジトリの「Actions」タブに移動
+2. 実行したいワークフロー（「CI/CD Pipeline」または「E2E Tests」）を選択
+3. 「Run workflow」ボタンをクリック
+4. 必要に応じてブランチを選択して「Run workflow」をクリック
+
+### テストレポートの確認
+
+1. ワークフロー実行後、「Artifacts」セクションにレポートが表示されます
+2. 以下のレポートがダウンロード可能です：
+   - `code-quality-report`
+   - `test-reports`
+   - `cypress-results-{run_id}`
+   - `e2e-failures-{run_id}`（テスト失敗時のみ）
+   - `test-timing-{run_id}`
+   - `test-summary-{run_id}`
+   - `deployment-summary`（デプロイ時のみ）
+
+## 環境変数の設定
+
+CI/CDを正常に動作させるためには、以下の環境変数をGitHubリポジトリの「Settings」→「Secrets and variables」→「Actions」に設定する必要があります：
+
+- `DATABASE_URL`: データベース接続URL
+- `NEXTAUTH_URL`: Next.js認証用URL
+- `NEXTAUTH_SECRET`: Next.js認証用シークレット
+- `BASE_URL`: アプリケーションのベースURL
+- `STRIPE_SECRET_KEY`: Stripe APIキー
+- `VERCEL_TOKEN`: Vercelデプロイトークン
+- `SLACK_WEBHOOK`: Slack通知用Webhook URL（オプション）
+- `TEST_USER_EMAIL`: E2Eテスト用のユーザーメールアドレス
+- `TEST_USER_PASSWORD`: E2Eテスト用のユーザーパスワード
