@@ -1,30 +1,21 @@
-// jest.setup.js
+// jest.setup.mjs
 // テスト環境のグローバル設定
 
 import '@testing-library/jest-dom';
-import { jest } from '@jest/globals';
+
+// jestオブジェクトをグローバルに公開
+globalThis.jest = jest;
 
 // テスト用のグローバルオブジェクトを設定
 globalThis.Request = class {};
 globalThis.Headers = class {};
 globalThis.Response = class {};
 
-// テスト用のモック関数を設定
-jest.mock('next/server', () => {
-  return {
-    NextResponse: {
-      json: jest.fn().mockImplementation((body, init) => {
-        return {
-          status: init?.status || 200,
-          json: async () => body,
-        };
-      }),
-    },
-  };
-});
+// モックをグローバルに保存するための変数
+globalThis.mockModules = {};
 
 // fs/promises のモックを設定
-jest.mock('fs/promises', () => ({
+const fsPromisesMock = {
   readdir: jest.fn().mockImplementation(() => Promise.resolve([])),
   mkdir: jest.fn().mockImplementation(() => Promise.resolve()),
   unlink: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -33,10 +24,10 @@ jest.mock('fs/promises', () => ({
   writeFile: jest.fn().mockImplementation(() => Promise.resolve()),
   readFile: jest.fn().mockImplementation(() => Promise.resolve(Buffer.from('test'))),
   access: jest.fn().mockImplementation(() => Promise.resolve()),
-}));
+};
 
 // fs のモックを設定
-jest.mock('fs', () => ({
+const fsMock = {
   existsSync: jest.fn().mockImplementation(() => true),
   createReadStream: jest.fn().mockImplementation(() => ({
     pipe: jest.fn().mockReturnThis(),
@@ -52,43 +43,60 @@ jest.mock('fs', () => ({
     }),
     end: jest.fn(),
   })),
-}));
+};
 
-// SWRのモックを設定
-jest.mock('swr', () => {
-  const originalModule = jest.requireActual('swr');
-  return {
-    __esModule: true,
-    ...originalModule,
-    default: jest.fn().mockImplementation((key, fetcher, config) => {
+// next/server のモックを設定
+const nextServerMock = {
+  NextResponse: {
+    json: jest.fn().mockImplementation((body, init) => {
       return {
-        data: undefined,
-        error: null,
-        mutate: jest.fn().mockImplementation(async () => {}),
-        isValidating: false,
-        isLoading: false,
+        status: init?.status || 200,
+        json: async () => body,
       };
     }),
-  };
-});
+  }
+};
+
+// SWR のモックを設定
+const swrMock = {
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => {
+    return {
+      data: undefined,
+      error: null,
+      mutate: jest.fn().mockImplementation(async () => {}),
+      isValidating: false,
+      isLoading: false,
+    };
+  }),
+};
+
+// モックをグローバルに保存
+globalThis.mockModules.fsPromises = fsPromisesMock;
+globalThis.mockModules.fs = fsMock;
+globalThis.mockModules.nextServer = nextServerMock;
+globalThis.mockModules.swr = swrMock;
+
+// モックの適用
+jest.mock('fs/promises', () => fsPromisesMock);
+jest.mock('fs', () => fsMock);
+jest.mock('next/server', () => nextServerMock);
+jest.mock('swr', () => swrMock);
 
 // ファイルモックのためのユーティリティ関数を追加
 globalThis.__mockReaddir = (files) => {
-  const fsPromises = jest.requireMock('fs/promises');
-  fsPromises.readdir.mockResolvedValue(files);
+  globalThis.mockModules.fsPromises.readdir.mockResolvedValue(files);
 };
 
 globalThis.__mockExistsSync = (exists) => {
-  const fs = jest.requireMock('fs');
-  fs.existsSync.mockReturnValue(exists);
+  globalThis.mockModules.fs.existsSync.mockReturnValue(exists);
 };
 
 globalThis.__mockMkdir = (implementationFn) => {
-  const fsPromises = jest.requireMock('fs/promises');
   if (implementationFn) {
-    fsPromises.mkdir.mockImplementation(implementationFn);
+    globalThis.mockModules.fsPromises.mkdir.mockImplementation(implementationFn);
   } else {
-    fsPromises.mkdir.mockResolvedValue(undefined);
+    globalThis.mockModules.fsPromises.mkdir.mockResolvedValue(undefined);
   }
 };
 
