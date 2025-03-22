@@ -10,4 +10,4 @@ module.exports = {
   bracketSameLine: false, // JSX要素の閉じタグを新しい行に配置
   arrowParens: 'always', // アロー関数の引数を常に括弧で囲む
   endOfLine: 'lf', // 改行コードをLFに統一
-};
+}; 
