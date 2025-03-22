@@ -26,9 +26,7 @@ jest.mock('fs/promises', () => ({
 jest.mock('path', () => ({
   join: jest.fn().mockImplementation((...args) => args.join('/')),
   dirname: jest.fn().mockReturnValue('/mock/dir'),
-  basename: jest.fn().mockImplementation((path, ext) =>
-    ext ? 'test' : 'pptx_parser.py'
-  ),
+  basename: jest.fn().mockImplementation((path, ext) => (ext ? 'test' : 'pptx_parser.py')),
 }));
 
 // PythonShellモック
@@ -55,7 +53,7 @@ jest.mock('python-shell', () => {
                 positions: [{ x: 100, y: 100, width: 200, height: 50 }],
               },
             ],
-          })
+          }),
         );
       }
       return { on: jest.fn() };
@@ -149,13 +147,11 @@ describe('PPTXパーサー', () => {
       // fs.existsSyncを一時的にfalseを返すように設定
       const existsSyncMock = jest
         .fn()
-        .mockReturnValueOnce(false)  // 最初の呼び出しでfalse
-        .mockReturnValue(true);      // その後の呼び出しではtrue
+        .mockReturnValueOnce(false) // 最初の呼び出しでfalse
+        .mockReturnValue(true); // その後の呼び出しではtrue
       (fs.existsSync as jest.Mock).mockImplementation(existsSyncMock);
 
-      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow(
-        'Python script not found'
-      );
+      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow('Python script not found');
       expect(existsSyncMock).toHaveBeenCalled();
     });
 
@@ -225,9 +221,7 @@ describe('PPTXパーサー', () => {
 
       jest.mocked(PythonShell).mockImplementationOnce(() => errorImplementation);
 
-      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow(
-        'Python execution error'
-      );
+      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow('Python execution error');
     });
   });
 

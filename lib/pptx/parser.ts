@@ -2,13 +2,7 @@ import * as fs from 'fs';
 import { PythonShell, PythonShellError } from 'python-shell';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  PPTXParseResult,
-  ParseAPIResponse,
-  SlideContent,
-  TextElement,
-  Position,
-} from './types';
+import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -129,11 +123,7 @@ print("All dependencies are installed")
       });
 
       pyshell.on('stderr', (stderr) => {
-        if (
-          stderr.includes('Error') ||
-          stderr.includes('Exception') ||
-          stderr.includes('Traceback')
-        ) {
+        if (stderr.includes('Error') || stderr.includes('Exception') || stderr.includes('Traceback')) {
           hasError = true;
           console.error('Python script error:', stderr);
         }
@@ -222,9 +212,7 @@ print("All dependencies are installed")
   }
 
   public extractTexts(parseResult: PPTXParseResult): string[] {
-    return parseResult.slides.flatMap((slide) =>
-      slide.textElements.map((element) => element.text),
-    );
+    return parseResult.slides.flatMap((slide) => slide.textElements.map((element) => element.text));
   }
 
   public getTextWithPositions(parseResult: PPTXParseResult): SlideContent[] {
