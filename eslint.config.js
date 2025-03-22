@@ -88,6 +88,7 @@ export default [
     },
     files: ['**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx'],
     ignores: [
+      'next.config.cjs',
       'node_modules/**',
       '.next/**',
       'out/**',
