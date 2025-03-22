@@ -38,7 +38,8 @@ export default function SignInForm() {
       } else if (result?.ok) {
         router.push(redirect || '/translate');
       }
-    } catch (error) {
+    } catch (e) {
+      console.error('サインインエラー:', e);
       setError('サインインに失敗しました');
     } finally {
       setLoading(false);

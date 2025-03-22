@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { CircleIcon, Home, LogOut } from 'lucide-react';
+import { CircleIcon, /* Home, */ LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +15,11 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
+  /* LayoutDashboard, */
   History,
   Settings,
   Link as LinkIcon,
-  Bell,
+  /* Bell, */
   User,
   ChevronLeft,
   ChevronRight,

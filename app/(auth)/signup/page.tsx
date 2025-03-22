@@ -10,7 +10,6 @@ import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { toast } from '@/components/ui/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { ErrorMessage } from '@/components/ui/error-message';
 
 // SearchParamsを取得するコンポーネント
 function SignUpContent() {

@@ -5,12 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, CircleIcon } from 'lucide-react';
+// import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { toast } from '@/components/ui/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { ErrorMessage } from '@/components/ui/error-message';
 
 export default function SignUpForm() {
   const router = useRouter();
@@ -92,7 +91,7 @@ export default function SignUpForm() {
       <input type="hidden" name="priceId" value={priceId || ''} />
       <input type="hidden" name="inviteId" value={inviteId || ''} />
 
-      {error && <ErrorMessage message={error} variant="destructive" className="mb-4" />}
+      {error && <div className="text-red-500 mb-4">{error}</div>}
 
       <div className="space-y-2">
         <Label htmlFor="name">名前</Label>

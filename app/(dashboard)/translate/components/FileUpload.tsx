@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
+// import { useToast } from '@/components/ui/use-toast';
 import { FileText, Loader2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -13,7 +13,7 @@ export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  // const { toast } = useToast();
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

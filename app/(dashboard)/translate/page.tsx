@@ -2,22 +2,17 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Download, ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import path from 'path';
 import { Label } from '@/components/ui/label';
-import Image from 'next/image';
 import { Toaster } from '@/components/ui/toaster';
 import { FileUploadComponent } from './components/FileUpload';
 import { PreviewSectionComponent } from './components/PreviewSection';
-import { Slide, TranslationModel, CustomSession, SessionStatus } from './types';
+import { Slide, TranslationModel } from './types';
 
 function LoadingSpinner() {
   return (
@@ -98,11 +93,9 @@ export default function TranslatePage() {
   useEffect(() => {
     // ステートをリセット
     setFile(null);
-    setUploading(false);
     setSlides([]);
     setCurrentSlide(0);
     setSelectedTextIndex(null);
-    setScale(1);
     setPosition({ x: 0, y: 0 });
     setIsDragging(false);
     setDragStart({ x: 0, y: 0 });
@@ -180,8 +173,7 @@ export default function TranslatePage() {
       }
 
       setFile(file);
-      setUploading(true);
-      setIsLoading(true);
+      setIsSaving(true);
       const formData = new FormData();
       formData.append('file', file);
 
@@ -330,7 +322,7 @@ export default function TranslatePage() {
 
         setSlides(formattedSlides);
         setCurrentSlide(0);
-        setShouldUpdateOverlay(true);
+        setIsTranslated(true);
 
         toast({
           title: '成功',
@@ -346,8 +338,7 @@ export default function TranslatePage() {
           variant: 'destructive',
         });
       } finally {
-        setUploading(false);
-        setIsLoading(false);
+        setIsSaving(false);
       }
     },
     [toast, router],
@@ -474,15 +465,15 @@ export default function TranslatePage() {
 
   const handleZoom = (newScale: number) => {
     // スケールを更新するだけで、オーバーレイのリペイントは行わない
-    setScale(Math.max(0.5, Math.min(3, newScale)));
+    // setScale(Math.max(0.5, Math.min(3, newScale)));
     // setShouldUpdateOverlayは呼び出さない
   };
 
   // リセット時に位置もリセット
   const resetZoom = () => {
-    setScale(1);
+    // setScale(1);
     setPosition({ x: 0, y: 0 });
-    setShouldUpdateOverlay(true);
+    // setShouldUpdateOverlay(true);
   };
 
   // 翻訳処理
@@ -637,7 +628,6 @@ export default function TranslatePage() {
 
   // 編集開始
   const startEditing = (key: string, value: string) => {
-    setEditingKey(key);
     setEditingValue(value);
   };
 
@@ -645,13 +635,11 @@ export default function TranslatePage() {
   const saveTranslation = (key: string) => {
     const [slideIndex, textIndex] = key.split('-').map(Number);
     handleTranslationChange(textIndex, editingValue);
-    setEditingKey(null);
     setEditingValue('');
   };
 
   // 編集キャンセル
   const cancelEditing = () => {
-    setEditingKey(null);
     setEditingValue('');
   };
 
@@ -667,7 +655,6 @@ export default function TranslatePage() {
     setEditedTranslations({});
     setIsTranslated(false);
     setIsTranslating(false);
-    setEditingKey(null);
     setEditingValue('');
   };
 
