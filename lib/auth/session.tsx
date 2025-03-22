@@ -324,6 +324,6 @@ export async function comparePasswords(plainPassword: string, hashedPassword: st
     console.error('Password comparison error:', error);
     return false;
   }
-  
+
   return true; // デフォルトの戻り値
 }

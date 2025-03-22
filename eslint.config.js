@@ -11,7 +11,7 @@ export default [
   {
     plugins: {
       '@next/next': next,
-      'react': reactPlugin,
+      react: reactPlugin,
       'react-hooks': reactHooksPlugin,
       '@typescript-eslint': tseslint,
     },
@@ -124,14 +124,28 @@ export default [
       'python_backend/**',
       'uploads/**',
       '.next/static/chunks/webpack-*.js',
-      '.next/static/chunks/*-*.js'
+      '.next/static/chunks/*-*.js',
     ],
   },
   {
-    files: ['app/**/*.js', 'app/**/*.jsx', 'app/**/*.ts', 'app/**/*.tsx', 
-            'components/**/*.js', 'components/**/*.jsx', 'components/**/*.ts', 'components/**/*.tsx',
-            'lib/**/*.js', 'lib/**/*.jsx', 'lib/**/*.ts', 'lib/**/*.tsx',
-            'types/**/*.js', 'types/**/*.jsx', 'types/**/*.ts', 'types/**/*.tsx'],
+    files: [
+      'app/**/*.js',
+      'app/**/*.jsx',
+      'app/**/*.ts',
+      'app/**/*.tsx',
+      'components/**/*.js',
+      'components/**/*.jsx',
+      'components/**/*.ts',
+      'components/**/*.tsx',
+      'lib/**/*.js',
+      'lib/**/*.jsx',
+      'lib/**/*.ts',
+      'lib/**/*.tsx',
+      'types/**/*.js',
+      'types/**/*.jsx',
+      'types/**/*.ts',
+      'types/**/*.tsx',
+    ],
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
@@ -155,6 +169,6 @@ export default [
       'no-sparse-arrays': 'warn',
       'no-redeclare': 'warn',
       'no-control-regex': 'warn',
-    }
-  }
+    },
+  },
 ];
