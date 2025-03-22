@@ -52,48 +52,58 @@ jest.mock('uuid', () => ({
 }));
 
 // app/api/pptx/parse/route.tsのモック
-jest.mock('@/app/api/pptx/parse/route', () => ({
-  POST: jest.fn().mockImplementation(async (req) => {
-    const formData = await req.formData();
-    const file = formData.get('file');
+jest.mock('@/app/api/pptx/parse/route', () => {
+  // モック用のレスポンス生成関数
+  const mockJsonResponse = (data: any, status = 200) => {
+    return {
+      json: () => Promise.resolve(data),
+      status,
+    };
+  };
 
-    if (!file) {
-      return NextResponse.json({ success: false, error: 'ファイルが指定されていません' }, { status: 400 });
-    }
+  return {
+    POST: jest.fn().mockImplementation(async (req) => {
+      const formData = await req.formData();
+      const file = formData.get('file');
 
-    if (file.type !== 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
-      return NextResponse.json({ success: false, error: 'PPTXファイルのみアップロード可能です' }, { status: 400 });
-    }
+      if (!file) {
+        return mockJsonResponse({ success: false, error: 'ファイルが指定されていません' }, 400);
+      }
 
-    return NextResponse.json({
-      success: true,
-      fileId: 'test-uuid',
-      slides: [
-        {
-          id: 'slide1',
-          title: 'テストスライド1',
-          content: 'スライド1のコンテンツ',
+      if (file.type !== 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
+        return mockJsonResponse({ success: false, error: 'PPTXファイルのみアップロード可能です' }, 400);
+      }
+
+      return mockJsonResponse({
+        success: true,
+        fileId: 'test-uuid',
+        slides: [
+          {
+            id: 'slide1',
+            title: 'テストスライド1',
+            content: 'スライド1のコンテンツ',
+          },
+          {
+            id: 'slide2',
+            title: 'テストスライド2',
+            content: 'スライド2のコンテンツ',
+          },
+        ],
+        metadata: {
+          title: 'テストプレゼンテーション',
+          author: 'テストユーザー',
+          totalSlides: 2,
         },
-        {
-          id: 'slide2',
-          title: 'テストスライド2',
-          content: 'スライド2のコンテンツ',
-        },
-      ],
-      metadata: {
-        title: 'テストプレゼンテーション',
-        author: 'テストユーザー',
-        totalSlides: 2,
-      },
-    });
-  }),
-  GET: jest.fn().mockImplementation(() => {
-    return NextResponse.json({
-      success: true,
-      message: 'PPTXパーサーAPIは正常に動作しています',
-    });
-  }),
-}));
+      });
+    }),
+    GET: jest.fn().mockImplementation(() => {
+      return mockJsonResponse({
+        success: true,
+        message: 'PPTXパーサーAPIは正常に動作しています',
+      });
+    }),
+  };
+});
 
 // インポートはモックの後に行う
 import { POST, GET } from '@/app/api/pptx/parse/route';

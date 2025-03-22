@@ -1,4 +1,4 @@
-// jest.config.js
+// jest.config.cjs
 // このファイルはJest設定を行います
 process.env.NODE_ENV = 'test';
 
@@ -11,11 +11,12 @@ const createJestConfig = nextJest({
 
 // 任意のJest設定
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
   testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
+  extensionsToTreatAsEsm: ['.ts', '.tsx', '.jsx'],
   collectCoverage: true,
   coverageReporters: ['json', 'lcov', 'text', 'cobertura'],
   coverageDirectory: 'coverage',
@@ -58,7 +59,7 @@ const customJestConfig = {
   ],
   // Babelの代わりにトランスフォームを使用
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: '<rootDir>/babel.config.js' }],
+    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['babel-jest', { configFile: './babel.config.cjs' }],
   },
 };
 

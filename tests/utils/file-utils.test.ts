@@ -46,27 +46,27 @@ jest.mock('@/lib/utils/file-utils', () => {
     ...original,
     FilePathManager: jest.fn().mockImplementation(() => ({
       getTempPath: jest.fn().mockImplementation((userId, fileId, type = 'original') => {
-        return join('tmp/users', userId, 'uploads', `${fileId}_${type}.pptx`);
+        return `tmp/users/${userId}/uploads/${fileId}_${type}.pptx`;
       }),
       getPublicPath: jest.fn().mockImplementation((userId, fileId, type = 'translated') => {
-        return join('uploads', userId, `${fileId}_${type}.pptx`);
+        return `uploads/${userId}/${fileId}_${type}.pptx`;
       }),
       getProcessingPath: jest.fn().mockImplementation((userId, fileId) => {
-        return join('tmp/processing', userId, fileId);
+        return `tmp/processing/${userId}/${fileId}`;
       }),
       getSlidesPath: jest.fn().mockImplementation((userId, fileId) => {
-        return join('tmp/users', userId, 'slides', fileId);
+        return `tmp/users/${userId}/slides/${fileId}`;
       }),
       getAbsolutePath: jest.fn().mockImplementation((path) => {
         if (path.startsWith('/')) return path;
-        return join('/mock/root', path);
+        return `/mock/root/${path}`;
       }),
       ensurePath: jest.fn().mockResolvedValue(undefined),
       findActualFilePath: jest.fn().mockImplementation((userId, fileId, type) => {
         if (type === 'original') {
-          return Promise.resolve(join('tmp/users', userId, 'uploads', `${fileId}_original.pptx`));
+          return Promise.resolve(`tmp/users/${userId}/uploads/${fileId}_original.pptx`);
         } else {
-          return Promise.resolve(join('tmp/users', userId, 'uploads', `${fileId}_translated.pptx`));
+          return Promise.resolve(`tmp/users/${userId}/uploads/${fileId}_translated.pptx`);
         }
       }),
       moveFile: jest.fn().mockResolvedValue(undefined),

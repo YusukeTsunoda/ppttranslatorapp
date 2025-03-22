@@ -5,9 +5,9 @@ import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
 
 // テスト用のグローバルオブジェクトを設定
-global.Request = class {};
-global.Headers = class {};
-global.Response = class {};
+globalThis.Request = class {};
+globalThis.Headers = class {};
+globalThis.Response = class {};
 
 // テスト用のモック関数を設定
 jest.mock('next/server', () => {
@@ -77,17 +77,17 @@ jest.mock('swr', () => {
 });
 
 // ファイルモックのためのユーティリティ関数を追加
-global.__mockReaddir = (files) => {
+globalThis.__mockReaddir = (files) => {
   const { readdir } = require('fs/promises');
   readdir.mockResolvedValue(files);
 };
 
-global.__mockExistsSync = (exists) => {
+globalThis.__mockExistsSync = (exists) => {
   const { existsSync } = require('fs');
   existsSync.mockReturnValue(exists);
 };
 
-global.__mockMkdir = (implementationFn) => {
+globalThis.__mockMkdir = (implementationFn) => {
   const { mkdir } = require('fs/promises');
   if (implementationFn) {
     mkdir.mockImplementation(implementationFn);
@@ -106,4 +106,4 @@ afterAll(() => {
 });
 
 // テスト用のユーティリティ関数
-global.waitForNextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
+globalThis.waitForNextTick = () => new Promise((resolve) => setTimeout(resolve, 0));

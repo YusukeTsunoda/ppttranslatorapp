@@ -46,22 +46,32 @@ jest.mock('@/lib/utils/file-utils', () => ({
 }));
 
 // app/api/pptx/generate/route.tsのモック
-jest.mock('@/app/api/pptx/generate/route', () => ({
-  POST: jest.fn().mockImplementation(async (req) => {
-    const body = await req.json();
+jest.mock('@/app/api/pptx/generate/route', () => {
+  // モック用のレスポンス生成関数
+  const mockJsonResponse = (data: any, status = 200) => {
+    return {
+      json: () => Promise.resolve(data),
+      status,
+    };
+  };
 
-    if (!body.fileId || !body.translations) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-    }
+  return {
+    POST: jest.fn().mockImplementation(async (req) => {
+      const body = await req.json();
 
-    return NextResponse.json({
-      success: true,
-      fileId: body.fileId,
-      filePath: 'uploads/test-user/test-file_translated.pptx',
-      message: 'PPTXファイルが正常に生成されました',
-    });
-  }),
-}));
+      if (!body.fileId || !body.translations) {
+        return mockJsonResponse({ error: 'Missing required parameters' }, 400);
+      }
+
+      return mockJsonResponse({
+        success: true,
+        fileId: body.fileId,
+        filePath: 'uploads/test-user/test-file_translated.pptx',
+        message: 'PPTXファイルが正常に生成されました',
+      });
+    }),
+  };
+});
 
 // インポートはモックの後に行う
 import { POST } from '@/app/api/pptx/generate/route';
