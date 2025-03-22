@@ -89,6 +89,9 @@ npm run test
 # Run Jest tests with coverage report
 npm run test:coverage
 
+# Run Jest tests with HTML report generation
+npm run test:report
+
 # Run Cypress E2E tests
 npm run cypress:run
 
@@ -104,6 +107,16 @@ npm run reports:clean
 # Create report directories
 npm run reports:create-dirs
 ```
+
+### Test Reports
+
+When running tests, HTML reports are automatically generated in the following locations:
+
+- **Jest Test Report**: `reports/jest-report.html`
+- **Coverage Report**: `coverage/lcov-report/index.html`
+- **Cypress Test Report**: `cypress/reports/report.html`
+
+These reports provide detailed information about test results, failures, and code coverage.
 
 ### CI/CD Pipeline
 

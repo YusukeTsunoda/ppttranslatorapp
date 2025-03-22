@@ -21,8 +21,8 @@ const config = {
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
   collectCoverage: true,
-  coverageProvider: 'babel',
-  coverageReporters: ['text', 'lcov'],
+  coverageProvider: 'v8',
+  coverageReporters: ['text', 'lcov', 'json-summary'],
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
@@ -36,6 +36,14 @@ const config = {
   coverageThreshold: null,
   verbose: true,
   testTimeout: 10000,
+  reporters: [
+    'default',
+    ['jest-html-reporter', {
+      outputPath: 'reports/jest-report.html',
+      pageTitle: 'Test Report',
+      includeFailureMsg: true
+    }]
+  ]
 };
 
 // createJestConfigは、次の処理のためにこのcustomConfigを使用します
