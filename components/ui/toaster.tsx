@@ -4,7 +4,7 @@ import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastVi
 import { useToast } from '@/components/ui/use-toast';
 
 export function Toaster() {
-  const { toasts } = useToast();
+  const { toasts = [] } = useToast() || { toasts: [] };
 
   return (
     <ToastProvider swipeDirection="right">

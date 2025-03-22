@@ -1,8 +1,8 @@
-// jest.config.mjs
+// jest.config.js
 // このファイルはJest設定を行います
 process.env.NODE_ENV = 'test';
 
-import nextJest from 'next/jest.js';
+const nextJest = require('next/jest');
 
 // next/jestが次のNextとJestの設定が正しく作動するようにします
 const createJestConfig = nextJest({
@@ -11,13 +11,13 @@ const createJestConfig = nextJest({
 
 // 任意のJest設定
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jsdom',
   moduleNameMapper: {
+    '^@/app/\\(dashboard\\)/(.*)$': '<rootDir>/app/(dashboard)/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
-  extensionsToTreatAsEsm: ['.ts', '.tsx', '.jsx'],
-  collectCoverage: true,
+  collectCoverage: false, // カバレッジ収集を無効化
   coverageReporters: ['json', 'lcov', 'text', 'cobertura'],
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
@@ -72,10 +72,10 @@ const customJestConfig = {
   ],
   // Babelの代わりにトランスフォームを使用
   transform: {
-    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['babel-jest', { configFile: './babel.config.mjs' }],
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
 };
 
 // createJestConfigは、次の処理のためにこのcustomConfigを使用します
 // https://nextjs.org/docs/testing#setting-up-jest-with-the-rust-compiler
-export default createJestConfig(customJestConfig);
+module.exports = createJestConfig(customJestConfig);
