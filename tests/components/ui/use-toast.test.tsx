@@ -51,13 +51,13 @@ describe('useToast', () => {
     });
 
     expect(result.current.toasts).toHaveLength(2);
-    expect(result.current.toasts.every(t => t.open)).toBe(true);
+    expect(result.current.toasts.every((t) => t.open)).toBe(true);
 
     act(() => {
       result.current.dismiss();
     });
 
-    expect(result.current.toasts.every(t => !t.open)).toBe(true);
+    expect(result.current.toasts.every((t) => !t.open)).toBe(true);
   });
 });
 
@@ -80,7 +80,7 @@ describe('reducer', () => {
   it('ADD_TOASTアクションでトーストを追加する', () => {
     const initialState = { toasts: [] };
     const newToast = { id: '1', title: 'テストトースト', open: true };
-    
+
     const newState = reducer(initialState, {
       type: 'ADD_TOAST',
       toast: newToast,
@@ -92,7 +92,7 @@ describe('reducer', () => {
 
   it('UPDATE_TOASTアクションでトーストを更新する', () => {
     const initialState = { toasts: [{ id: '1', title: '元のタイトル', open: true }] };
-    
+
     const newState = reducer(initialState, {
       type: 'UPDATE_TOAST',
       toast: { id: '1', title: '新しいタイトル' },
@@ -105,7 +105,7 @@ describe('reducer', () => {
 
   it('DISMISS_TOASTアクションでトーストを閉じる', () => {
     const initialState = { toasts: [{ id: '1', title: 'タイトル', open: true }] };
-    
+
     const newState = reducer(initialState, {
       type: 'DISMISS_TOAST',
       toastId: '1',
@@ -117,7 +117,7 @@ describe('reducer', () => {
 
   it('REMOVE_TOASTアクションでトーストを削除する', () => {
     const initialState = { toasts: [{ id: '1', title: 'タイトル', open: false }] };
-    
+
     const newState = reducer(initialState, {
       type: 'REMOVE_TOAST',
       toastId: '1',
@@ -127,13 +127,13 @@ describe('reducer', () => {
   });
 
   it('IDなしのREMOVE_TOASTアクションで全てのトーストを削除する', () => {
-    const initialState = { 
+    const initialState = {
       toasts: [
         { id: '1', title: 'タイトル1', open: false },
-        { id: '2', title: 'タイトル2', open: false }
-      ] 
+        { id: '2', title: 'タイトル2', open: false },
+      ],
     };
-    
+
     const newState = reducer(initialState, {
       type: 'REMOVE_TOAST',
     });

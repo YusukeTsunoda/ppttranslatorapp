@@ -105,7 +105,7 @@ describe('Login API', () => {
 
     const res = await POST(req);
     // statusのチェックをスキップ（デフォルトではundefinedが返される）
-    // expect(res.status).toBe(200); 
+    // expect(res.status).toBe(200);
 
     const data = await res.json();
     expect(data.success).toBe(true);

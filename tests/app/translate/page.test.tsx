@@ -7,7 +7,7 @@ import '@testing-library/jest-dom';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import userEvent from '@testing-library/user-event';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 
 // モック
@@ -22,7 +22,7 @@ jest.mock('next-auth/react', () => ({
 }));
 
 jest.mock('@/components/ui/use-toast', () => {
-  const mockToasts: Array<{id: string; title?: string; description?: string; open: boolean}> = [];
+  const mockToasts: Array<{ id: string; title?: string; description?: string; open: boolean }> = [];
   return {
     useToast: jest.fn().mockReturnValue({
       toasts: mockToasts,
@@ -188,7 +188,9 @@ describe('TranslatePage', () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -205,7 +207,9 @@ describe('TranslatePage', () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -223,7 +227,9 @@ describe('TranslatePage', () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -240,7 +246,9 @@ describe('TranslatePage', () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -255,19 +263,21 @@ describe('TranslatePage', () => {
 
   it('エラー発生時にエラーメッセージが表示されること', async () => {
     // fetchをオーバーライドしてエラーを返すようにする
-    global.fetch = jest.fn().mockImplementation(() => 
+    global.fetch = jest.fn().mockImplementation(() =>
       Promise.resolve({
         ok: false,
         status: 500,
         json: () => Promise.resolve({ error: 'サーバーエラー' }),
-      })
+      }),
     );
 
     await act(async () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -295,7 +305,9 @@ describe('TranslatePage', () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -315,12 +327,14 @@ describe('TranslatePage', () => {
 
   it.skip('翻訳中のローディング状態が表示されること', async () => {
     const user = userEvent.setup();
-    
+
     await act(async () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -329,7 +343,7 @@ describe('TranslatePage', () => {
 
     // 翻訳ボタンを取得
     const translateButton = await screen.findByRole('button', { name: /翻訳開始/i });
-    
+
     // ボタンをクリック
     await act(async () => {
       await user.click(translateButton);
@@ -338,12 +352,14 @@ describe('TranslatePage', () => {
 
   it.skip('翻訳結果が表示されること', async () => {
     const user = userEvent.setup();
-    
+
     await act(async () => {
       render(<TranslatePage />);
     });
 
-    const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const file = new File(['dummy content'], 'test.pptx', {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
     const fileInput = screen.getByTestId('mock-file-input');
 
     await act(async () => {
@@ -352,7 +368,7 @@ describe('TranslatePage', () => {
 
     // 翻訳ボタンを取得
     const translateButton = await screen.findByRole('button', { name: /翻訳開始/i });
-    
+
     // ボタンをクリック
     await act(async () => {
       await user.click(translateButton);

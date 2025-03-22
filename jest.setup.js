@@ -24,9 +24,9 @@ jest.mock('fs', () => ({
 // next/serverのモック
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: jest.fn((data, options = {}) => ({ 
+    json: jest.fn((data, options = {}) => ({
       json: () => data,
-      status: options.status 
+      status: options.status,
     })),
     redirect: jest.fn((url) => ({ url })),
     next: jest.fn(() => ({ status: 200 })),
@@ -53,7 +53,7 @@ if (typeof global.fetch === 'undefined') {
       json: () => Promise.resolve({}),
       ok: true,
       status: 200,
-    })
+    }),
   );
 }
 
@@ -78,57 +78,59 @@ global.mockFile = (name, size, type, lastModified = new Date()) => {
 jest.mock('@/components/ui/use-toast', () => {
   // モック用の状態管理 - モジュールレベルで定義して全テストで共有
   const mockToastsState = { toasts: [] };
-  
+
   // トースト追加関数
   const mockToastFn = jest.fn((props) => {
     const id = `toast-${Date.now()}`;
     const newToast = { id, ...props, open: true };
     // 実際にモックステートにトーストを追加
     mockToastsState.toasts.push(newToast);
-    
-    return { 
-      id, 
+
+    return {
+      id,
       dismiss: () => {
-        const index = mockToastsState.toasts.findIndex(t => t.id === id);
+        const index = mockToastsState.toasts.findIndex((t) => t.id === id);
         if (index !== -1) {
           mockToastsState.toasts[index].open = false;
         }
-      }, 
+      },
       update: (updatedProps) => {
-        const index = mockToastsState.toasts.findIndex(t => t.id === id);
+        const index = mockToastsState.toasts.findIndex((t) => t.id === id);
         if (index !== -1) {
-          mockToastsState.toasts[index] = { 
-            ...mockToastsState.toasts[index], 
-            ...updatedProps 
+          mockToastsState.toasts[index] = {
+            ...mockToastsState.toasts[index],
+            ...updatedProps,
           };
         }
-      } 
+      },
     };
   });
-  
+
   // dismiss関数（特定のIDまたはすべてのトーストを閉じる）
   const mockDismissFn = jest.fn((id) => {
     if (id) {
-      const index = mockToastsState.toasts.findIndex(t => t.id === id);
+      const index = mockToastsState.toasts.findIndex((t) => t.id === id);
       if (index !== -1) {
         mockToastsState.toasts[index].open = false;
       }
     } else {
       // IDがない場合は全てのトーストを閉じる
-      mockToastsState.toasts.forEach(t => { t.open = false; });
+      mockToastsState.toasts.forEach((t) => {
+        t.open = false;
+      });
     }
   });
-  
+
   // テスト間でmockToastsStateをリセットする関数
   const resetMockState = () => {
     mockToastsState.toasts = [];
   };
-  
+
   // 各テストの前にトーストの状態をリセット
   beforeEach(() => {
     resetMockState();
   });
-  
+
   return {
     useToast: jest.fn().mockImplementation(() => ({
       toasts: mockToastsState.toasts,
@@ -143,25 +145,19 @@ jest.mock('@/components/ui/use-toast', () => {
         case 'UPDATE_TOAST':
           return {
             ...state,
-            toasts: state.toasts.map(t => 
-              t.id === action.toast.id ? { ...t, ...action.toast } : t
-            ),
+            toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
           };
         case 'DISMISS_TOAST':
           return {
             ...state,
-            toasts: state.toasts.map(t => 
-              t.id === action.toastId || action.toastId === undefined
-                ? { ...t, open: false }
-                : t
+            toasts: state.toasts.map((t) =>
+              t.id === action.toastId || action.toastId === undefined ? { ...t, open: false } : t,
             ),
           };
         case 'REMOVE_TOAST':
           return {
             ...state,
-            toasts: action.toastId === undefined 
-              ? [] 
-              : state.toasts.filter(t => t.id !== action.toastId),
+            toasts: action.toastId === undefined ? [] : state.toasts.filter((t) => t.id !== action.toastId),
           };
         default:
           return state;

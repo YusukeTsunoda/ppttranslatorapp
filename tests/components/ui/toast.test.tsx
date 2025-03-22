@@ -10,7 +10,7 @@ describe('Toast', () => {
           <div>トーストの内容</div>
         </Toast>
         <ToastViewport />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     expect(screen.getByText('トーストの内容')).toBeInTheDocument();
@@ -23,7 +23,7 @@ describe('Toast', () => {
           <div>表示されるトースト</div>
         </Toast>
         <ToastViewport />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     const toast = screen.getByTestId('test-toast');
@@ -38,7 +38,7 @@ describe('Toast', () => {
           <div>非表示のトースト</div>
         </Toast>
         <ToastViewport />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     // openがfalseの場合、コンテンツが表示されないことを確認
@@ -55,7 +55,7 @@ describe('Toast', () => {
           <div>テスト</div>
         </Toast>
         <ToastViewport />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     // テスト中はモックが適切に動作するようスキップ（後でより良い修正を適用）
@@ -71,7 +71,7 @@ describe('Toast', () => {
           <div>エラートースト</div>
         </Toast>
         <ToastViewport />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     const toast = screen.getByTestId('test-toast');

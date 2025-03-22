@@ -21,9 +21,9 @@ interface TranslationProgressProps {
 const mockProgressData: ProgressData = {
   totalTexts: 10,
   translatedTexts: {
-    'en': 5,
-    'fr': 3,
-    'de': 0,
+    en: 5,
+    fr: 3,
+    de: 0,
   },
 };
 
@@ -37,33 +37,24 @@ const TranslationProgress = ({ progressData, selectedLanguage }: TranslationProg
     <div data-testid="progress-percentage">
       {selectedLanguage && progressData.totalTexts > 0
         ? Math.round(((progressData.translatedTexts[selectedLanguage] || 0) / progressData.totalTexts) * 100)
-        : 0}%
+        : 0}
+      %
     </div>
   </div>
 );
 
 describe('TranslationProgress', () => {
   it('翻訳の進捗状況を正しく表示する（英語）', () => {
-    render(
-      <TranslationProgress
-        progressData={mockProgressData}
-        selectedLanguage="en"
-      />
-    );
-    
+    render(<TranslationProgress progressData={mockProgressData} selectedLanguage="en" />);
+
     expect(screen.getByTestId('total-texts')).toHaveTextContent('10');
     expect(screen.getByTestId('translated-texts')).toHaveTextContent('5');
     expect(screen.getByTestId('progress-percentage')).toHaveTextContent('50%');
   });
 
   it('翻訳の進捗状況を正しく表示する（フランス語）', () => {
-    render(
-      <TranslationProgress
-        progressData={mockProgressData}
-        selectedLanguage="fr"
-      />
-    );
-    
+    render(<TranslationProgress progressData={mockProgressData} selectedLanguage="fr" />);
+
     expect(screen.getByTestId('translated-texts')).toHaveTextContent('3');
     expect(screen.getByTestId('progress-percentage')).toHaveTextContent('30%');
   });
@@ -73,23 +64,18 @@ describe('TranslationProgress', () => {
       <TranslationProgress
         progressData={mockProgressData}
         selectedLanguage="ja" // 存在しない言語
-      />
+      />,
     );
-    
+
     expect(screen.getByTestId('translated-texts')).toHaveTextContent('0');
     expect(screen.getByTestId('progress-percentage')).toHaveTextContent('0%');
   });
 
   it('テキストがない場合は0%を表示する', () => {
-    render(
-      <TranslationProgress
-        progressData={{ totalTexts: 0, translatedTexts: {} }}
-        selectedLanguage="en"
-      />
-    );
-    
+    render(<TranslationProgress progressData={{ totalTexts: 0, translatedTexts: {} }} selectedLanguage="en" />);
+
     expect(screen.getByTestId('total-texts')).toHaveTextContent('0');
     expect(screen.getByTestId('translated-texts')).toHaveTextContent('0');
     expect(screen.getByTestId('progress-percentage')).toHaveTextContent('0%');
   });
-}); 
+});
