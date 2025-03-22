@@ -432,3 +432,38 @@ Vercelダッシュボードで以下の環境変数を設定:
    - [ ] キーボードナビゲーションテスト
    - [ ] コントラスト比テスト
    - [ ] フォーカス管理テスト
+
+# ファイル拡張子の一貫性確保
+
+## 背景
+- package.jsonで`"type": "module"`を設定しているため、デフォルトでは.jsファイルがESM（ECMAScript Modules）として扱われる
+- CommonJSモジュールを使用するファイルは`.cjs`拡張子を使用する必要がある
+- 明示的にESMを使用するファイルは`.mjs`拡張子を使用できる
+- 現状、`.js`、`.mjs`、`.cjs`拡張子が混在しており、一貫性を持たせる必要がある
+
+## 修正計画
+- [x] PostCSSの設定を統一
+  - [x] `postcss.config.js`と`postcss.config.mjs`の内容を比較
+  - [x] 内容を統合し、`postcss.config.cjs`に変換
+  - [x] 既存の設定ファイルを削除
+- [x] Tailwindの設定を調整
+  - [x] `tailwind.config.js`を`tailwind.config.cjs`に変換
+  - [x] 既存の設定ファイルを削除
+- [x] Cypressの設定を調整
+  - [x] `cypress.config.js`を`cypress.config.cjs`に変換
+  - [x] 既存の設定ファイルを削除
+- [x] package.jsonのスクリプト内で参照しているパスを更新
+  - [x] Cypressスクリプトの設定ファイル参照パスを.cjsに更新
+- [x] CI/CDパイプラインでの参照を確認・修正
+  - [x] .github/workflows/ci-cd.ymlでの参照を確認
+
+### 実装順序
+1. [x] PostCSS設定の統一（影響範囲が限られているため）
+2. [x] Tailwindの設定調整
+3. [x] Cypressの設定調整
+4. [x] その他必要な参照更新
+
+### 注意点
+- [x] 変更は独立して行い、各変更後に動作確認をする
+- [x] 変更理由を文書化し、将来の開発者のための注釈を追加する
+- [x] eslint.config.jsは新しいフラット設定形式を使用しているため、ESMを使用しており、.js拡張子のままとする
