@@ -17,14 +17,14 @@ const mockSlides = [
         id: 'text1',
         text: 'サンプルテキスト1',
         position: { x: 100, y: 100, width: 200, height: 50 },
-        translations: [{ language: 'en', text: 'Sample Text 1' }]
+        translations: [{ language: 'en', text: 'Sample Text 1' }],
       },
       {
         id: 'text2',
         text: 'サンプルテキスト2',
         position: { x: 100, y: 200, width: 200, height: 50 },
-        translations: [{ language: 'en', text: 'Sample Text 2' }]
-      }
+        translations: [{ language: 'en', text: 'Sample Text 2' }],
+      },
     ],
     index: 0,
   },
@@ -35,7 +35,7 @@ const mockSlides = [
     imageUrl: '/test-image-2.png',
     texts: [],
     index: 1,
-  }
+  },
 ];
 
 describe('PreviewSection', () => {
@@ -66,13 +66,7 @@ describe('PreviewSection', () => {
 
   it('スライド切り替えボタンが機能する', () => {
     const mockOnSlideChange = jest.fn();
-    render(
-      <PreviewSectionComponent 
-        currentSlide={0} 
-        slides={mockSlides} 
-        onSlideChange={mockOnSlideChange} 
-      />
-    );
+    render(<PreviewSectionComponent currentSlide={0} slides={mockSlides} onSlideChange={mockOnSlideChange} />);
 
     // 次へボタンをクリック
     const nextButton = screen.getByLabelText('次のスライド');
@@ -88,12 +82,12 @@ describe('PreviewSection', () => {
   it('テキスト要素を選択できる', () => {
     const mockOnTextSelect = jest.fn();
     render(
-      <PreviewSectionComponent 
-        currentSlide={0} 
-        slides={mockSlides} 
-        onSlideChange={() => {}} 
+      <PreviewSectionComponent
+        currentSlide={0}
+        slides={mockSlides}
+        onSlideChange={() => {}}
         onTextSelect={mockOnTextSelect}
-      />
+      />,
     );
 
     // テキスト要素が表示されていることを確認
@@ -112,12 +106,12 @@ describe('PreviewSection', () => {
   it('テキスト要素にホバーできる', () => {
     const mockOnTextHover = jest.fn();
     render(
-      <PreviewSectionComponent 
-        currentSlide={0} 
-        slides={mockSlides} 
-        onSlideChange={() => {}} 
+      <PreviewSectionComponent
+        currentSlide={0}
+        slides={mockSlides}
+        onSlideChange={() => {}}
         onTextHover={mockOnTextHover}
-      />
+      />,
     );
 
     // テキスト要素が表示されていることを確認

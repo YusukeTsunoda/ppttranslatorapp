@@ -31,10 +31,15 @@ jest.mock('@/app/(dashboard)/translate/components/FileUpload', () => ({
         data-testid="mock-file-input"
         onChange={(e) => e.target.files && onUploadComplete(e.target.files[0])}
       />
-      <button onClick={() => {
-        const file = new File(['dummy content'], 'test.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-        onUploadComplete(file);
-      }} data-testid="mock-upload-button">
+      <button
+        onClick={() => {
+          const file = new File(['dummy content'], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          });
+          onUploadComplete(file);
+        }}
+        data-testid="mock-upload-button"
+      >
         ファイルをアップロード
       </button>
     </div>
@@ -70,7 +75,7 @@ describe('TranslatePage', () => {
   const mockRouter = {
     push: jest.fn(),
   };
-  
+
   const mockSession = {
     data: {
       user: {
@@ -103,11 +108,11 @@ describe('TranslatePage', () => {
                 id: 'text1',
                 text: 'サンプルテキスト1',
                 position: { x: 100, y: 100, width: 200, height: 50 },
-                translations: []
-              }
+                translations: [],
+              },
             ],
             index: 0,
-          }
+          },
         ],
       }),
     });
@@ -115,13 +120,13 @@ describe('TranslatePage', () => {
 
   it('ページが正しくレンダリングされること', async () => {
     render(<TranslatePage />);
-    
+
     // ページタイトルが表示されていることを確認
     expect(screen.getByText('プレゼンテーション翻訳')).toBeInTheDocument();
-    
+
     // ファイルアップロードコンポーネントが表示されていることを確認
     expect(screen.getByTestId('file-upload-component')).toBeInTheDocument();
-    
+
     // 言語選択が表示されていることを確認
     expect(screen.getByText('翻訳元言語')).toBeInTheDocument();
     expect(screen.getByText('翻訳先言語')).toBeInTheDocument();
@@ -129,10 +134,10 @@ describe('TranslatePage', () => {
 
   it('ファイルがアップロードされたときにAPIが呼ばれること', async () => {
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // APIが呼ばれたことを確認
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/upload', expect.any(Object));
@@ -141,15 +146,15 @@ describe('TranslatePage', () => {
 
   it('アップロード後にスライドが表示されること', async () => {
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // スライドが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByTestId('preview-section-component')).toBeInTheDocument();
     });
-    
+
     // スライド数が1であることを確認
     await waitFor(() => {
       expect(screen.getByTestId('slides-count').textContent).toBe('1');
@@ -158,11 +163,11 @@ describe('TranslatePage', () => {
 
   it('翻訳言語を選択できること', async () => {
     render(<TranslatePage />);
-    
+
     // 翻訳元言語のセレクトボックスを取得
     const sourceLangSelect = screen.getByLabelText('翻訳元言語');
     expect(sourceLangSelect).toBeInTheDocument();
-    
+
     // 翻訳先言語のセレクトボックスを取得
     const targetLangSelect = screen.getByLabelText('翻訳先言語');
     expect(targetLangSelect).toBeInTheDocument();
@@ -170,18 +175,18 @@ describe('TranslatePage', () => {
 
   it('翻訳ボタンが表示され、クリックするとAPIが呼ばれること', async () => {
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // 翻訳ボタンが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByText('翻訳開始')).toBeInTheDocument();
     });
-    
+
     // 翻訳ボタンをクリック
     fireEvent.click(screen.getByText('翻訳開始'));
-    
+
     // 翻訳APIが呼ばれたことを確認
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/translate', expect.any(Object));
@@ -195,12 +200,12 @@ describe('TranslatePage', () => {
       status: 500,
       json: async () => ({ error: 'サーバーエラーが発生しました' }),
     });
-    
+
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // エラーメッセージが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByText(/エラーが発生しました/)).toBeInTheDocument();
@@ -214,12 +219,12 @@ describe('TranslatePage', () => {
       status: 401,
       json: async () => ({ error: '認証が必要です' }),
     });
-    
+
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // ログインページにリダイレクトされることを確認
     await waitFor(() => {
       expect(mockRouter.push).toHaveBeenCalledWith(expect.stringContaining('/signin'));
@@ -250,32 +255,32 @@ describe('TranslatePage', () => {
             imageUrl: '/test-image-2.png',
             texts: [],
             index: 1,
-          }
+          },
         ],
       }),
     });
-    
+
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // スライドが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByTestId('preview-section-component')).toBeInTheDocument();
     });
-    
+
     // 次のスライドボタンをクリック
     fireEvent.click(screen.getByTestId('next-slide-button'));
-    
+
     // 現在のスライドが1になることを確認
     await waitFor(() => {
       expect(screen.getByTestId('current-slide').textContent).toBe('1');
     });
-    
+
     // 前のスライドボタンをクリック
     fireEvent.click(screen.getByTestId('prev-slide-button'));
-    
+
     // 現在のスライドが0に戻ることを確認
     await waitFor(() => {
       expect(screen.getByTestId('current-slide').textContent).toBe('0');
@@ -284,18 +289,18 @@ describe('TranslatePage', () => {
 
   it('翻訳中のローディング状態が表示されること', async () => {
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // 翻訳ボタンが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByText('翻訳開始')).toBeInTheDocument();
     });
-    
+
     // 翻訳ボタンをクリック
     fireEvent.click(screen.getByText('翻訳開始'));
-    
+
     // ローディング状態が表示されることを確認
     await waitFor(() => {
       expect(screen.getByText(/翻訳中/)).toBeInTheDocument();
@@ -304,58 +309,60 @@ describe('TranslatePage', () => {
 
   it('翻訳結果が表示されること', async () => {
     // 翻訳結果のモック
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        success: true,
-        fileId: 'test-file-id',
-        slides: [
-          {
-            id: 'slide1',
-            title: 'テストスライド',
-            content: 'これはテストスライドのコンテンツです。',
-            imageUrl: '/test-image.png',
-            texts: [
-              {
-                id: 'text1',
-                text: 'サンプルテキスト1',
-                position: { x: 100, y: 100, width: 200, height: 50 },
-                translations: []
-              }
-            ],
-            index: 0,
-          }
-        ],
-      }),
-    }).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        success: true,
-        translations: [
-          {
-            id: 'text1',
-            original: 'サンプルテキスト1',
-            translated: 'Sample Text 1',
-          }
-        ],
-      }),
-    });
-    
+    (globalThis.fetch as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          fileId: 'test-file-id',
+          slides: [
+            {
+              id: 'slide1',
+              title: 'テストスライド',
+              content: 'これはテストスライドのコンテンツです。',
+              imageUrl: '/test-image.png',
+              texts: [
+                {
+                  id: 'text1',
+                  text: 'サンプルテキスト1',
+                  position: { x: 100, y: 100, width: 200, height: 50 },
+                  translations: [],
+                },
+              ],
+              index: 0,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          translations: [
+            {
+              id: 'text1',
+              original: 'サンプルテキスト1',
+              translated: 'Sample Text 1',
+            },
+          ],
+        }),
+      });
+
     render(<TranslatePage />);
-    
+
     // ファイルアップロードボタンをクリック
     fireEvent.click(screen.getByTestId('mock-upload-button'));
-    
+
     // 翻訳ボタンが表示されるまで待機
     await waitFor(() => {
       expect(screen.getByText('翻訳開始')).toBeInTheDocument();
     });
-    
+
     // 翻訳ボタンをクリック
     fireEvent.click(screen.getByText('翻訳開始'));
-    
+
     // 翻訳APIが呼ばれたことを確認
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/translate', expect.any(Object));

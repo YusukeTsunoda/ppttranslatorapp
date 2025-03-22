@@ -59,6 +59,7 @@ interface Assertion {
   toMatchObject(expected: object): void;
   toThrow(expected?: string | Error | RegExp): void;
   toThrowError(expected?: string | Error | RegExp): void;
+  toBeInstanceOf(expected: any): void;
   not: Assertion;
 
   // モック関数用のアサーション
@@ -113,6 +114,7 @@ interface AsyncAssertion {
   toMatchObject(expected: object): void;
   toThrow(expected?: string | Error | RegExp): void;
   toThrowError(expected?: string | Error | RegExp): void;
+  toBeInstanceOf(expected: any): void;
   not: AsyncAssertion;
 
   // モック関数用のアサーション
