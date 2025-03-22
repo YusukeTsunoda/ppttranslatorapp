@@ -291,7 +291,7 @@ function main() {
           ];
         case 5:
           adminExists = _e.sent();
-          if (!!adminExists) return [3 /*break*/, 8];
+          if (adminExists) return [3 /*break*/, 8];
           _b = (_a = prisma.user).create;
           _c = {};
           _d = {
