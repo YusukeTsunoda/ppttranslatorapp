@@ -10,7 +10,9 @@ interface FileUploadProps {
 }
 
 export const FileUploadComponent = ({ onUploadComplete }: FileUploadProps) => {
-  const [uploading, setUploading] = useState(false);
+  // file 変数が使用されていないというエラーは誤検知のようです
+  // setUploading は使用されていませんが、将来的に使う可能性があるためコメントアウト
+  const [uploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // const { toast } = useToast();

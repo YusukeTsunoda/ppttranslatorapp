@@ -1,14 +1,15 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+// 未使用のコンポーネントをコメントアウト
+// import { Card } from '@/components/ui/card';
 import { Slide, TextItem, TranslationItem, TextPosition, SlideData, ImageSize } from '../types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Edit2, Save, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+// import { Edit2, Save, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, RotateCcw } from 'lucide-react';
 
 export interface PreviewSectionProps {
   currentSlide: number;
@@ -32,8 +33,9 @@ export const PreviewSectionComponent = ({
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState('');
+  // 未使用の状態変数をコメントアウト
+  // const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  // const [editValue, setEditValue] = useState('');
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -71,6 +73,8 @@ export const PreviewSectionComponent = ({
     console.log('Valid slide index?', currentSlide >= 0 && slides && currentSlide < slides.length);
   }, [slides, currentSlide]);
 
+  // 未使用の関数をコメントアウト
+  /*
   const startEditing = (index: number, text: string) => {
     setEditingIndex(index);
     setEditValue(text);
@@ -86,6 +90,7 @@ export const PreviewSectionComponent = ({
   const cancelEdit = () => {
     setEditingIndex(null);
   };
+  */
 
   const handleZoomIn = () => {
     setScale((prev) => Math.min(prev + 0.1, 2));

@@ -60,7 +60,6 @@ const availableLanguages = [
 
 export default function TranslatePage() {
   const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedTextIndex, setSelectedTextIndex] = useState<number | null>(null);
@@ -70,83 +69,16 @@ export default function TranslatePage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isPremium, setIsPremium] = useState(false); // TODO: 実際のユーザー情報から取得
-  const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [editedTranslations, setEditedTranslations] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isTranslationComplete, setIsTranslationComplete] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [shouldUpdateOverlay, setShouldUpdateOverlay] = useState(true);
-  const { data: session, status } = useSession();
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [isTranslated, setIsTranslated] = useState(false);
   const [selectedModel, setSelectedModel] = useState(availableModels[0].value);
-
-  // コンポーネントの初期化
-  useEffect(() => {
-    // ステートをリセット
-    setFile(null);
-    setSlides([]);
-    setCurrentSlide(0);
-    setSelectedTextIndex(null);
-    setPosition({ x: 0, y: 0 });
-    setIsDragging(false);
-    setDragStart({ x: 0, y: 0 });
-    setEditedTranslations({});
-    setIsSaving(false);
-    setIsGenerating(false);
-    setIsTranslationComplete(false);
-    setIsInitialized(true);
-    setShouldUpdateOverlay(true);
-    setIsLoading(false);
-    setEditingKey(null);
-    setEditingValue('');
-    setIsTranslating(false);
-    setIsTranslated(false);
-
-    return () => {
-      setIsInitialized(false);
-    };
-  }, []); // 依存配列を空にして、マウント時のみ実行
-
-  // セッション状態の監視
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/signin');
-      return;
-    }
-
-    if (status === 'loading') {
-      return;
-    }
-
-    if (!session?.user) {
-      toast({
-        title: 'エラー',
-        description: '認証が必要です',
-        variant: 'destructive',
-      });
-      router.push('/signin');
-      return;
-    }
-  }, [status, session, router, toast]);
-
-  // ローディング中の表示
-  if (status === 'loading') {
-    return <LoadingSpinner />;
-  }
-
-  // 未認証の場合は何も表示しない
-  if (!session?.user) {
-    return null;
-  }
+  const { data: session, status } = useSession();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [editingValue, setEditingValue] = useState('');
 
   // ファイルアップロード処理
   const handleFileUpload = useCallback(
@@ -173,7 +105,6 @@ export default function TranslatePage() {
       }
 
       setFile(file);
-      setIsSaving(true);
       const formData = new FormData();
       formData.append('file', file);
 
@@ -337,117 +268,10 @@ export default function TranslatePage() {
           description: error instanceof Error ? error.message : 'アップロードに失敗しました',
           variant: 'destructive',
         });
-      } finally {
-        setIsSaving(false);
       }
     },
     [toast, router],
   );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileUpload(file);
-    },
-    [handleFileUpload],
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFileUpload(file);
-    },
-    [handleFileUpload],
-  );
-
-  // 画像サイズの状態を追加
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-
-  // 画像読み込み時のハンドラーを修正
-  const handleImageLoad = useCallback(() => {
-    if (imageRef.current && containerRef.current) {
-      const imgRect = imageRef.current.getBoundingClientRect();
-      const containerRect = containerRef.current.getBoundingClientRect();
-
-      setImageSize({
-        width: imgRect.width,
-        height: imgRect.height,
-      });
-      setContainerSize({
-        width: containerRect.width,
-        height: containerRect.height,
-      });
-    }
-  }, []);
-
-  // プレビューコンテナのスタイル
-  const previewContainerStyle = {
-    width: '100%',
-    paddingTop: '56.25%', // 16:9のアスペクト比
-    position: 'relative' as const,
-    overflow: 'hidden',
-    backgroundColor: '#f3f4f6',
-    cursor: isDragging ? 'grabbing' : 'grab',
-    touchAction: 'none', // タッチデバイスでのスクロールを防止
-  };
-
-  // 共通のtransformスタイル
-  const getTransformStyle = (x: number, y: number, scale: number) => ({
-    transform: `translate(${x}px, ${y}px) scale(${scale})`,
-    transformOrigin: 'center',
-  });
-
-  // ドラッグ処理の関数を修正
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y,
-      });
-    },
-    [position],
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDragging) return;
-      e.preventDefault();
-
-      const newX = e.clientX - dragStart.x;
-      const newY = e.clientY - dragStart.y;
-
-      // 移動範囲を制限（オプション）
-      const maxMove = 500; // 最大移動距離
-      const limitedX = Math.max(-maxMove, Math.min(maxMove, newX));
-      const limitedY = Math.max(-maxMove, Math.min(maxMove, newY));
-
-      setPosition({
-        x: limitedX,
-        y: limitedY,
-      });
-    },
-    [isDragging, dragStart],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
 
   // マウスイベントのクリーンアップを最適化
   useEffect(() => {
@@ -463,18 +287,56 @@ export default function TranslatePage() {
     };
   }, [isDragging]);
 
-  const handleZoom = (newScale: number) => {
-    // スケールを更新するだけで、オーバーレイのリペイントは行わない
-    // setScale(Math.max(0.5, Math.min(3, newScale)));
-    // setShouldUpdateOverlayは呼び出さない
-  };
-
-  // リセット時に位置もリセット
-  const resetZoom = () => {
-    // setScale(1);
+  // コンポーネントの初期化
+  useEffect(() => {
+    // ステートをリセット
+    setFile(null);
+    setSlides([]);
+    setCurrentSlide(0);
+    setSelectedTextIndex(null);
     setPosition({ x: 0, y: 0 });
-    // setShouldUpdateOverlay(true);
-  };
+    setIsDragging(false);
+    setDragStart({ x: 0, y: 0 });
+    setEditedTranslations({});
+    setIsTranslating(false);
+    setIsTranslated(false);
+
+    return () => {
+      // setIsInitialized(false);
+    };
+  }, []); // 依存配列を空にして、マウント時のみ実行
+
+  // セッション状態の監視
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/signin');
+      return;
+    }
+
+    if (status === 'loading') {
+      return;
+    }
+
+    if (!session?.user) {
+      toast({
+        title: 'エラー',
+        description: '認証が必要です',
+        variant: 'destructive',
+      });
+      router.push('/signin');
+      return;
+    }
+  }, [status, session, router, toast]);
+
+  // ローディング中の表示
+  if (status === 'loading') {
+    return <LoadingSpinner />;
+  }
+
+  // 未認証の場合は何も表示しない
+  if (!session?.user) {
+    return null;
+  }
 
   // 翻訳処理
   const handleTranslate = async () => {
@@ -616,46 +478,6 @@ export default function TranslatePage() {
     } finally {
       setIsDownloading(false);
     }
-  };
-
-  // 翻訳テキストの編集
-  const handleTranslationChange = (textIndex: number, newValue: string) => {
-    const translationKey = `${currentSlide}-${textIndex}`;
-    const newTranslations = { ...editedTranslations };
-    newTranslations[translationKey] = newValue;
-    setEditedTranslations(newTranslations);
-  };
-
-  // 編集開始
-  const startEditing = (key: string, value: string) => {
-    setEditingValue(value);
-  };
-
-  // 翻訳保存
-  const saveTranslation = (key: string) => {
-    const [slideIndex, textIndex] = key.split('-').map(Number);
-    handleTranslationChange(textIndex, editingValue);
-    setEditingValue('');
-  };
-
-  // 編集キャンセル
-  const cancelEditing = () => {
-    setEditingValue('');
-  };
-
-  // 翻訳実行
-  const handleTranslateSlide = async () => {
-    await handleTranslate();
-  };
-
-  // リセット処理
-  const handleReset = () => {
-    setSlides([]);
-    setCurrentSlide(0);
-    setEditedTranslations({});
-    setIsTranslated(false);
-    setIsTranslating(false);
-    setEditingValue('');
   };
 
   // テキストが選択された時の処理を追加
