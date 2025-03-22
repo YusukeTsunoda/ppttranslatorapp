@@ -41,38 +41,78 @@ export class PPTXParser {
   }
 
   private async checkDependencies(): Promise<void> {
-    const requiredModules = ['pptx', 'pdf2image', 'PIL'];
-    const checkScript = `
+    const checkScriptPath = path.join(process.cwd(), 'tmp', 'check_deps.py');
+    const checkScriptContent = `
 import sys
-missing = []
-for module in ${JSON.stringify(requiredModules)}:
-    try:
-        __import__(module)
-    except ImportError:
-        missing.append(module)
-if missing:
-    print(f"Missing modules: {', '.join(missing)}")
+try:
+    import pptx
+    print("pptx OK")
+except ImportError:
+    print("pptx NOT FOUND")
     sys.exit(1)
+
+try:
+    import pdf2image
+    print("pdf2image OK")
+except ImportError:
+    print("pdf2image NOT FOUND")
+    sys.exit(1)
+
+try:
+    import PIL
+    print("PIL OK")
+except ImportError:
+    print("PIL NOT FOUND")
+    sys.exit(1)
+
 print("All dependencies are installed")
-    `;
+`;
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        const pyshell = new PythonShell('', {
+      if (!fs.existsSync(path.join(process.cwd(), 'tmp'))) {
+        fs.mkdirSync(path.join(process.cwd(), 'tmp'), { recursive: true });
+      }
+
+      fs.writeFileSync(checkScriptPath, checkScriptContent, 'utf8');
+
+      const result = await new Promise<boolean>((resolve, reject) => {
+        const pyshell = new PythonShell(checkScriptPath, {
           mode: 'text',
           pythonPath: this.pythonPath,
-          pythonOptions: ['-c', checkScript],
         });
 
-        pyshell.on('message', console.log);
-        pyshell.on('stderr', (err) => {
-          reject(new Error(err));
+        let hasError = false;
+
+        pyshell.on('message', (message) => {
+          console.log(message);
         });
+
+        pyshell.on('stderr', (stderr) => {
+          console.error('Python stderr:', stderr);
+          hasError = true;
+        });
+
         pyshell.end((err) => {
-          if (err) reject(new Error('Python execution error'));
-          else resolve();
+          try {
+            if (fs.existsSync(checkScriptPath)) {
+              fs.unlinkSync(checkScriptPath);
+            }
+          } catch (e) {
+            console.error('Failed to delete temp script:', e);
+          }
+
+          if (err) {
+            console.error('Python script error:', err);
+            reject(new Error('Python dependency check failed'));
+          } else if (hasError) {
+            reject(new Error('Python script reported errors on stderr'));
+          } else {
+            resolve(true);
+          }
         });
       });
+
+      return;
     } catch (error) {
       console.error('Dependency check failed:', error);
       throw error instanceof Error ? error : new Error('Python execution error');

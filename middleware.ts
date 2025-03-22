@@ -1,46 +1,65 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from 'next-auth/middleware';
-import type { NextRequestWithAuth } from 'next-auth/middleware';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import { PrismaClient } from '@prisma/client';
 
 // Node.jsランタイムを明示的に指定
 export const runtime = 'nodejs';
 
-export default withAuth(
-  // `withAuth` augments your `Request` with the user's token.
-  function middleware(req: NextRequestWithAuth) {
-    // 認証済みの場合は、そのまま次の処理へ
-    if (req.nextauth.token) {
-      return NextResponse.next();
+export async function middleware(request: NextRequest) {
+  // セッションを取得
+  const token = await getToken({ req: request });
+  
+  // パスを取得
+  const path = request.nextUrl.pathname;
+  
+  // 管理者ページへのアクセスを制限
+  if (path.startsWith('/admin')) {
+    // セッションがない場合はログインページにリダイレクト
+    if (!token) {
+      const url = new URL('/signin', request.url);
+      url.searchParams.set('callbackUrl', path);
+      return NextResponse.redirect(url);
     }
+    
+    // 管理者権限をチェック
+    try {
+      const userId = token.id as string;
+      const prisma = new PrismaClient();
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+      });
+      
+      await prisma.$disconnect();
+      
+      // 管理者でない場合は403ページまたはホームページにリダイレクト
+      if (!user || user.role !== 'ADMIN') {
+        return NextResponse.redirect(new URL('/translate', request.url));
+      }
+    } catch (error) {
+      console.error('Admin check error:', error);
+      return NextResponse.redirect(new URL('/translate', request.url));
+    }
+  }
+  
+  // 保護されたルートへのアクセス（/signin, /signupを除く）
+  if (!path.startsWith('/signin') && 
+      !path.startsWith('/signup') && 
+      !path.startsWith('/api/auth') && 
+      !path.startsWith('/_next') && 
+      !path.startsWith('/public')) {
+    
+    if (!token) {
+      const url = new URL('/signin', request.url);
+      url.searchParams.set('callbackUrl', path);
+      return NextResponse.redirect(url);
+    }
+  }
 
-    // 認証されていない場合は、サインインページへリダイレクト
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return NextResponse.next();
+}
 
-    const signInUrl = new URL('/signin', baseUrl);
-    const fullCallbackUrl = `${baseUrl}${req.nextUrl.pathname}`;
-    signInUrl.searchParams.set('callbackUrl', fullCallbackUrl);
-
-    return NextResponse.redirect(signInUrl);
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => {
-        return !!token;
-      },
-    },
-  },
-);
-
-// 保護するパスを指定
 export const config = {
-  matcher: [
-    '/translate/:path*',
-    '/profile/:path*',
-    '/settings/:path*',
-    '/history/:path*',
-    '/activity/:path*',
-    '/integrations/:path*',
-    '/dashboard/:path*',
-    '/api/protected/:path*',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
