@@ -2,7 +2,13 @@ import * as fs from 'fs';
 import { PythonShell, PythonShellError } from 'python-shell';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
+import {
+  PPTXParseResult,
+  ParseAPIResponse,
+  SlideContent,
+  TextElement,
+  Position,
+} from './types';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -14,9 +20,7 @@ export class PPTXParser {
   private pythonPath: string;
 
   private constructor() {
-    // スクリプトのパスを設定
     this.pythonScriptPath = path.join(process.cwd(), 'lib', 'python', 'pptx_parser.py');
-    // Python実行環境の設定
     this.pythonPath = process.env.PYTHON_PATH || 'python3';
   }
 
@@ -28,13 +32,11 @@ export class PPTXParser {
   }
 
   private async ensurePythonScript(): Promise<void> {
-    // Pythonスクリプトの存在を確認
     if (!fs.existsSync(this.pythonScriptPath)) {
       console.error('Python script not found');
       throw new Error('Python script not found');
     }
 
-    // Python実行環境の確認
     try {
       const { stdout } = await execAsync('python3 --version');
       console.log('Python version:', stdout.trim());
@@ -85,13 +87,8 @@ print("All dependencies are installed")
 
   public async parsePPTX(inputPath: string, outputDir: string): Promise<PPTXParseResult> {
     try {
-      // Pythonスクリプトと実行環境の確認
       await this.ensurePythonScript();
-
-      // 必要なPythonパッケージの確認
       await this.checkDependencies();
-
-      // PPTXファイルの解析
       const result = await this.executePythonScript(inputPath, outputDir);
       return this.validateAndProcessResult(result, inputPath);
     } catch (error) {
@@ -158,7 +155,6 @@ print("All dependencies are installed")
   }
 
   private validateAndProcessResult(results: any, inputPath: string): PPTXParseResult {
-    // スライドデータの検証を強化
     if (!results || typeof results !== 'object') {
       throw new Error('Invalid result format: Expected an object');
     }
@@ -201,8 +197,8 @@ print("All dependencies are installed")
             x: position.x || 0,
             y: position.y || 0,
             width: position.width || 0,
-            height: position.height || 0
-          }
+            height: position.height || 0,
+          },
         };
       });
 
@@ -226,7 +222,9 @@ print("All dependencies are installed")
   }
 
   public extractTexts(parseResult: PPTXParseResult): string[] {
-    return parseResult.slides.flatMap((slide) => slide.textElements.map((element) => element.text));
+    return parseResult.slides.flatMap((slide) =>
+      slide.textElements.map((element) => element.text),
+    );
   }
 
   public getTextWithPositions(parseResult: PPTXParseResult): SlideContent[] {

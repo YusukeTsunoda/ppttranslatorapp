@@ -26,7 +26,9 @@ jest.mock('fs/promises', () => ({
 jest.mock('path', () => ({
   join: jest.fn().mockImplementation((...args) => args.join('/')),
   dirname: jest.fn().mockReturnValue('/mock/dir'),
-  basename: jest.fn().mockImplementation((path, ext) => (ext ? 'test' : 'pptx_parser.py')),
+  basename: jest.fn().mockImplementation((path, ext) =>
+    ext ? 'test' : 'pptx_parser.py'
+  ),
 }));
 
 // PythonShellモック
@@ -43,16 +45,18 @@ jest.mock('python-shell', () => {
   const defaultImplementation = {
     on: jest.fn().mockImplementation((event, callback) => {
       if (event === 'message') {
-        callback(JSON.stringify({
-          slides: [
-            {
-              index: 0,
-              image_path: 'slide_1.png',
-              texts: ['テストテキスト1'],
-              positions: [{ x: 100, y: 100, width: 200, height: 50 }],
-            },
-          ],
-        }));
+        callback(
+          JSON.stringify({
+            slides: [
+              {
+                index: 0,
+                image_path: 'slide_1.png',
+                texts: ['テストテキスト1'],
+                positions: [{ x: 100, y: 100, width: 200, height: 50 }],
+              },
+            ],
+          })
+        );
       }
       return { on: jest.fn() };
     }),
@@ -143,12 +147,15 @@ describe('PPTXパーサー', () => {
 
     it('Pythonスクリプトが見つからない場合はエラーを投げる', async () => {
       // fs.existsSyncを一時的にfalseを返すように設定
-      const existsSyncMock = jest.fn()
+      const existsSyncMock = jest
+        .fn()
         .mockReturnValueOnce(false)  // 最初の呼び出しでfalse
         .mockReturnValue(true);      // その後の呼び出しではtrue
       (fs.existsSync as jest.Mock).mockImplementation(existsSyncMock);
 
-      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow('Python script not found');
+      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow(
+        'Python script not found'
+      );
       expect(existsSyncMock).toHaveBeenCalled();
     });
 
@@ -218,7 +225,9 @@ describe('PPTXパーサー', () => {
 
       jest.mocked(PythonShell).mockImplementationOnce(() => errorImplementation);
 
-      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow('Python execution error');
+      await expect(parser.parsePPTX('test.pptx', '/tmp')).rejects.toThrow(
+        'Python execution error'
+      );
     });
   });
 
@@ -229,8 +238,16 @@ describe('PPTXパーサー', () => {
           {
             index: 0,
             textElements: [
-              { id: 'text_0_0', text: 'テキスト1', position: { x: 0, y: 0, width: 0, height: 0 } },
-              { id: 'text_0_1', text: 'テキスト2', position: { x: 0, y: 0, width: 0, height: 0 } },
+              {
+                id: 'text_0_0',
+                text: 'テキスト1',
+                position: { x: 0, y: 0, width: 0, height: 0 },
+              },
+              {
+                id: 'text_0_1',
+                text: 'テキスト2',
+                position: { x: 0, y: 0, width: 0, height: 0 },
+              },
             ],
             imagePath: 'slide_1.png',
           },

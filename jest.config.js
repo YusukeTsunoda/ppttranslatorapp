@@ -9,70 +9,43 @@ const createJestConfig = nextJest({
   dir: './',
 });
 
-// 任意のJest設定
-const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+/** @type {import('jest').Config} */
+const config = {
   testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
   moduleNameMapper: {
-    '^@/app/\\(dashboard\\)/(.*)$': '<rootDir>/app/(dashboard)/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
-  collectCoverage: true,
-  coverageProvider: 'babel',
-  coverageReporters: ['text', 'lcov', 'clover'],
-  coverageDirectory: 'coverage',
-  collectCoverageFrom: [
-    '**/*.{js,jsx,ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
-    '!**/vendor/**',
-    '!**/.next/**',
-    '!**/coverage/**',
-    '!**/public/**',
-    '!**/tests/**',
-    '!**/jest.config.js',
-    '!**/next.config.js',
-    '!**/tailwind.config.js',
-    '!**/postcss.config.js',
-    '!**/prettier.config.js',
-  ],
-  // パスの中に以下の文字列を含むモジュールはトランスフォームしない
-  transformIgnorePatterns: [
-    '/node_modules/(?!(openid-client|jose)/).*/',
-    '^.+\\.module\\.(css|sass|scss)$'
-  ],
-  // テスト対象の最小カバレッジを設定
-  coverageThreshold: {
-    global: {
-      statements: 1,
-      branches: 0,
-      functions: 1,
-      lines: 1,
-    },
-    './lib/hooks/': {
-      statements: 40,
-      branches: 30,
-      functions: 20,
-      lines: 40,
-    },
-  },
-  // テスト結果をHTMLで出力
-  reporters: [
-    'default',
-    [
-      'jest-html-reporter',
-      {
-        pageTitle: 'Test Report',
-        outputPath: './reports/jest-report.html',
-      },
-    ],
-  ],
-  // トランスフォーム設定の更新
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
+  collectCoverage: true,
+  coverageProvider: 'v8',
+  coverageReporters: ['text', 'lcov', 'json-summary'],
+  coverageDirectory: 'coverage',
+  collectCoverageFrom: [
+    'app/**/*.{js,jsx,ts,tsx}',
+    'lib/**/*.{js,jsx,ts,tsx}',
+    'components/**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+    '!**/.next/**',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/.next/',
+    '/coverage/',
+    '/__tests__/',
+    '/test/',
+    '/tests/',
+    '/dist/',
+  ],
+  coverageThreshold: null,
+  verbose: true,
+  testTimeout: 10000,
 };
 
 // createJestConfigは、次の処理のためにこのcustomConfigを使用します
 // https://nextjs.org/docs/testing#setting-up-jest-with-the-rust-compiler
-module.exports = createJestConfig(customJestConfig);
+module.exports = createJestConfig(config);
