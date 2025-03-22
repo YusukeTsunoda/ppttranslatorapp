@@ -4,8 +4,7 @@ import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// ESM形式でmain関数をexport
-export async function main() {
+async function main() {
   console.log('Seeding database...');
 
   // テストユーザーの作成
@@ -113,7 +112,7 @@ export async function main() {
   // 使用統計のサンプルデータ
   console.log('Creating usage statistics...');
   const currentDate = new Date();
-  const currentMonth = currentDate.getMonth() + 1; // JavaScriptの月は0から始まるため+1
+  const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
 
   await prisma.usageStatistics.upsert({
@@ -151,7 +150,7 @@ export async function main() {
         id: 'admin-user-id',
         name: '管理者',
         email: adminEmail,
-        password: await hash('admin123', 10), // 本番環境では強力なパスワードを使用してください
+        password: await hash('admin123', 10),
         role: 'ADMIN',
         credits: 1000,
       },
@@ -173,5 +172,4 @@ main()
     await prisma.$disconnect();
   });
 
-// ここにexport defaultも追加することで、Prismaのシードスクリプトとしても認識されやすくなります
-export default main;
+export default main; 
