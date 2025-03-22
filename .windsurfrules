@@ -104,36 +104,120 @@ ppttranslatorapp/
 │   │   ├── page.tsx        # トップページ
 │   │   └── pricing/
 │   │       └── page.tsx    # プライシングページ
-│   ├── globals.css                   # グローバルスタイル
-│   ├── layout.tsx                    # ルートレイアウト
-│   ├── not-found.tsx                # 404ページ
-│   ├── (login)/                     # ログイン関連ページ
-│   ├── (dashboard)/                 # ダッシュボード関連ページ
-│   └── api/                         # APIエンドポイント
+│   ├── (auth)/
+│   │   ├── signin/         # サインインページ
+│   │   │   └── page.tsx
+│   │   ├── signup/         # サインアップページ
+│   │   │   └── page.tsx
+│   │   └── reset-password/ # パスワードリセット
+│   │       ├── page.tsx
+│   │       └── confirm/
+│   │           └── page.tsx
+│   ├── (dashboard)/
+│   │   ├── translate/      # 翻訳機能ページ
+│   │   │   ├── page.tsx
+│   │   │   └── components/ # 翻訳ページ固有コンポーネント
+│   │   ├── activity/       # アクティビティページ
+│   │   ├── history/        # 履歴ページ
+│   │   ├── profile/        # プロフィールページ
+│   │   ├── settings/       # 設定ページ
+│   │   │   └── subscription/ # サブスクリプション設定
+│   │   ├── checkout/       # 決済ページ
+│   │   ├── integrations/   # 連携設定ページ
+│   │   └── admin/          # 管理者ページ
+│   │       ├── logs/       # ログ管理
+│   │       ├── statistics/ # 統計情報
+│   │       └── users/      # ユーザー管理
+│   ├── api/                # APIエンドポイント
+│   │   ├── auth/           # 認証関連API
+│   │   │   ├── [...nextauth]/  # NextAuth.js設定
+│   │   │   ├── login/      # ログインAPI
+│   │   │   ├── signup/     # サインアップAPI
+│   │   │   ├── session/    # セッション管理API
+│   │   │   └── reset-password/ # パスワードリセットAPI
+│   │   ├── pptx/           # PowerPoint関連API
+│   │   │   ├── parse/      # PPTXパース処理
+│   │   │   └── generate/   # PPTX生成処理
+│   │   ├── translate/      # 翻訳処理API
+│   │   ├── translations/   # 翻訳データ管理API
+│   │   │   └── save/       # 翻訳保存API
+│   │   ├── stripe/         # 決済関連API
+│   │   │   ├── checkout/   # 決済処理API
+│   │   │   └── webhook/    # Stripeウェブフック
+│   │   ├── upload/         # ファイルアップロードAPI
+│   │   ├── download/       # ファイルダウンロードAPI
+│   │   ├── history/        # 履歴管理API
+│   │   ├── activity/       # アクティビティ管理API
+│   │   ├── user/           # ユーザー管理API
+│   │   ├── profile/        # プロフィール管理API
+│   │   ├── subscription/   # サブスクリプション管理API
+│   │   ├── integrations/   # 外部連携API
+│   │   ├── admin/          # 管理者用API
+│   │   ├── anthropic/      # Anthropic AI連携API
+│   │   └── health/         # ヘルスチェックAPI
+│   ├── globals.css         # グローバルスタイル
+│   ├── layout.tsx          # ルートレイアウト
+│   └── not-found.tsx       # 404ページ
 ├── components/
-│   └── ui/                          # 基本UIコンポーネント
+│   ├── ui/                 # 基本UIコンポーネント (shadcn/ui)
+│   ├── auth/               # 認証関連コンポーネント
+│   ├── activity/           # アクティビティ関連コンポーネント
+│   └── admin/              # 管理者用コンポーネント
 ├── lib/
-│   ├── auth/                        # 認証関連
-│   ├── db/                          # データベース関連
-│   ├── payments/                    # 支払い関連
-│   └── utils.ts                     # ユーティリティ関数
-├── middleware.ts                    # ミドルウェア設定
-├── next.config.ts                   # Next.js設定
-└── drizzle.config.ts               # Drizzle設定
+│   ├── auth/               # 認証関連ロジック
+│   ├── db/                 # データベース関連
+│   │   └── migrations/     # データベースマイグレーション
+│   ├── anthropic/          # Anthropic AI連携ロジック
+│   ├── email/              # メール送信ロジック
+│   ├── hooks/              # カスタムReactフック
+│   ├── payments/           # 支払い関連ロジック
+│   ├── pptx/               # PowerPoint処理ロジック
+│   ├── python/             # Python連携ロジック
+│   ├── stripe/             # Stripe決済連携
+│   ├── supabase/           # Supabase連携
+│   └── utils/              # ユーティリティ関数
+├── middleware.ts           # ミドルウェア設定
+├── next.config.cjs         # Next.js設定
+├── postcss.config.js       # PostCSS設定
+├── tailwind.config.js      # Tailwind CSS設定
+├── tsconfig.json           # TypeScript設定
+├── .babelrc                # Babel設定
+├── jest.config.js          # Jest設定
+└── package.json            # パッケージ設定
 ```
 
 ### 配置ルール
-- UIコンポーネント → `components/ui/` (shadcn/uiコンポーネント)
-- APIエンドポイント → `app/api/[endpoint]/route.ts` (Next.js API Routes)
-- 認証関連処理 → `lib/auth/` (NextAuth.js関連)
-- データベース関連処理 → `lib/db/` (Prisma/SQLite)
-- 支払い関連処理 → `lib/stripe/` (Stripe API統合)
-- 共通ユーティリティ → `lib/utils.ts` (TypeScript型定義含む)
-- Webhook処理 → `app/api/webhooks/` (Stripe Webhook等)
-- 環境設定 → `app/lib/api/config.ts` (API設定の一元管理)
-- 型定義 → `app/lib/api/types.ts` (共通型定義)
+- UIコンポーネント: components/ui/ (shadcn/uiコンポーネント)
+- ページ固有コンポーネント: app/(section)/[page]/components/
+- APIエンドポイント: app/api/[endpoint]/route.ts (Next.js API Routes)
+- 認証関連処理: lib/auth/ (NextAuth.js関連)
+- データベース関連処理: lib/db/ (Prisma/SQLite)
+- 支払い関連処理:
+  - lib/payments/ (一般的な支払い処理)
+  - lib/stripe/ (Stripe API統合)
+- AI連携処理: lib/anthropic/ (Anthropic AI連携)
+- PowerPoint処理: lib/pptx/ (PPTX解析・生成)
+- 共通ユーティリティ: lib/utils/ (TypeScript型定義含む)
+- Webhook処理: app/api/stripe/webhook/ (Stripe Webhook等)
+- レイアウト:
+  - app/layout.tsx (ルートレイアウト)
+  - app/(marketing)/layout.tsx (マーケティングページ用)
+  - app/(dashboard)/layout.tsx (ダッシュボード用)
+  - app/(auth)/layout.tsx (認証ページ用)
 
 ---
+### 要機能グループ
+- マーケティング機能 (app/(marketing)/): トップページ、料金プランページ
+- 認証機能 (app/(auth)/): サインイン、サインアップ、パスワードリセット
+- ダッシュボード機能 (app/(dashboard)/):
+  - 翻訳機能
+  - アクティビティ管理
+  - 履歴管理
+  - プロフィール設定
+  - サブスクリプション管理
+- 管理者機能
+- API機能 (app/api/): 各種バックエンド処理API
+- 共通ライブラリ (lib/): 再利用可能なロジックとユーティリティ
 
 # 実装プロセス
 
@@ -192,3 +276,4 @@ ppttranslatorapp/
 ---
 
 以上の指示に従い、確実で質の高い実装を行います。不明点や重要な判断が必要な場合は、必ず確認を取ります。
+回答は日本語で行います。

@@ -11,7 +11,7 @@ const createJestConfig = nextJest({
 
 // 任意のJest設定
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.mjs'],
   testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
