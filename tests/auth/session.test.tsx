@@ -144,9 +144,9 @@ const mockIsSessionValid = (session: any): boolean => {
 
 // モックの設定
 jest.mock('next-auth/react');
-const mockUseSession = useSession as jest.Mock;
-const mockSignIn = signIn as jest.Mock;
-const mockSignOut = signOut as jest.Mock;
+const mockUseSession = useSession as any;
+const mockSignIn = signIn as any;
+const mockSignOut = signOut as any;
 
 // モック用のルーター
 jest.mock('next/navigation', () => ({
@@ -212,6 +212,12 @@ describe('セッション管理', () => {
         redirect: false,
         callbackUrl: '/dashboard',
       });
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(result.current.user).toEqual({
+        id: 'test-user-id',
+        name: 'Test User',
+        email: 'test@example.com',
+      });
     });
 
     it('ログアウト処理を正しく実行する', async () => {
@@ -228,10 +234,11 @@ describe('セッション管理', () => {
         redirect: false,
         callbackUrl: '/signin',
       });
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(result.current.user).toBeNull();
     });
 
-    it('エラー状態を正しく処理する', async () => {
-      // エラーケースのモック
+    it('ログインエラーを正しく処理する', async () => {
       mockSignIn.mockResolvedValue({ ok: false, error: 'Invalid credentials' });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -243,13 +250,13 @@ describe('セッション管理', () => {
         await result.current.login('test@example.com', 'wrong-password');
       });
 
+      expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.error).toBeDefined();
       expect(result.current.error?.type).toBe('UNAUTHORIZED');
       expect(result.current.error?.message).toBe('Invalid credentials');
     });
 
     it('エラーをクリアする', async () => {
-      // エラー状態を作成
       mockSignIn.mockResolvedValue({ ok: false, error: 'Invalid credentials' });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -263,7 +270,6 @@ describe('セッション管理', () => {
 
       expect(result.current.error).toBeDefined();
 
-      // エラーをクリア
       act(() => {
         result.current.clearError();
       });
@@ -272,7 +278,7 @@ describe('セッション管理', () => {
     });
   });
 
-  describe('isSessionValid', () => {
+  describe('セッション有効性チェック', () => {
     it('有効なセッションを正しく検証する', () => {
       const validSession = {
         user: {
@@ -291,13 +297,13 @@ describe('セッション管理', () => {
           id: 'test-user-id',
           email: 'test@example.com',
         },
-        expires: new Date(Date.now() - 1000).toISOString(),
+        expires: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       };
 
       expect(mockIsSessionValid(expiredSession)).toBe(false);
     });
 
-    it('ユーザー情報のないセッションを無効と判定する', () => {
+    it('ユーザー情報がないセッションを無効と判定する', () => {
       const invalidSession = {
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       };

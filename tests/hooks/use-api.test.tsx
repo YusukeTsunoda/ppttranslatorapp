@@ -3,8 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useApiMutation } from '@/lib/hooks/use-api';
 
 // fetchのモック
-global.fetch = jest.fn();
-const mockFetch = global.fetch as jest.Mock;
+globalThis.fetch = jest.fn();
+const mockFetch = globalThis.fetch as any;
 
 describe('APIフック', () => {
   beforeEach(() => {

@@ -104,7 +104,7 @@ describe('PPTXパーサー', () => {
     it('Pythonスクリプトが見つからない場合はエラーを投げる', async () => {
       // fs.accessがエラーを投げるようにモック
       const mockAccess = jest.fn().mockRejectedValueOnce(new Error('ENOENT'));
-      (fs.promises.access as jest.Mock).mockImplementation(mockAccess);
+      (fs.promises.access as any).mockImplementation(mockAccess);
 
       // PythonShellのモックをリセット
       (PythonShell as any).mockReset();
