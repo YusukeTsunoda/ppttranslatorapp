@@ -4,7 +4,8 @@ import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-async function main() {
+// ESM形式でmain関数をexport
+export async function main() {
   console.log('Seeding database...');
 
   // テストユーザーの作成
@@ -162,6 +163,7 @@ async function main() {
   console.log('Seeding completed.');
 }
 
+// 実行部分
 main()
   .catch((e) => {
     console.error(e);
@@ -170,3 +172,6 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+// ここにexport defaultも追加することで、Prismaのシードスクリプトとしても認識されやすくなります
+export default main;
