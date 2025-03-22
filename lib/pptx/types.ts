@@ -22,9 +22,8 @@ export interface TextStyle {
 // スライド内の個々のテキスト要素
 export interface TextElement {
   id: string;
-  content: string;
+  text: string;
   position: Position;
-  style?: TextStyle;
 }
 
 // レイアウト要素（シェイプ、プレースホルダーなど）
@@ -42,11 +41,9 @@ export interface LayoutInfo {
 
 // 1枚のスライドの全情報
 export interface SlideContent {
-  id: string;
   index: number;
-  texts: TextElement[];
-  layout: LayoutInfo;
-  image_path?: string; // スライド画像のパス
+  textElements: TextElement[];
+  imagePath: string;
 }
 
 // PPTXファイル全体の解析結果
@@ -54,9 +51,8 @@ export interface PPTXParseResult {
   slides: SlideContent[];
   metadata: {
     totalSlides: number;
-    title?: string;
-    author?: string;
-    lastModified?: string;
+    title: string;
+    lastModified: string;
   };
 }
 

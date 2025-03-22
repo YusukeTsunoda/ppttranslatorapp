@@ -60,7 +60,14 @@ if (typeof global.fetch === 'undefined') {
 // コンソールエラーを抑制（テスト中に意図的なエラーを発生させる場合に便利）
 const originalConsoleError = console.error;
 console.error = (...args) => {
-  if (args[0]?.includes?.('Warning: ReactDOM.render is no longer supported')) {
+  // テスト中の意図的なエラーメッセージをスキップ
+  if (
+    args[0]?.includes?.('Warning: ReactDOM.render is no longer supported') ||
+    args[0] === '=== Upload Error ===' ||
+    args[0] === 'Database connection error: Error: DB connection error' ||
+    args[0] === 'Login error: Error: Unexpected error' ||
+    args[0]?.includes?.('Client error: Error: Request failed with status')
+  ) {
     return;
   }
   originalConsoleError(...args);
