@@ -9,10 +9,10 @@ export const runtime = 'nodejs';
 export async function middleware(request: NextRequest) {
   // セッションを取得
   const token = await getToken({ req: request });
-  
+
   // パスを取得
   const path = request.nextUrl.pathname;
-  
+
   // 管理者ページへのアクセスを制限
   if (path.startsWith('/admin')) {
     // セッションがない場合はログインページにリダイレクト
@@ -21,18 +21,18 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set('callbackUrl', path);
       return NextResponse.redirect(url);
     }
-    
+
     // 管理者権限をチェック
     try {
       const userId = token.id as string;
       const prisma = new PrismaClient();
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true }
+        select: { role: true },
       });
-      
+
       await prisma.$disconnect();
-      
+
       // 管理者でない場合は403ページまたはホームページにリダイレクト
       if (!user || user.role !== 'ADMIN') {
         return NextResponse.redirect(new URL('/translate', request.url));
@@ -42,14 +42,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/translate', request.url));
     }
   }
-  
+
   // 保護されたルートへのアクセス（/signin, /signupを除く）
-  if (!path.startsWith('/signin') && 
-      !path.startsWith('/signup') && 
-      !path.startsWith('/api/auth') && 
-      !path.startsWith('/_next') && 
-      !path.startsWith('/public')) {
-    
+  if (
+    !path.startsWith('/signin') &&
+    !path.startsWith('/signup') &&
+    !path.startsWith('/api/auth') &&
+    !path.startsWith('/_next') &&
+    !path.startsWith('/public')
+  ) {
     if (!token) {
       const url = new URL('/signin', request.url);
       url.searchParams.set('callbackUrl', path);

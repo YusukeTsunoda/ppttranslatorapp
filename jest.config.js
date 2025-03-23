@@ -38,12 +38,15 @@ const config = {
   testTimeout: 10000,
   reporters: [
     'default',
-    ['jest-html-reporter', {
-      outputPath: 'reports/jest-report.html',
-      pageTitle: 'Test Report',
-      includeFailureMsg: true
-    }]
-  ]
+    [
+      'jest-html-reporter',
+      {
+        outputPath: 'reports/jest-report.html',
+        pageTitle: 'Test Report',
+        includeFailureMsg: true,
+      },
+    ],
+  ],
 };
 
 // createJestConfigは、次の処理のためにこのcustomConfigを使用します

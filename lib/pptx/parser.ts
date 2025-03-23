@@ -139,7 +139,7 @@ print("All dependencies are installed")
       scriptName: path.basename(this.pythonScriptPath),
       pythonPath: this.pythonPath,
       inputPath,
-      outputDir
+      outputDir,
     });
 
     // ディレクトリの存在を確認
@@ -162,10 +162,23 @@ print("All dependencies are installed")
       args: [inputPath, outputDir],
     };
 
-    return new Promise<any>((resolve, reject) => {
+    // スクリプト直接実行のテスト
+    try {
       const scriptFullPath = path.join(options.scriptPath, path.basename(this.pythonScriptPath));
       console.log(`Full script path: ${scriptFullPath}`);
       console.log(`Script exists: ${fs.existsSync(scriptFullPath)}`);
+
+      const testResult = await execAsync(`${this.pythonPath} ${scriptFullPath} "${inputPath}" "${outputDir}"`, {
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      console.log('Direct Python execution stdout:', testResult.stdout);
+      console.log('Direct Python execution stderr:', testResult.stderr);
+    } catch (error) {
+      console.error('Direct Python execution error:', error);
+    }
+
+    return new Promise<any>((resolve, reject) => {
+      const scriptFullPath = path.join(options.scriptPath, path.basename(this.pythonScriptPath));
 
       const pyshell = new PythonShell(path.basename(this.pythonScriptPath), options);
       let result: any = null;
