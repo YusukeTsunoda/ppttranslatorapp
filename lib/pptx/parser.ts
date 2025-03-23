@@ -134,6 +134,26 @@ print("All dependencies are installed")
   }
 
   private async executePythonScript(inputPath: string, outputDir: string): Promise<any> {
+    console.log('Executing Python script with options:', {
+      scriptPath: path.dirname(this.pythonScriptPath),
+      scriptName: path.basename(this.pythonScriptPath),
+      pythonPath: this.pythonPath,
+      inputPath,
+      outputDir
+    });
+
+    // ディレクトリの存在を確認
+    if (!fs.existsSync(outputDir)) {
+      console.log(`Creating output directory: ${outputDir}`);
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // 入力ファイルの存在を確認
+    if (!fs.existsSync(inputPath)) {
+      console.error(`Input file not found: ${inputPath}`);
+      throw new Error(`Input file not found: ${inputPath}`);
+    }
+
     const options = {
       mode: 'json' as const,
       pythonPath: this.pythonPath,
@@ -143,11 +163,17 @@ print("All dependencies are installed")
     };
 
     return new Promise<any>((resolve, reject) => {
+      const scriptFullPath = path.join(options.scriptPath, path.basename(this.pythonScriptPath));
+      console.log(`Full script path: ${scriptFullPath}`);
+      console.log(`Script exists: ${fs.existsSync(scriptFullPath)}`);
+
       const pyshell = new PythonShell(path.basename(this.pythonScriptPath), options);
       let result: any = null;
       let hasError = false;
+      let errorOutput = '';
 
       pyshell.on('message', (message) => {
+        console.log('Python message:', message);
         try {
           if (typeof message === 'string') {
             const parsed = JSON.parse(message);
@@ -163,21 +189,26 @@ print("All dependencies are installed")
       });
 
       pyshell.on('stderr', (stderr) => {
+        console.error('Python stderr:', stderr);
+        errorOutput += stderr + '\n';
         if (stderr.includes('Error') || stderr.includes('Exception') || stderr.includes('Traceback')) {
           hasError = true;
-          console.error('Python script error:', stderr);
         }
       });
 
       pyshell.end((err) => {
         if (err) {
           console.error('Python script execution error:', err);
-          reject(new Error('Python execution error'));
+          console.error('Error output:', errorOutput);
+          reject(new Error(`Python execution error: ${err.message}\n${errorOutput}`));
         } else if (hasError) {
-          reject(new Error('Python script error'));
+          console.error('Python script reported errors on stderr:', errorOutput);
+          reject(new Error(`Python script error: ${errorOutput}`));
         } else if (!result) {
+          console.error('No valid result from Python script');
           reject(new Error('No valid result from Python script'));
         } else {
+          console.log('Python script executed successfully');
           resolve(result);
         }
       });

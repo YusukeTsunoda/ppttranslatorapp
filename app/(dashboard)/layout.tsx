@@ -35,6 +35,26 @@ function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // 管理者権限の確認
+    const checkAdminRole = async () => {
+      if (session?.user?.id) {
+        try {
+          const response = await fetch('/api/user/role');
+          if (response.ok) {
+            const data = await response.json();
+            setIsAdmin(data.isAdmin);
+          }
+        } catch (error) {
+          console.error('管理者権限の確認に失敗しました:', error);
+        }
+      }
+    };
+
+    checkAdminRole();
+  }, [session]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -134,6 +154,14 @@ function Header() {
                   アクティビティ
                 </Link>
               </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin">
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    管理者ダッシュボード
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={handleSignOut} data-testid="logout-button">
                 <LogOut className="mr-2 h-4 w-4" />
                 ログアウト
