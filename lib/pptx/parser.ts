@@ -103,7 +103,7 @@ print("All dependencies are installed")
 
           if (err) {
             console.error('Python script error:', err);
-            reject(new Error('Python dependency check failed'));
+            reject(new Error('Python execution error'));
           } else if (hasError) {
             reject(new Error('Python script reported errors on stderr'));
           } else {
