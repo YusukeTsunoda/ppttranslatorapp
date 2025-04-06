@@ -4,10 +4,4 @@
 ### TypeScript
 ✅ TypeScriptチェック成功
 ### Prettier
-❌ Prettierチェック失敗
-```
-Checking formatting...
-[warn] eslint.config.js
-[warn] Code style issues found in the above file. Run Prettier with --write to fix.
-... (省略)
-```
+✅ Prettierチェック成功

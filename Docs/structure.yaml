@@ -1,0 +1,436 @@
+# アプリケーション構造定義
+
+# 基本情報
+app:
+  name: "PPTXTranslator"
+  version: "0.1.0"
+  description: "PowerPointプレゼンテーションの翻訳を支援するWebアプリケーション"
+
+# 技術スタック
+tech_stack:
+  frontend:
+    framework: "Next.js 14.x"
+    styling: "Tailwind CSS 3.x"
+    ui_components: "Shadcn/UI"
+    state_management: "React Hooks"
+    routing: "Next.js App Router"
+    testing: 
+      - "Jest 29.x"
+      - "React Testing Library"
+      - "Cypress"
+  
+  backend:
+    runtime: "Node.js 20.x"
+    framework: "Next.js API Routes"
+    database: "Prisma ORM with PostgreSQL"
+    authentication: "NextAuth.js"
+    file_processing: "Python scripts (python-pptx, pdf2image)"
+    office_automation: "LibreOffice"
+    testing: 
+      - "Jest 29.x"
+      - "Supertest"
+  
+  development:
+    version_control: "Git"
+    package_manager: "npm"
+    code_quality:
+      - "ESLint"
+      - "Prettier"
+      - "TypeScript 5.x"
+    ci_cd: "GitHub Actions"
+    deployment: "Vercel"
+
+# データベース構造
+database:
+  tables:
+    users:
+      columns:
+        id: "string (PK)"
+        name: "string"
+        email: "string (unique)"
+        emailVerified: "datetime"
+        image: "string"
+        created_at: "datetime"
+        updated_at: "datetime"
+        role: "string (enum)"
+    
+    accounts:
+      columns:
+        id: "string (PK)"
+        userId: "string (FK)"
+        type: "string"
+        provider: "string"
+        providerAccountId: "string"
+        refresh_token: "string"
+        access_token: "string"
+        expires_at: "integer"
+        token_type: "string"
+        scope: "string"
+        id_token: "string"
+        session_state: "string"
+    
+    sessions:
+      columns:
+        id: "string (PK)"
+        sessionToken: "string (unique)"
+        userId: "string (FK)"
+        expires: "datetime"
+    
+    verificationTokens:
+      columns:
+        identifier: "string"
+        token: "string (unique)"
+        expires: "datetime"
+    
+    translations:
+      columns:
+        id: "string (PK)"
+        userId: "string (FK)"
+        title: "string"
+        sourceLanguage: "string"
+        targetLanguage: "string"
+        status: "string (enum)"
+        created_at: "datetime"
+        updated_at: "datetime"
+    
+    slides:
+      columns:
+        id: "string (PK)"
+        translationId: "string (FK)"
+        index: "integer"
+        imagePath: "string"
+        created_at: "datetime"
+        updated_at: "datetime"
+    
+    textElements:
+      columns:
+        id: "string (PK)"
+        slideId: "string (FK)"
+        text: "string"
+        translatedText: "string"
+        position: "json"
+        created_at: "datetime"
+        updated_at: "datetime"
+    
+    activities:
+      columns:
+        id: "string (PK)"
+        userId: "string (FK)"
+        action: "string"
+        ipAddress: "string"
+        userAgent: "string"
+        metadata: "json"
+        timestamp: "datetime"
+
+# アプリケーション機能
+features:
+  authentication:
+    - "NextAuthによる認証"
+    - "メール/パスワード認証"
+    - "ソーシャルログイン（Google）"
+    - "ロールベースのアクセス制御"
+    - "セッション管理"
+  
+  file_handling:
+    - "PPTXファイルのアップロード"
+    - "ファイルの一時保存"
+    - "Python処理のための変換"
+    - "スライド画像の生成"
+    - "テキスト抽出"
+  
+  translation:
+    - "スライドテキストの表示"
+    - "テキスト編集と翻訳"
+    - "言語選択（複数言語対応）"
+    - "翻訳結果のプレビュー"
+    - "翻訳済みPPTXの生成"
+  
+  admin:
+    - "ユーザー管理"
+    - "アクティビティログ"
+    - "システム状態監視"
+    - "処理キュー管理"
+    - "エラーログの確認"
+
+# セキュリティ設定
+security:
+  authentication:
+    - "NextAuthによる認証"
+    - "JWTトークン管理"
+    - "セッション管理"
+    - "ロールベースのアクセス制御"
+  
+  data_protection:
+    - "ファイルアクセス制限"
+    - "一時ファイルの自動削除"
+    - "サニタイズ処理"
+    - "ユーザーデータの隔離"
+  
+  security_measures:
+    - "XSS対策"
+    - "CSRF対策"
+    - "ファイルタイプの検証"
+    - "レート制限"
+    - "入力検証"
+
+# パフォーマンス設定
+performance:
+  optimization:
+    - "画像の最適化"
+    - "キャッシュ戦略"
+    - "一時ファイルの管理"
+    - "非同期処理"
+  
+  monitoring:
+    - "処理時間のモニタリング"
+    - "エラー監視"
+    - "リソース使用状況"
+    - "ユーザー行動分析"
+
+# テスト設定
+testing:
+  coverage:
+    target: 80
+    types:
+      - "コンポーネントテスト"
+      - "ユニットテスト"
+      - "統合テスト"
+      - "E2Eテスト"
+  
+  naming_conventions:
+    test_files: "*.test.ts, *.test.tsx"
+    test_cases: "describe and it"
+    test_data: "__fixtures__ directory"
+  
+  mock_setup:
+    - "ファイル操作のモック"
+    - "Python実行のモック"
+    - "認証モック処理"
+    - "データベース操作モック"
+
+# デプロイメント設定
+deployment:
+  branch_strategy:
+    main: "本番環境"
+    develop: "開発環境"
+    feature: "機能開発"
+    bugfix: "バグ修正"
+    release: "リリース準備"
+  
+  deployment_flow:
+    - "開発環境（develop）"
+    - "ステージング環境（release/*）"
+    - "本番環境（main）"
+  
+  release_procedure:
+    - "バージョン番号の更新"
+    - "変更履歴の更新"
+    - "テストの実行"
+    - "ビルドの実行"
+    - "デプロイの実行"
+    - "動作確認"
+  
+  dependencies:
+    - "Node.js 20.x"
+    - "Python 3.11+"
+    - "LibreOffice"
+    - "python-pptx"
+    - "pdf2image"
+    - "Pillow"
+
+# プロジェクト構造
+project_structure:
+  app:
+    (auth):
+      login:
+        page.tsx: "ログインページ"
+      register:
+        page.tsx: "登録ページ"
+    (dashboard):
+      layout.tsx: "ダッシュボードレイアウト"
+      page.tsx: "ダッシュボードホームページ"
+      admin:
+        page.tsx: "管理者ページ"
+      translate:
+        page.tsx: "翻訳ページ"
+    (marketing):
+      layout.tsx: "マーケティングレイアウト"
+      page.tsx: "ホームページ"
+    api:
+      auth:
+        login:
+          route.ts: "ログインAPIルート"
+        register:
+          route.ts: "登録APIルート"
+        role:
+          route.ts: "ロール確認APIルート"
+      pptx:
+        parse:
+          route.ts: "PPTXパースAPIルート"
+        generate:
+          route.ts: "PPTX生成APIルート"
+      translate:
+        route.ts: "翻訳APIルート"
+      upload:
+        route.ts: "ファイルアップロードAPIルート"
+      health:
+        route.ts: "ヘルスチェックAPIルート"
+  
+  components:
+    ui:
+      button.tsx: "ボタンコンポーネント"
+      card.tsx: "カードコンポーネント"
+      input.tsx: "入力コンポーネント"
+      label.tsx: "ラベルコンポーネント"
+      toast.tsx: "トーストコンポーネント"
+      alert.tsx: "アラートコンポーネント"
+      avatar.tsx: "アバターコンポーネント"
+      dialog.tsx: "ダイアログコンポーネント"
+      dropdown-menu.tsx: "ドロップダウンメニューコンポーネント"
+      form.tsx: "フォームコンポーネント"
+      switch.tsx: "スイッチコンポーネント"
+    admin:
+      AdminPanel.tsx: "管理パネルコンポーネント"
+      ActivityLog.tsx: "アクティビティログコンポーネント"
+      UserManagement.tsx: "ユーザー管理コンポーネント"
+    auth:
+      LoginForm.tsx: "ログインフォームコンポーネント"
+      RegisterForm.tsx: "登録フォームコンポーネント"
+  
+  lib:
+    pptx:
+      parser.ts: "PPTXパーサーモジュール"
+      generator.ts: "PPTX生成モジュール"
+      types.ts: "PPTX関連の型定義"
+    utils:
+      file-utils.ts: "ファイルユーティリティ"
+      error-handler.ts: "エラーハンドリングユーティリティ"
+      activity-logger.ts: "アクティビティログユーティリティ"
+    hooks:
+      use-api.ts: "API呼び出しフック"
+      useIntersectionObserver.ts: "交差監視フック"
+    auth:
+      session.ts: "セッション管理モジュール"
+  
+  tests:
+    api:
+      auth:
+        login.test.ts: "ログインAPIテスト"
+      pptx-parse.test.ts: "PPTXパースAPIテスト"
+      pptx-generate.test.ts: "PPTX生成APIテスト"
+      translate.test.ts: "翻訳APIテスト"
+      upload.test.ts: "ファイルアップロードAPIテスト"
+    app:
+      translate:
+        components:
+          FileUpload.test.tsx: "ファイルアップロードコンポーネントテスト"
+          TextList.test.tsx: "テキストリストコンポーネントテスト"
+          Translation.test.tsx: "翻訳コンポーネントテスト"
+          PreviewSection.test.tsx: "プレビューセクションコンポーネントテスト"
+          TranslationProgress.test.tsx: "翻訳進捗コンポーネントテスト"
+        page.test.tsx: "翻訳ページテスト"
+    auth:
+      session.test.tsx: "セッション管理テスト"
+    components:
+      ui:
+        button.test.tsx: "ボタンコンポーネントテスト"
+        card.test.tsx: "カードコンポーネントテスト"
+        input.test.tsx: "入力コンポーネントテスト"
+        toast.test.tsx: "トーストコンポーネントテスト"
+        switch.test.tsx: "スイッチコンポーネントテスト"
+        alert.test.tsx: "アラートコンポーネントテスト"
+        avatar.test.tsx: "アバターコンポーネントテスト"
+        dropdown-menu.test.tsx: "ドロップダウンメニューコンポーネントテスト"
+        label.test.tsx: "ラベルコンポーネントテスト"
+    hooks:
+      use-api.test.tsx: "API呼び出しフックテスト"
+      useIntersectionObserver.test.tsx: "交差監視フックテスト"
+    lib:
+      pptx:
+        parser.test.ts: "PPTXパーサーモジュールテスト"
+      utils:
+        file-utils.test.ts: "ファイルユーティリティテスト"
+        error-handler.test.ts: "エラーハンドリングユーティリティテスト"
+  
+  types:
+    index.ts: "アプリケーション全体の型定義"
+    api.ts: "API関連の型定義"
+    auth.ts: "認証関連の型定義"
+    pptx.ts: "PPTX関連の型定義"
+
+# Python処理フロー
+python_processing:
+  modules:
+    pptx_parser:
+      description: "PPTXファイルの解析と情報抽出"
+      input: "PPTX ファイル"
+      output: "JSON 形式のスライド情報（テキスト、位置）"
+      dependencies:
+        - "python-pptx"
+        - "pdf2image"
+        - "Pillow"
+    
+    pptx_generator:
+      description: "翻訳済みテキストでPPTXファイルを生成"
+      input: "元のPPTXファイルと翻訳テキスト情報"
+      output: "翻訳済みPPTXファイル"
+      dependencies:
+        - "python-pptx"
+  
+  execution_environment:
+    python_version: "Python 3.11+"
+    file_structure:
+      temp_dir: "./tmp"
+      processing_dir: "./tmp/processing"
+      user_dir: "./tmp/users"
+    error_handling:
+      - "プロセス終了コード確認"
+      - "標準エラー出力の捕捉"
+      - "タイムアウト処理"
+      - "依存関係チェック"
+
+# JSONデータフォーマット
+json_formats:
+  pptx_parse_result:
+    description: "PPTXパース結果のJSONフォーマット"
+    format: |
+      {
+        "slides": [
+          {
+            "index": 0,
+            "imagePath": "slide_1.png",
+            "textElements": [
+              {
+                "id": "text_0_0",
+                "text": "元のテキスト",
+                "position": { "x": 100, "y": 100, "width": 200, "height": 50 }
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "totalSlides": 10,
+          "title": "プレゼンテーションタイトル",
+          "lastModified": "2023-01-01T00:00:00.000Z"
+        }
+      }
+  
+  translation_data:
+    description: "翻訳データのJSONフォーマット"
+    format: |
+      {
+        "sourceLanguage": "ja",
+        "targetLanguage": "en",
+        "slides": [
+          {
+            "index": 0,
+            "textElements": [
+              {
+                "id": "text_0_0",
+                "originalText": "元のテキスト",
+                "translatedText": "Translated text"
+              }
+            ]
+          }
+        ]
+      }

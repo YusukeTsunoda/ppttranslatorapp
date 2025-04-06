@@ -43,13 +43,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 保護されたルートへのアクセス（/signin, /signupを除く）
+  // 保護されたルートへのアクセス（/signin, /signup, /api/healthを除く）
   if (
     !path.startsWith('/signin') &&
     !path.startsWith('/signup') &&
     !path.startsWith('/api/auth') &&
     !path.startsWith('/_next') &&
-    !path.startsWith('/public')
+    !path.startsWith('/public') &&
+    !path.startsWith('/api/health')
   ) {
     if (!token) {
       const url = new URL('/signin', request.url);

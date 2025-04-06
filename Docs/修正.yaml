@@ -1,0 +1,498 @@
+# PPTXTranslator 移行計画
+# Prisma + NextAuth + Vercel から Drizzle + Supabase + Cloudflare Pages への移行
+
+# 移行概要
+migration_overview:
+  current_stack:
+    database: "Prisma ORM with PostgreSQL"
+    authentication: "NextAuth.js"
+    deployment: "Vercel"
+  
+  target_stack:
+    database: "Cloudflare D1 / KV"
+    orm: "Drizzle"
+    authentication: "Supabase"
+    deployment: "Cloudflare Pages"
+  
+  affected_areas:
+    - "データベースモデルとスキーマ定義"
+    - "認証システム"
+    - "APIルート"
+    - "環境変数"
+    - "デプロイメント設定"
+
+# 移行ステップ
+migration_steps:
+  # ステップ1: プロジェクト依存関係の更新
+  update_dependencies:
+    description: "新しい依存関係をインストールし、古い依存関係を削除します"
+    commands:
+      - "npm uninstall @prisma/client prisma next-auth"
+      - "npm install drizzle-orm @supabase/supabase-js @cloudflare/workers-types"
+      - "npm install -D drizzle-kit wrangler"
+    files_to_update:
+      - "package.json"
+      - "package-lock.json"
+
+  # ステップ2: 環境変数の更新
+  update_environment_variables:
+    description: "新しい環境変数を設定し、古い環境変数を削除します"
+    files_to_update:
+      - ".env"
+      - ".env.local"
+      - ".env.production"
+    old_variables:
+      - "DATABASE_URL"
+      - "NEXTAUTH_SECRET"
+      - "NEXTAUTH_URL"
+    new_variables:
+      - "SUPABASE_URL"
+      - "SUPABASE_ANON_KEY"
+      - "SUPABASE_SERVICE_ROLE_KEY"
+      - "CLOUDFLARE_ACCOUNT_ID"
+      - "CLOUDFLARE_API_TOKEN"
+
+  # ステップ3: データベーススキーマの移行
+  migrate_database_schema:
+    description: "PrismaスキーマをDrizzleスキーマに変換します"
+    old_files:
+      - "prisma/schema.prisma"
+    new_files:
+      - "drizzle/schema.ts"
+    steps:
+      - "DrizzleスキーマディレクトリとファイルをSetupする: `mkdir -p drizzle`"
+      - "各テーブルのスキーマをPrismaからDrizzle形式に変換"
+      - "マイグレーション設定を作成: `touch drizzle.config.ts`"
+      - "マイグレーションスクリプトを実行: `npx drizzle-kit generate`"
+    schema_mapping:
+      users:
+        prisma: |
+          model User {
+            id            String    @id @default(cuid())
+            name          String?
+            email         String?   @unique
+            emailVerified DateTime?
+            image         String?
+            role          String?   @default("user")
+            createdAt     DateTime  @default(now()) @map("created_at")
+            updatedAt     DateTime  @updatedAt @map("updated_at")
+            accounts      Account[]
+            sessions      Session[]
+          }
+        drizzle: |
+          import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+          
+          export const users = sqliteTable('users', {
+            id: text('id').primaryKey(),
+            name: text('name'),
+            email: text('email').unique(),
+            emailVerified: integer('email_verified', { mode: 'timestamp_ms' }),
+            image: text('image'),
+            role: text('role').default('user'),
+            createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().defaultNow(),
+            updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().defaultNow(),
+          });
+      # 他のテーブルも同様に変換
+
+  # ステップ4: データベース接続の更新
+  update_database_connection:
+    description: "データベース接続をPrismaからDrizzleに更新します"
+    old_files:
+      - "lib/prisma.ts"
+      - "lib/db.ts"
+    new_files:
+      - "lib/db/index.ts"
+      - "lib/db/drizzle.ts"
+    code_changes:
+      old_prisma_connection: |
+        // lib/prisma.ts
+        import { PrismaClient } from '@prisma/client';
+
+        let prisma: PrismaClient;
+
+        if (process.env.NODE_ENV === 'production') {
+          prisma = new PrismaClient();
+        } else {
+          if (!global.prisma) {
+            global.prisma = new PrismaClient();
+          }
+          prisma = global.prisma;
+        }
+
+        export default prisma;
+      new_drizzle_connection: |
+        // lib/db/drizzle.ts
+        import { drizzle } from 'drizzle-orm/d1';
+        import { env } from '@/lib/env';
+        
+        // D1データベースのインスタンスを取得
+        export function getDb(context?: { cloudflare?: { env?: { DB: D1Database } } }) {
+          // Cloudflare D1 インスタンスを取得
+          if (context?.cloudflare?.env?.DB) {
+            return drizzle(context.cloudflare.env.DB);
+          }
+          
+          // 開発環境ではバインドされたD1インスタンスを使用
+          if (process.env.NODE_ENV !== 'production') {
+            // ローカル開発用のモックD1
+            return null; // 開発環境用のモックを実装
+          }
+          
+          throw new Error('D1 database instance not found');
+        }
+        
+        // KVストレージインスタンスを取得
+        export function getKV(context?: { cloudflare?: { env?: { KV: KVNamespace } } }) {
+          if (context?.cloudflare?.env?.KV) {
+            return context.cloudflare.env.KV;
+          }
+          
+          if (process.env.NODE_ENV !== 'production') {
+            // ローカル開発用のモックKV
+            return null; // 開発環境用のモックを実装
+          }
+          
+          throw new Error('KV namespace not found');
+        }
+
+  # ステップ5: 認証システムの移行
+  migrate_authentication:
+    description: "NextAuthからSupabaseの認証に移行します"
+    old_files:
+      - "auth.ts"
+      - "lib/auth/session.ts"
+      - "app/api/auth/[...nextauth]/route.ts"
+    new_files:
+      - "lib/supabase/index.ts"
+      - "lib/supabase/server.ts"
+      - "lib/supabase/client.ts"
+      - "lib/supabase/auth.ts"
+    code_changes:
+      supabase_client: |
+        // lib/supabase/client.ts
+        import { createClient } from '@supabase/supabase-js';
+        
+        export const supabaseClient = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+      supabase_server: |
+        // lib/supabase/server.ts
+        import { createServerClient } from '@supabase/supabase-js';
+        import { cookies } from 'next/headers';
+        
+        export function createServerSupabaseClient() {
+          const cookieStore = cookies();
+          
+          return createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+              cookies: {
+                get(name) {
+                  return cookieStore.get(name)?.value;
+                },
+                set(name, value, options) {
+                  cookieStore.set({ name, value, ...options });
+                },
+                remove(name, options) {
+                  cookieStore.set({ name, value: '', ...options });
+                },
+              },
+            }
+          );
+        }
+      auth_utils: |
+        // lib/supabase/auth.ts
+        import { createServerSupabaseClient } from './server';
+        
+        export async function getUser() {
+          const supabase = createServerSupabaseClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          return user;
+        }
+        
+        export async function isAdmin() {
+          const user = await getUser();
+          if (!user) return false;
+          
+          const { data, error } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+            
+          return data?.role === 'admin';
+        }
+
+  # ステップ6: API Routes の更新
+  update_api_routes:
+    description: "Prisma及びNextAuthを使用しているAPIルートをDrizzleとSupabaseに更新します"
+    files_to_update:
+      - "app/api/auth/login/route.ts"
+      - "app/api/auth/register/route.ts"
+      - "app/api/auth/role/route.ts"
+      - "app/api/pptx/parse/route.ts"
+      - "app/api/pptx/generate/route.ts"
+      - "app/api/translate/route.ts"
+      - "app/api/upload/route.ts"
+      - "app/api/health/route.ts"
+    example_changes:
+      old_auth_role_api: |
+        // app/api/auth/role/route.ts
+        import { NextResponse } from 'next/server';
+        import { getServerSession } from 'next-auth/next';
+        import prisma from '@/lib/prisma';
+        
+        export async function GET() {
+          try {
+            const session = await getServerSession();
+            
+            if (!session?.user?.email) {
+              return NextResponse.json({ isAdmin: false }, { status: 401 });
+            }
+            
+            const user = await prisma.user.findUnique({
+              where: { email: session.user.email },
+              select: { role: true },
+            });
+            
+            const isAdmin = user?.role === 'admin';
+            
+            return NextResponse.json({ isAdmin });
+          } catch (error) {
+            console.error('Role check error:', error);
+            return NextResponse.json({ isAdmin: false }, { status: 500 });
+          }
+        }
+      new_auth_role_api: |
+        // app/api/auth/role/route.ts
+        import { NextResponse } from 'next/server';
+        import { createServerSupabaseClient } from '@/lib/supabase/server';
+        import { isAdmin } from '@/lib/supabase/auth';
+        
+        export async function GET() {
+          try {
+            const supabase = createServerSupabaseClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+              return NextResponse.json({ isAdmin: false }, { status: 401 });
+            }
+            
+            const adminStatus = await isAdmin();
+            
+            return NextResponse.json({ isAdmin: adminStatus });
+          } catch (error) {
+            console.error('Role check error:', error);
+            return NextResponse.json({ isAdmin: false }, { status: 500 });
+          }
+        }
+
+  # ステップ7: ミドルウェアの更新
+  update_middleware:
+    description: "認証ミドルウェアをNextAuthからSupabaseに更新します"
+    files_to_update:
+      - "middleware.ts"
+    code_changes:
+      old_middleware: |
+        import { withAuth } from "next-auth/middleware";
+        import { NextResponse } from "next/server";
+        
+        export default withAuth(
+          function middleware(req) {
+            const token = req.nextauth.token;
+            const isAdminPanel = req.nextUrl.pathname.startsWith("/admin");
+            
+            if (isAdminPanel && token?.role !== "admin") {
+              return NextResponse.redirect(new URL("/", req.url));
+            }
+          },
+          {
+            callbacks: {
+              authorized: ({ token }) => !!token,
+            },
+          }
+        );
+        
+        export const config = {
+          matcher: ["/admin/:path*", "/dashboard/:path*"],
+        };
+      new_middleware: |
+        import { NextResponse } from 'next/server';
+        import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+        
+        export async function middleware(req) {
+          const res = NextResponse.next();
+          const supabase = createMiddlewareClient({ req, res });
+          
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          
+          // 認証が必要なページで未認証の場合はリダイレクト
+          if (!session && (req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/admin'))) {
+            return NextResponse.redirect(new URL('/login', req.url));
+          }
+          
+          // 管理者ページへのアクセス制限
+          if (req.nextUrl.pathname.startsWith('/admin')) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', session?.user?.id)
+              .single();
+              
+            if (userData?.role !== 'admin') {
+              return NextResponse.redirect(new URL('/', req.url));
+            }
+          }
+          
+          return res;
+        }
+        
+        export const config = {
+          matcher: ['/dashboard/:path*', '/admin/:path*'],
+        };
+
+  # ステップ8: コンポーネントの更新
+  update_components:
+    description: "認証関連のコンポーネントを更新します"
+    files_to_update:
+      - "components/auth/LoginForm.tsx"
+      - "components/auth/RegisterForm.tsx"
+      - "app/(dashboard)/layout.tsx"
+    example_changes:
+      login_form: |
+        // components/auth/LoginForm.tsx
+        'use client';
+        
+        import { useState } from 'react';
+        import { useForm } from 'react-hook-form';
+        import { supabaseClient } from '@/lib/supabase/client';
+        import { useRouter } from 'next/navigation';
+        
+        export function LoginForm() {
+          const [isLoading, setIsLoading] = useState(false);
+          const [error, setError] = useState('');
+          const router = useRouter();
+          const { register, handleSubmit } = useForm();
+          
+          const onSubmit = async (data) => {
+            setIsLoading(true);
+            setError('');
+            
+            try {
+              const { error } = await supabaseClient.auth.signInWithPassword({
+                email: data.email,
+                password: data.password,
+              });
+              
+              if (error) throw error;
+              
+              router.push('/dashboard');
+              router.refresh();
+            } catch (error) {
+              setError(error.message || 'ログインに失敗しました');
+            } finally {
+              setIsLoading(false);
+            }
+          };
+          
+          return (
+            <form onSubmit={handleSubmit(onSubmit)}>
+              {/* フォームの内容 */}
+            </form>
+          );
+        }
+
+  # ステップ9: デプロイメント設定の更新
+  update_deployment_settings:
+    description: "VercelからCloudflare Pagesへのデプロイメント設定を更新します"
+    files_to_remove:
+      - "vercel.json"
+    files_to_add:
+      - "wrangler.toml"
+    code_changes:
+      wrangler_toml: |
+        # wrangler.toml
+        name = "ppttranslator"
+        main = ".next/server/index.js"
+        compatibility_date = "2023-12-01"
+        
+        [build]
+        command = "npm run build"
+        
+        [site]
+        bucket = ".next/static"
+        
+        [[d1_databases]]
+        binding = "DB"
+        database_name = "ppttranslator_db"
+        database_id = "YOUR_D1_DATABASE_ID"
+        
+        [[kv_namespaces]]
+        binding = "KV"
+        id = "YOUR_KV_NAMESPACE_ID"
+        
+        [env.production]
+        workers_dev = false
+        route = "your-domain.com/*"
+        
+        [env.production.vars]
+        NEXT_PUBLIC_SUPABASE_URL = "YOUR_SUPABASE_URL"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
+
+  # ステップ10: データ移行
+  migrate_data:
+    description: "PostgreSQLからCloudflare D1へのデータ移行"
+    steps:
+      - "PostgreSQLからデータをエクスポート: `pg_dump -t users -t sessions ... > data.sql`"
+      - "SQLiteの形式に変換するスクリプトを作成"
+      - "変換したデータをCloudflare D1にインポート: `wrangler d1 execute ppttranslator_db --file=data.sqlite`"
+    migration_scripts:
+      export_script: |
+        #!/bin/bash
+        # PostgreSQLからデータをエクスポート
+        pg_dump -U postgres -d your_database -t users -t accounts -t sessions -t translations -t slides -t textElements -t activities > exported_data.sql
+      import_script: |
+        #!/bin/bash
+        # 変換したSQLiteデータをD1にインポート
+        wrangler d1 execute ppttranslator_db --file=converted_data.sql
+
+# 移行テスト計画
+testing_plan:
+  local_testing:
+    - "ローカル環境でDrizzleとSupabaseを設定してテスト"
+    - "認証機能のテスト（ログイン、登録、ロールベースアクセス）"
+    - "データベース操作のテスト（CRUD操作）"
+    - "ファイルアップロードと処理のテスト"
+    - "翻訳機能のテスト"
+  
+  integration_testing:
+    - "Cloudflare Pagesへのステージングデプロイ"
+    - "D1データベースとの接続テスト"
+    - "KVストレージの操作テスト"
+    - "エンドツーエンドテスト"
+  
+  rollback_plan:
+    - "移行前のコードとデータベースのバックアップを作成"
+    - "段階的なデプロイと問題が発生した場合の復旧手順"
+    - "Vercel設定とPrismaスキーマの保持（緊急時の復旧用）"
+
+# 注意点と推奨事項
+recommendations:
+  - "Cloudflare D1はSQLiteベースであり、PostgreSQLと完全に互換性があるわけではないため、複雑なクエリやトランザクションを使用している場合は特に注意が必要です"
+  - "Cloudflare D1はプレビュー段階の技術であるため、本番環境に移行する前に十分なテストを行ってください"
+  - "SupabaseとCloudflare Pagesの統合には追加の設定が必要な場合があります"
+  - "KVストレージにはサイズ制限があるため、大きなファイルの保存には適していない可能性があります"
+  - "Python処理を使用している部分については、Cloudflare Workersでの実行方法を検討する必要があります（例：Pyodide）"
+
+# 移行後の検証
+post_migration_verification:
+  - "全てのAPIエンドポイントが正常に動作することを確認"
+  - "認証フローが正常に機能することを確認"
+  - "ファイルのアップロードと処理が正常に動作することを確認"
+  - "管理者ダッシュボードへのアクセス制限が機能していることを確認"
+  - "パフォーマンスメトリクスを収集し、移行前と比較"
+  - "エラーログをモニタリングし、新たな問題がないか確認" 

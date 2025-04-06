@@ -463,16 +463,143 @@ jobs:
         path: deployment-summary.md
         retention-days: 14
 
+  production-verification:
+    name: 本番環境動作確認
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 10
+    
+    steps:
+    - name: Wait for deployment to complete
+      run: sleep 60  # デプロイが完全に反映されるまで待機
+    
+    - name: Check health endpoint
+      id: health_check
+      run: |
+        HEALTH_URL="${{ secrets.NEXTAUTH_URL }}/api/health"
+        echo "ヘルスチェックURL: $HEALTH_URL"
+        
+        # ヘルスチェックエンドポイントにリクエスト
+        RESPONSE=$(curl -s -w "\n%{http_code}" $HEALTH_URL)
+        HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        
+        # レスポンスを保存
+        echo "$BODY" > health-check-response.json
+        
+        # ステータスコードを確認
+        if [[ $HTTP_STATUS -ge 200 && $HTTP_STATUS -lt 300 ]]; then
+          echo "✅ ヘルスチェック成功: HTTP $HTTP_STATUS"
+          echo "health_status=success" >> $GITHUB_ENV
+        else
+          echo "❌ ヘルスチェック失敗: HTTP $HTTP_STATUS"
+          echo "health_status=failure" >> $GITHUB_ENV
+        fi
+        
+        # レスポンスの内容を確認
+        OVERALL_STATUS=$(echo "$BODY" | jq -r '.status')
+        echo "全体ステータス: $OVERALL_STATUS"
+        
+        # 各コンポーネントのステータスを確認
+        AUTH_STATUS=$(echo "$BODY" | jq -r '.components.auth.status')
+        DB_STATUS=$(echo "$BODY" | jq -r '.components.database.status')
+        ERROR_HANDLING_STATUS=$(echo "$BODY" | jq -r '.components.errorHandling.status')
+        
+        echo "認証ステータス: $AUTH_STATUS"
+        echo "データベースステータス: $DB_STATUS"
+        echo "エラーハンドリングステータス: $ERROR_HANDLING_STATUS"
+        
+        # 結果をサマリーに出力
+        echo "## 本番環境動作確認結果" > verification-summary.md
+        echo "### ヘルスチェック" >> verification-summary.md
+        echo "- エンドポイント: $HEALTH_URL" >> verification-summary.md
+        echo "- HTTPステータス: $HTTP_STATUS" >> verification-summary.md
+        echo "- 全体ステータス: $OVERALL_STATUS" >> verification-summary.md
+        echo "- 認証ステータス: $AUTH_STATUS" >> verification-summary.md
+        echo "- データベースステータス: $DB_STATUS" >> verification-summary.md
+        echo "- エラーハンドリングステータス: $ERROR_HANDLING_STATUS" >> verification-summary.md
+        
+        # 詳細情報を追加
+        echo "### 詳細情報" >> verification-summary.md
+        echo '```json' >> verification-summary.md
+        echo "$BODY" >> verification-summary.md
+        echo '```' >> verification-summary.md
+        
+        # 失敗した場合はエラーを出力
+        if [[ "$OVERALL_STATUS" != "ok" ]]; then
+          echo "::error::ヘルスチェックが失敗しました。ステータス: $OVERALL_STATUS"
+          exit 1
+        fi
+    
+    - name: Upload verification summary
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: verification-summary
+        path: verification-summary.md
+        retention-days: 14
+    
+    - name: Verify authentication functionality
+      id: auth_check
+      run: |
+        AUTH_URL="${{ secrets.NEXTAUTH_URL }}/api/auth/session"
+        echo "認証チェックURL: $AUTH_URL"
+        
+        # セッションエンドポイントにリクエスト
+        RESPONSE=$(curl -s -w "\n%{http_code}" $AUTH_URL)
+        HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        
+        # レスポンスを保存
+        echo "$BODY" > auth-check-response.json
+        
+        # ステータスコードを確認（未認証なので200または401が正常）
+        if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 401 ]]; then
+          echo "✅ 認証エンドポイント確認成功: HTTP $HTTP_STATUS"
+          echo "auth_check_status=success" >> $GITHUB_ENV
+        else
+          echo "❌ 認証エンドポイント確認失敗: HTTP $HTTP_STATUS"
+          echo "auth_check_status=failure" >> $GITHUB_ENV
+          echo "::error::認証エンドポイントの確認に失敗しました。ステータス: $HTTP_STATUS"
+          exit 1
+        fi
+        
+        # 結果をサマリーに追加
+        echo "### 認証機能確認" >> verification-summary.md
+        echo "- エンドポイント: $AUTH_URL" >> verification-summary.md
+        echo "- HTTPステータス: $HTTP_STATUS" >> verification-summary.md
+        echo "- レスポンス: \`$BODY\`" >> verification-summary.md
+    
+    - name: Send verification notification
+      if: always()
+      run: |
+        if [ "${{ env.health_status }}" == "success" ] && [ "${{ env.auth_check_status }}" == "success" ]; then
+          echo "verification_result=success" >> $GITHUB_ENV
+          echo "verification_message=✅ 本番環境動作確認が成功しました" >> $GITHUB_ENV
+        else
+          echo "verification_result=failure" >> $GITHUB_ENV
+          echo "verification_message=❌ 本番環境動作確認に失敗しました" >> $GITHUB_ENV
+        fi
+        
+        echo "## 本番環境動作確認" >> verification-notification.md
+        echo "${{ env.verification_message }}" >> verification-notification.md
+        echo "- 確認時刻: $(date)" >> verification-notification.md
+        echo "- デプロイURL: ${{ secrets.NEXTAUTH_URL }}" >> verification-notification.md
+        
+        if [ "${{ env.verification_result }}" == "failure" ]; then
+          echo "::error::本番環境動作確認に失敗しました。詳細はverification-summaryを確認してください。"
+
   notify:
     name: Notify
     runs-on: ubuntu-latest
-    needs: [build-and-deploy]
+    needs: [build-and-deploy, production-verification]
     if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     
     steps:
     - name: Notification Status
       run: |
-        if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
+        if [ "${{ needs.build-and-deploy.result }}" == "success" ] && [ "${{ needs.production-verification.result }}" == "success" ]; then
           echo "status=success" >> $GITHUB_ENV
           echo "color=good" >> $GITHUB_ENV
           echo "title=✅ デプロイ成功" >> $GITHUB_ENV
