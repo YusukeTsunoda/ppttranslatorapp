@@ -2,92 +2,95 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Translation } from '@/app/(dashboard)/translate/components/Translation';
+import { Translation, type TranslationProps, type TextItemType, type TranslationType } from '@/app/(dashboard)/translate/components/Translation';
 import '@testing-library/jest-dom';
 
 // モックをインポートパスの問題を回避するために更新
-jest.mock('@/app/(dashboard)/translate/components/Translation', () => ({
-  Translation: (props: any) => {
-    // 実装をそのまま置き換えるモック
-    const { textItem, onUpdate, onCancel, targetLanguages } = props;
-    const [translationValues, setTranslationValues] = React.useState<Record<string, string>>({});
+jest.mock('@/app/(dashboard)/translate/components/Translation', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    Translation: (props: TranslationProps) => {
+      // 実装をそのまま置き換えるモック
+      const { textItem, onUpdate, onCancel, targetLanguages } = props;
+      const [translationValues, setTranslationValues] = React.useState<Record<string, string>>({});
 
-    React.useEffect(() => {
-      const initialValues: Record<string, string> = {};
-      targetLanguages.forEach((lang: string) => {
-        const translation = textItem.translations.find((t: any) => t.language === lang);
-        initialValues[lang] = translation ? translation.text : '';
-      });
-      setTranslationValues(initialValues);
-    }, [textItem, targetLanguages]);
+      React.useEffect(() => {
+        const initialValues: Record<string, string> = {};
+        targetLanguages.forEach((lang: string) => {
+          const translation = textItem.translations.find((t: any) => t.language === lang);
+          initialValues[lang] = translation ? translation.text : '';
+        });
+        setTranslationValues(initialValues);
+      }, [textItem, targetLanguages]);
 
-    return (
-      <div className="space-y-4 p-4 border rounded-lg">
-        <div>
-          <h3 className="font-medium mb-2">元のテキスト:</h3>
-          <p>{textItem.text}</p>
-        </div>
-        <div className="space-y-3">
-          <h3 className="font-medium">翻訳:</h3>
-          {targetLanguages.map((lang: string) => (
-            <div key={lang} className="space-y-1">
-              <label htmlFor={`translation-${lang}`}>{lang === 'en' ? '英語' : '中国語'}</label>
-              <input
-                id={`translation-${lang}`}
-                value={translationValues[lang] || ''}
-                onChange={(e) => setTranslationValues({ ...translationValues, [lang]: e.target.value })}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="flex space-x-2 justify-end pt-2">
-          <button onClick={onCancel}>キャンセル</button>
-          <button
-            onClick={() => {
-              // 自動翻訳処理
-              fetch('/api/translate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  text: textItem.text,
-                  sourceLang: 'ja',
-                  targetLangs: targetLanguages,
-                }),
-              })
-                .then((res) => {
-                  if (!res.ok) throw new Error('Translation API error');
-                  return res.json();
+      return (
+        <div className="space-y-4 p-4 border rounded-lg">
+          <div>
+            <h3 className="font-medium mb-2">元のテキスト:</h3>
+            <p>{textItem.text}</p>
+          </div>
+          <div className="space-y-3">
+            <h3 className="font-medium">翻訳:</h3>
+            {targetLanguages.map((lang: string) => (
+              <div key={lang} className="space-y-1">
+                <label htmlFor={`translation-${lang}`}>{lang === 'en' ? '英語' : '中国語'}</label>
+                <input
+                  id={`translation-${lang}`}
+                  value={translationValues[lang] || ''}
+                  onChange={(e) => setTranslationValues({ ...translationValues, [lang]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex space-x-2 justify-end pt-2">
+            <button onClick={onCancel}>キャンセル</button>
+            <button
+              onClick={() => {
+                // 自動翻訳処理
+                global.fetch('/api/translate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    text: textItem.text,
+                    sourceLang: 'ja',
+                    targetLangs: targetLanguages,
+                  }),
                 })
-                .then((data) => {
-                  setTranslationValues(data.translations);
-                })
-                .catch((error) => {
-                  require('@/components/ui/use-toast').useToast().toast({
-                    variant: 'destructive',
-                    title: 'エラー',
-                    description: '翻訳処理中にエラーが発生しました',
+                  .then((res) => {
+                    if (!res.ok) throw new Error('Translation API error');
+                    return res.json();
+                  })
+                  .then((data) => {
+                    setTranslationValues(data.translations);
+                  })
+                  .catch((error) => {
+                    require('@/components/ui/use-toast').useToast().toast({
+                      variant: 'destructive',
+                      title: 'エラー',
+                      description: '翻訳処理中にエラーが発生しました',
+                    });
                   });
-                });
-            }}
-          >
-            自動翻訳
-          </button>
-          <button
-            onClick={() => {
-              const updatedTranslations = targetLanguages.map((lang: string) => ({
-                language: lang,
-                text: translationValues[lang] || '',
-              }));
-              onUpdate({ ...textItem, translations: updatedTranslations });
-            }}
-          >
-            保存
-          </button>
+              }}
+            >
+              自動翻訳
+            </button>
+            <button
+              onClick={() => {
+                const updatedTranslations = targetLanguages.map((lang: string) => ({
+                  language: lang,
+                  text: translationValues[lang] || '',
+                }));
+                onUpdate({ ...textItem, translations: updatedTranslations });
+              }}
+            >
+              保存
+            </button>
+          </div>
         </div>
-      </div>
-    );
-  },
-}));
+      );
+    },
+  };
+});
 
 // モックデータ
 const mockTextItem = {

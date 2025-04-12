@@ -480,6 +480,42 @@ testing_plan:
     - "段階的なデプロイと問題が発生した場合の復旧手順"
     - "Vercel設定とPrismaスキーマの保持（緊急時の復旧用）"
 
+# テスト環境の課題と学び
+testing_environment_challenges:
+  - title: "JestとNext.js (SWC) の互換性問題"
+    description: |
+      初期のテスト実行時に`Failed to load SWC binary`エラーが頻発しました。
+      これは、JestがNext.jsのデフォルトコンパイラであるSWC（Speedy Web Compiler）を
+      テスト環境で正しくロードできない場合に発生します。
+    cause: |
+      - JestがSWCのバイナリを見つけられない、または実行できない。
+      - `next/jest`の設定が不十分または環境と互換性がない。
+      - `NODE_OPTIONS`フラグ（`--no-experimental-fetch`など）がSWCの動作に影響を与える可能性がある。
+    solution: |
+      - `package.json`のテストスクリプトに`NODE_OPTIONS=--no-experimental-fetch`を追加。
+      - `jest.config.js`を修正し、`next/jest`ラッパーを使用せず、直接Babelトランスフォーマーを使用するように設定。
+      - `babel.config.js`または`.babelrc`でテスト環境用のBabel設定を明示的に行い、`@babel/plugin-transform-modules-commonjs`を使用してESモジュールをCommonJSに変換。
+      - `jest.config.js`の`transformIgnorePatterns`に必要なモジュール（swr, @babel, @anthropic-ai, react, react-domなど）を追加。
+      - `jest.config.js`の`moduleNameMapper`でNext.jsの内部モジュールを適切にマッピング。
+    learnings: |
+      - Next.jsプロジェクトでJestを使用する場合、SWCとの互換性に注意が必要。
+      - BabelをJestのトランスフォーマーとして明示的に設定することで、SWC関連の問題を回避できる場合がある。
+      - Jestの設定（特に`transformIgnorePatterns`, `moduleNameMapper`）とBabelの設定（presets, plugins）を環境に合わせて慎重に調整する必要がある。
+
+  - title: "ESモジュール構文の解析エラー"
+    description: |
+      SWCの問題を解決した後も、一部のテストファイル（特にReactコンポーネントを含む`.tsx`ファイル）で
+      `SyntaxError: Cannot use import statement outside a module`エラーが発生しました。
+    cause: |
+      - JestがデフォルトでESモジュール構文を直接解釈できない。
+      - Babelの設定が不十分で、テストファイル内の`import`文が正しくCommonJSの`require`文に変換されていない。
+    solution: |
+      - `babel.config.js`または`.babelrc`のテスト環境設定で`@babel/preset-env`の`modules`オプションを`commonjs`に設定し、`@babel/plugin-transform-modules-commonjs`プラグインを使用。
+      - `jest.config.js`の`transform`セクションでBabelの設定を正しく指定。
+    learnings: |
+      - Jest環境でTypeScriptやJSXを使用する場合、Babelによる適切なトランスパイル設定が不可欠。
+      - ESモジュールとCommonJSの混在環境では、モジュール解決と変換の設定に特に注意が必要。
+
 # 注意点と推奨事項
 recommendations:
   - "Cloudflare D1はSQLiteベースであり、PostgreSQLと完全に互換性があるわけではないため、複雑なクエリやトランザクションを使用している場合は特に注意が必要です"
@@ -495,4 +531,22 @@ post_migration_verification:
   - "ファイルのアップロードと処理が正常に動作することを確認"
   - "管理者ダッシュボードへのアクセス制限が機能していることを確認"
   - "パフォーマンスメトリクスを収集し、移行前と比較"
-  - "エラーログをモニタリングし、新たな問題がないか確認" 
+  - "エラーログをモニタリングし、新たな問題がないか確認"
+
+# Jestテストに関する学び (Translation.test.tsx)
+jest_test_lessons:
+  problem: "Jestテストで `ReferenceError: fetch is not defined` と TypeScript の型エラーが発生"
+  root_cause:
+    - "`jest.mock` のファクトリ関数内で `global.fetch` を暗黙的に参照しようとしたが、Jest のスコープ制限により参照できなかった"
+    - "モックコンポーネントで使用する型定義 (`TranslationProps`, `TextItemType`, `TranslationType`) が元のコンポーネントファイルで `export` されていなかったため、テストファイルでインポートできなかった"
+    - "`fetch` モックの `json()` メソッドが返すオブジェクトの型が、実際のAPIレスポンスと一致していなかった (`translations` プロパティの欠落)"
+  improvement:
+    - "`jest.mock` のファクトリ関数内で `global.fetch` を明示的に参照するように修正"
+    - "必要な型定義を `export` するように元のコンポーネントファイルを修正"
+    - "テストファイル内で型定義を正しくインポート"
+    - "`fetch` モックの `json()` が返すオブジェクトに `translations` プロパティを追加"
+  lessons_learned:
+    - "`jest.mock` のファクトリ関数から外部スコープの変数（特にグローバル変数）を参照する場合は、`global.` プレフィックスを付けて明示的に参照する必要がある"
+    - "コンポーネントとそのテストファイル間で共有される型定義は、必ず `export` する"
+    - "モックする関数の戻り値の型は、実際の関数の戻り値の型（特に非同期処理の解決値）と一致させる必要がある"
+    - "テストエラーが発生した場合、エラーメッセージだけでなく、関連する設定ファイル（`jest.config.js`, `babel.config.js`, `jest.setup.js`）やモックの実装も確認する"

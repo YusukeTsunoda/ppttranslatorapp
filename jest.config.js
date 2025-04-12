@@ -1,13 +1,5 @@
 // jest.config.js
-// このファイルはJest設定を行います
 process.env.NODE_ENV = 'test';
-
-const nextJest = require('next/jest');
-
-// next/jestが次のNextとJestの設定が正しく作動するようにします
-const createJestConfig = nextJest({
-  dir: './',
-});
 
 /** @type {import('jest').Config} */
 const config = {
@@ -16,10 +8,24 @@ const config = {
   testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^next/router$': '<rootDir>/node_modules/next/router.js',
+    '^next/navigation$': '<rootDir>/node_modules/next/navigation.js',
+    '^next/link$': '<rootDir>/node_modules/next/link.js',
+    '^next/image$': '<rootDir>/node_modules/next/image.js',
+    '^next/dynamic$': '<rootDir>/node_modules/next/dynamic.js',
+    '^next/script$': '<rootDir>/node_modules/next/script.js',
+    '^next/head$': '<rootDir>/node_modules/next/head.js',
+    '^next/headers$': '<rootDir>/node_modules/next/headers.js',
+    '^next/server$': '<rootDir>/node_modules/next/server.js'
   },
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+    '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest', 
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@next|next|swr|@babel|@anthropic-ai|react|react-dom)/)'
+  ],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  testRegex: '(/__tests__|/tests/)(.*)(test|spec)\\.[jt]sx?$',
   collectCoverage: true,
   coverageProvider: 'v8',
   coverageReporters: ['text', 'lcov', 'json-summary'],
@@ -49,6 +55,4 @@ const config = {
   ],
 };
 
-// createJestConfigは、次の処理のためにこのcustomConfigを使用します
-// https://nextjs.org/docs/testing#setting-up-jest-with-the-rust-compiler
-module.exports = createJestConfig(config);
+module.exports = config;

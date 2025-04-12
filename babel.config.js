@@ -1,17 +1,13 @@
 // babel.config.js
 module.exports = {
   presets: [
-    [
-      'next/babel',
-      {
-        'preset-env': {},
-        'transform-runtime': {},
-        'styled-jsx': {},
-        'class-properties': {},
-      },
-    ],
+    ['@babel/preset-env', { targets: { node: 'current' }, modules: 'commonjs' }],
+    '@babel/preset-typescript',
+    // Runtime を 'automatic' に戻す
+    ['@babel/preset-react', { runtime: 'automatic' }] 
   ],
   plugins: [
+    '@babel/plugin-transform-modules-commonjs', 
     [
       '@babel/plugin-transform-runtime',
       {
@@ -19,9 +15,4 @@ module.exports = {
       },
     ],
   ],
-  env: {
-    test: {
-      plugins: ['@babel/plugin-transform-modules-commonjs'],
-    },
-  },
 };

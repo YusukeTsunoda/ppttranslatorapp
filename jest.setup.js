@@ -1,5 +1,18 @@
 // jest.setup.js
+
+// global.fetchのモック (他の設定より先に実行)
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    json: () => Promise.resolve({}),
+    ok: true,
+    status: 200,
+  }),
+);
+
 require('@testing-library/jest-dom');
+
+// SWC関連のエラーを抑制
+jest.mock('@next/swc-darwin-arm64', () => ({}), { virtual: true });
 
 // fs/promisesのモック
 jest.mock('fs/promises', () => ({
@@ -45,17 +58,6 @@ jest.mock('swr', () => {
     })),
   };
 });
-
-// global.fetchのモック
-if (typeof global.fetch === 'undefined') {
-  global.fetch = jest.fn(() =>
-    Promise.resolve({
-      json: () => Promise.resolve({}),
-      ok: true,
-      status: 200,
-    }),
-  );
-}
 
 // コンソールエラーを抑制（テスト中に意図的なエラーを発生させる場合に便利）
 const originalConsoleError = console.error;
@@ -133,17 +135,18 @@ jest.mock('@/components/ui/use-toast', () => {
     mockToastsState.toasts = [];
   };
 
-  // 各テストの前にトーストの状態をリセット
-  beforeEach(() => {
-    resetMockState();
-  });
-
+  // モックの外部でbeforeEachを使用するのではなく、モックの内部でリセット関数を返す
   return {
-    useToast: jest.fn().mockImplementation(() => ({
-      toasts: mockToastsState.toasts,
-      toast: mockToastFn,
-      dismiss: mockDismissFn,
-    })),
+    useToast: jest.fn().mockImplementation(() => {
+      // 各テスト実行時にリセット
+      resetMockState();
+      
+      return {
+        toasts: mockToastsState.toasts,
+        toast: mockToastFn,
+        dismiss: mockDismissFn,
+      };
+    }),
     toast: mockToastFn,
     reducer: jest.fn().mockImplementation((state, action) => {
       switch (action.type) {
@@ -171,4 +174,10 @@ jest.mock('@/components/ui/use-toast', () => {
       }
     }),
   };
+});
+
+// 各テストの前に実行するグローバル設定
+beforeEach(() => {
+  // テスト環境のリセット
+  jest.clearAllMocks();
 });

@@ -4,12 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 
-type TranslationType = {
+// Export Type
+export type TranslationType = {
   language: string;
   text: string;
 };
 
-type TextItemType = {
+// Export Type
+export type TextItemType = {
   id: string;
   text: string;
   position: {
@@ -21,7 +23,8 @@ type TextItemType = {
   translations: TranslationType[];
 };
 
-type TranslationProps = {
+// Export Type
+export type TranslationProps = {
   textItem: TextItemType;
   onUpdate: (updatedTextItem: TextItemType) => void;
   onCancel: () => void;
