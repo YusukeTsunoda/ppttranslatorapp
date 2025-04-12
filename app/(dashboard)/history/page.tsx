@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Clock, Eye, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate, formatBytes } from '@/lib/utils';
@@ -13,20 +13,36 @@ import { useHistoryFilter } from '@/lib/hooks/useHistoryFilter';
 import { HistoryFilter } from '@/components/history/HistoryFilter';
 import { HistorySort } from '@/components/history/HistorySort';
 import { Pagination } from '@/components/history/Pagination';
+import useSWR from 'swr';
+import { TranslationStatus, Language } from '@prisma/client';
+
+const fetcher = (url: string) => fetch(url).then(res => {
+  if (!res.ok) {
+    throw new Error('履歴の取得に失敗しました');
+  }
+  return res.json();
+});
 
 interface HistoryItem {
   id: string;
-  fileName: string;
+  originalFileName: string;
   createdAt: string;
-  status: string;
-  credits: number;
+  status: TranslationStatus;
   creditsUsed: number;
   pageCount: number;
-  fileSize: number;
-  processingTime: number;
+  fileSize: number | null;
+  processingTime: number | null;
   thumbnailPath?: string;
-  sourceLang: string;
-  targetLang: string;
+  sourceLang: Language;
+  targetLang: Language;
+  file: { originalName: string };
+}
+
+interface ApiResponse {
+  data: HistoryItem[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 interface PaginationInfo {
@@ -38,101 +54,36 @@ interface PaginationInfo {
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [credits, setCredits] = useState(0);
-  const [monthlyCount, setMonthlyCount] = useState(0);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0,
-  });
-  
   const filter = useHistoryFilter();
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        setIsLoading(true);
-        
-        // クエリパラメータを構築
-        const params = new URLSearchParams();
-        params.set('page', filter.page.toString());
-        params.set('limit', filter.limit.toString());
-        params.set('sort', filter.sort);
-        params.set('order', filter.order);
-        
-        if (filter.search) params.set('search', filter.search);
-        if (filter.startDate) params.set('startDate', filter.startDate);
-        if (filter.endDate) params.set('endDate', filter.endDate);
-        if (filter.status) params.set('status', filter.status);
-        if (filter.sourceLang) params.set('sourceLang', filter.sourceLang);
-        if (filter.targetLang) params.set('targetLang', filter.targetLang);
-        
-        const response = await fetch(`/api/history?${params.toString()}`);
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', filter.page.toString());
+    params.set('limit', filter.limit.toString());
+    params.set('sort', filter.sort);
+    params.set('order', filter.order);
+    if (filter.search) params.set('search', filter.search);
+    if (filter.startDate) params.set('startDate', filter.startDate);
+    if (filter.endDate) params.set('endDate', filter.endDate);
+    if (filter.status) params.set('status', filter.status);
+    if (filter.sourceLang) params.set('sourceLang', filter.sourceLang);
+    if (filter.targetLang) params.set('targetLang', filter.targetLang);
+    return `/api/history?${params.toString()}`;
+  }, [filter]);
 
-        if (!response.ok) {
-          throw new Error('履歴の取得に失敗しました');
-        }
+  const { data: apiResponse, error, isLoading } = useSWR<ApiResponse>(apiUrl, fetcher);
 
-        const data = await response.json();
-        console.log('履歴データ詳細:', {
-          history: data.history,
-          credits: data.credits,
-          monthlyCount: data.monthlyCount,
-          pagination: data.pagination,
-          historyLength: data.history?.length || 0,
-        });
-
-        // データを整形
-        const formattedHistory =
-          data.history?.map((item: any) => ({
-            id: item.id || 'unknown-id',
-            fileName: item.fileName || 'unknown.pptx',
-            createdAt: item.createdAt || new Date().toISOString(),
-            status: item.status || '完了',
-            credits: item.creditsUsed || 0,
-            creditsUsed: item.creditsUsed || 0,
-            pageCount: item.pageCount || 0,
-            fileSize: item.fileSize || 0,
-            processingTime: item.processingTime || 0,
-            thumbnailPath: item.thumbnailPath,
-            sourceLang: item.sourceLang,
-            targetLang: item.targetLang,
-          })) || [];
-
-        console.log('整形後の履歴データ:', formattedHistory);
-
-        setHistory(formattedHistory);
-        setCredits(data.credits || 0);
-        setMonthlyCount(data.monthlyCount || 0);
-        
-        if (data.pagination) {
-          setPagination(data.pagination);
-        }
-      } catch (err) {
-        console.error('履歴取得エラー:', err);
-        setError((err as Error).message);
-      } finally {
-        setIsLoading(false);
-      }
+  const pagination: PaginationInfo | null = useMemo(() => {
+    if (!apiResponse) return null;
+    return {
+      total: apiResponse.total,
+      page: apiResponse.page,
+      limit: apiResponse.limit,
+      totalPages: Math.ceil(apiResponse.total / apiResponse.limit),
     };
+  }, [apiResponse]);
 
-    fetchHistory();
-  }, [
-    filter.page,
-    filter.limit,
-    filter.sort,
-    filter.order,
-    filter.search,
-    filter.startDate,
-    filter.endDate,
-    filter.status,
-    filter.sourceLang,
-    filter.targetLang,
-  ]);
+  const history: HistoryItem[] = apiResponse?.data || [];
 
   const handleViewDetail = (id: string) => {
     router.push(`/history/${id}`);
@@ -140,6 +91,19 @@ export default function HistoryPage() {
 
   const handleRetranslate = (id: string) => {
     router.push(`/translate?file=${id}`);
+  };
+
+  const getBadgeVariant = (status: TranslationStatus): 'success' | 'destructive' | 'secondary' | 'default' => {
+    switch (status) {
+      case TranslationStatus.COMPLETED:
+        return 'success';
+      case TranslationStatus.FAILED:
+        return 'destructive';
+      case TranslationStatus.PROCESSING:
+        return 'secondary';
+      default:
+        return 'default';
+    }
   };
 
   if (error) {
@@ -172,10 +136,7 @@ export default function HistoryPage() {
             {isLoading ? (
               <Skeleton className="h-10 w-20" />
             ) : (
-              <>
-                <div className="text-3xl font-bold text-gray-900">{credits}</div>
-                <p className="text-sm text-gray-500 mt-1">1回の翻訳につき約10-20クレジットを消費します</p>
-              </>
+              <div className="text-3xl font-bold text-gray-900">0</div>
             )}
           </CardContent>
         </Card>
@@ -191,10 +152,7 @@ export default function HistoryPage() {
             {isLoading ? (
               <Skeleton className="h-10 w-20" />
             ) : (
-              <>
-                <div className="text-3xl font-bold text-gray-900">{monthlyCount}</div>
-                <p className="text-sm text-gray-500 mt-1">過去30日間の翻訳ファイル数</p>
-              </>
+              <div className="text-3xl font-bold text-gray-900">0</div>
             )}
           </CardContent>
         </Card>
@@ -244,7 +202,7 @@ export default function HistoryPage() {
                           className="cursor-pointer hover:bg-gray-50"
                         >
                           <TableCell>
-                            <div className="font-medium">{item.fileName}</div>
+                            <div className="font-medium">{item.originalFileName}</div>
                             <div className="text-sm text-gray-500 md:hidden">
                               {formatDate(new Date(item.createdAt))} · {item.pageCount}ページ
                             </div>
@@ -252,7 +210,7 @@ export default function HistoryPage() {
                           <TableCell className="hidden md:table-cell">{item.pageCount}ページ</TableCell>
                           <TableCell className="hidden md:table-cell">{formatDate(new Date(item.createdAt))}</TableCell>
                           <TableCell>
-                            <Badge variant={item.status === '完了' ? 'success' : item.status === 'エラー' ? 'destructive' : 'default'} className="whitespace-nowrap">
+                            <Badge variant={getBadgeVariant(item.status)} className="whitespace-nowrap">
                               {item.status}
                             </Badge>
                           </TableCell>
@@ -284,11 +242,13 @@ export default function HistoryPage() {
                 </Table>
               </div>
               
-              <Pagination
-                filter={filter}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.total}
-              />
+              {pagination && (
+                <Pagination
+                  filter={filter}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.total}
+                />
+              )}
             </>
           )}
         </CardContent>

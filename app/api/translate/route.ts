@@ -9,7 +9,7 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { Session } from 'next-auth';
 import { prisma } from '@/lib/db/prisma';
 import { v4 as uuidv4 } from 'uuid';
-import { Language } from '@prisma/client';
+import { Language, TranslationStatus } from '@prisma/client';
 
 interface CustomSession extends Session {
   user: {
@@ -65,7 +65,12 @@ export async function POST(req: Request) {
     const data = await req.json();
 
     // リクエストBodyからパラメータ取得
-    const { texts, sourceLang, targetLang, model, fileName = 'スライド', slides } = data;
+    const { texts, sourceLang, targetLang, model, fileName = 'スライド', slides, fileId } = data;
+
+    // ★★★ Check if fileId is provided ★★★
+    if (!fileId) {
+      return NextResponse.json({ error: 'File ID is required' }, { status: 400 });
+    }
 
     // デフォルトモデルを指定
     const defaultModel = 'claude-3-haiku-20240307';
@@ -93,9 +98,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'テキストが必要です' }, { status: 400 });
     }
 
-    const translations = await Promise.all(
-      texts.map(async (textObj) => {
-        const prompt = `
+    let translations: string[] = [];
+    let translationError: Error | null = null;
+    const startTime = performance.now(); // Start time measurement
+
+    try {
+      translations = await Promise.all(
+        texts.map(async (textObj) => {
+          const prompt = `
 あなたはプレゼンテーション資料の専門翻訳者です。
 以下のテキストを${getLanguageName(sourceLang)}から${getLanguageName(targetLang)}に翻訳してください。
 
@@ -111,68 +121,99 @@ ${textObj.text}
 翻訳文のみを出力してください。説明や注釈は含めないでください。
 `;
 
-        const message = await anthropic.messages.create({
-          model: selectedModel,
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-        });
+          const message = await anthropic.messages.create({
+            model: selectedModel,
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          });
 
-        // デバッグ用にログを出力
-        console.log('Translation request:', {
-          sourceLang,
-          targetLang,
-          originalText: textObj.text,
-          translatedText: (message.content[0] as any).text.trim(),
-        });
-        return (message.content[0] as any).text.trim();
-      }),
-    );
+          // ★★★ Remove debug log? Consider logging strategy ★★★
+          // console.log('Translation request:', {
+          //   sourceLang,
+          //   targetLang,
+          //   originalText: textObj.text,
+          //   translatedText: (message.content[0] as any).text.trim(),
+          // });
+          return (message.content[0] as any).text.trim();
+        }),
+      );
+      console.log('All translations completed successfully.');
+    } catch (error) {
+      console.error('Anthropic API Error:', error);
+      translationError = error instanceof Error ? error : new Error(String(error));
+      // If translation fails, we might still want to record history, but with FAILED status
+    }
 
-    // クレジット消費と履歴記録を試みる（エラーが発生しても翻訳結果は返す）
+    const endTime = performance.now();
+    const processingTime = Math.round(endTime - startTime); // Calculate processing time in milliseconds
+
+    // --- History and Credit Logic ---
+    let historyStatus: TranslationStatus;
+    let historyErrorMessage: string | null = null;
+
+    if (translationError) {
+      historyStatus = TranslationStatus.FAILED;
+      historyErrorMessage = translationError.message;
+    } else {
+      historyStatus = TranslationStatus.COMPLETED;
+    }
+
+    // Prepare history data regardless of DB operation success
+    const historyData = {
+      // id: uuidv4(), // Let Prisma handle default cuid()
+      userId: session.user.id,
+      fileId: fileId, // Use provided fileId
+      // fileName: fileName, // Removed, get from File model if needed
+      pageCount: slides?.length ?? 0, // Use provided slides array or default to 0
+      status: historyStatus,
+      creditsUsed: historyStatus === TranslationStatus.COMPLETED ? 1 : 0, // Only consume credit on success
+      sourceLang: sourceLang as Language,
+      targetLang: targetLang as Language,
+      model: selectedModel,
+      // fileSize: 0, // TODO: Get file size if needed, maybe from File record?
+      processingTime: processingTime, // Store calculated processing time
+      translatedFileKey: null, // Set later when file is generated and stored
+      errorMessage: historyErrorMessage,
+    };
+
+    // Attempt to update credits (only on success) and create history record
     try {
-      // ユーザー情報を取得
-      const userBefore = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { credits: true },
-      });
-      console.log('クレジット消費前のユーザー情報:', userBefore);
+      if (historyStatus === TranslationStatus.COMPLETED) {
+        // Decrement credit only if translation was successful
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { credits: { decrement: 1 } },
+        });
+        console.log('クレジット消費が完了しました');
+      }
 
-      // Prisma標準APIを使用してクレジットを更新
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { credits: { decrement: 1 } },
-      });
-
-      // 更新後のユーザー情報を取得
-      const userAfter = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { credits: true },
-      });
-      console.log('クレジット消費後のユーザー情報:', userAfter);
-
-      // 翻訳履歴を記録（Prisma標準APIを使用）
       const createdHistory = await prisma.translationHistory.create({
-        data: {
-          id: uuidv4(),
-          userId: session.user.id,
-          fileName,
-          pageCount: slides.length, // スライド数を正確に反映
-          status: '完了',
-          creditsUsed: 1,
-          sourceLang: sourceLang as Language,
-          targetLang: targetLang as Language,
-          model: selectedModel,
-        },
+        data: historyData,
       });
 
       console.log('作成された翻訳履歴:', createdHistory);
-      console.log('クレジット更新と履歴記録が完了しました');
+      console.log('履歴記録が完了しました');
+
     } catch (dbError) {
-      console.error('データベース操作エラー:', dbError);
+      console.error('データベース操作エラー (クレジット更新 or 履歴作成):', dbError);
+      // Even if DB fails, try to return the translation result if available
+    }
+    // --- End History and Credit Logic ---
+
+    // If translation itself failed, return error
+    if (translationError) {
+        return new NextResponse(JSON.stringify({ error: 'Translation failed', detail: translationError.message }), {
+            status: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-store, max-age=0',
+            },
+        });
     }
 
-    console.log('All translations completed:', translations);
+    // Return successful translation
+    console.log('Returning successful translation response.');
     return NextResponse.json({
       success: true,
       translations,
@@ -183,8 +224,11 @@ ${textObj.text}
       },
     });
   } catch (error) {
-    console.error('Translation error:', error);
-    return new NextResponse(JSON.stringify({ error: 'Translation failed' }), {
+    console.error('Overall Translation API Error:', error);
+    // Attempt to record a FAILED history entry even in outer catch block?
+    // This might be complex due to potential lack of data (session, fileId etc.)
+    // For now, just return a generic error.
+    return new NextResponse(JSON.stringify({ error: 'Translation failed', detail: error instanceof Error ? error.message : String(error) }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',

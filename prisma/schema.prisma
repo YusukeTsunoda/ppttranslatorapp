@@ -58,6 +58,7 @@ model File {
   updatedAt    DateTime
   User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   Slide        Slide[]
+  TranslationHistory TranslationHistory[]
 }
 
 model Slide {
@@ -69,8 +70,6 @@ model Slide {
   updatedAt DateTime
   File      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
   Text      Text[]
-
-  @@unique([fileId, index])
 }
 
 model Text {
@@ -105,9 +104,9 @@ model User {
 model TranslationHistory {
   id             String   @id @default(cuid())
   userId         String
-  fileName       String
+  fileId         String
   pageCount      Int      @default(0)
-  status         String
+  status         TranslationStatus
   creditsUsed    Int
   sourceLang     Language
   targetLang     Language
@@ -117,9 +116,15 @@ model TranslationHistory {
   thumbnailPath  String?
   tags           Json?
   metadata       Json?
+  translatedFileKey String?
+  errorMessage   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file           File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([userId, createdAt])
 }
 
 model ActivityLog {
@@ -167,4 +172,10 @@ enum Language {
 enum UserRole {
   USER
   ADMIN
+}
+
+enum TranslationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }

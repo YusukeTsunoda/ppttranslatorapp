@@ -18,31 +18,26 @@ export async function GET(
     const userId = session.user.id;
     const historyId = params.id;
 
-    // 履歴項目の詳細情報を取得
+    // 履歴項目の詳細情報と関連ファイル、スライド、テキスト、翻訳情報を一括取得
     const historyItem = await prisma.translationHistory.findUnique({
       where: {
         id: historyId,
-      },
-    });
-
-    // 権限チェック：自分の履歴データのみアクセス可能
-    if (!historyItem || historyItem.userId !== userId) {
-      return NextResponse.json({ error: '履歴が見つかりません' }, { status: 404 });
-    }
-
-    // 関連するファイル情報を取得
-    // 注：ここでは仮定として、ファイル名から関連するファイルを検索
-    const relatedFile = await prisma.file.findFirst({
-      where: {
-        userId: userId,
-        originalName: historyItem.fileName,
+        userId: userId, // 取得時にユーザーIDも条件に含める
       },
       include: {
-        Slide: {
+        file: { // fileIdリレーションを使ってFileを取得
           include: {
-            Text: {
+            Slide: { // Fileに関連するSlideを取得
+              orderBy: { index: 'asc' }, // スライド順でソート
               include: {
-                Translation: true,
+                Text: { // Slideに関連するTextを取得
+                  orderBy: { id: 'asc' }, // テキストIDでソート (またはpositionなど)
+                  include: {
+                    Translation: { // Textに関連するTranslationを取得
+                      orderBy: { createdAt: 'desc' }, // 最新の翻訳を優先
+                    },
+                  },
+                },
               },
             },
           },
@@ -50,28 +45,36 @@ export async function GET(
       },
     });
 
+    // 履歴が見つからない、または自分のものでない場合
+    if (!historyItem) {
+      return NextResponse.json({ error: '履歴が見つかりません' }, { status: 404 });
+    }
+
     // レスポンスデータの構築
     const responseData = {
-      historyItem,
-      fileDetails: relatedFile ? {
-        id: relatedFile.id,
-        originalName: relatedFile.originalName,
-        fileSize: relatedFile.fileSize,
-        mimeType: relatedFile.mimeType,
-        status: relatedFile.status,
-        createdAt: relatedFile.createdAt,
+      // 履歴自体の情報 (fileを除外して重複を避ける)
+      ...(({ file, ...rest }) => rest)(historyItem),
+      // 関連ファイル情報 (もしfileリレーションが存在すれば)
+      fileDetails: historyItem.file ? {
+        id: historyItem.file.id,
+        originalName: historyItem.file.originalName,
+        fileSize: historyItem.file.fileSize,
+        mimeType: historyItem.file.mimeType,
+        status: historyItem.file.status,
+        createdAt: historyItem.file.createdAt,
       } : null,
-      slides: relatedFile?.Slide.map(slide => ({
+      // 関連スライド情報 (もしfileとSlideリレーションが存在すれば)
+      slides: historyItem.file?.Slide.map(slide => ({
         id: slide.id,
         index: slide.index,
         imagePath: slide.imagePath,
         texts: slide.Text.map(text => ({
           id: text.id,
-          originalText: text.text,
+          originalText: text.text, // `text`フィールドはoriginalTextにマッピング
           position: text.position,
           translations: text.Translation.map(translation => ({
             id: translation.id,
-            translatedText: translation.translation,
+            translatedText: translation.translation, // `translation`フィールドはtranslatedTextにマッピング
             model: translation.model,
             sourceLang: translation.sourceLang,
             targetLang: translation.targetLang,
@@ -84,7 +87,7 @@ export async function GET(
   } catch (error) {
     console.error('履歴詳細取得エラー:', error);
     return NextResponse.json(
-      { error: '履歴詳細の取得中にエラーが発生しました' },
+      { error: '履歴詳細の取得中に予期せぬエラーが発生しました' },
       { status: 500 }
     );
   }

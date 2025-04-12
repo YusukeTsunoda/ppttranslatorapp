@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/db/prisma';
-import { Language } from '@prisma/client';
+import { Language, Prisma } from '@prisma/client';
+import { TranslationStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
+
+// ソート可能なフィールドのリスト
+const allowedSortFields: (keyof Prisma.TranslationHistoryOrderByWithRelationInput | 'originalFileName')[] = [
+  'createdAt', 'updatedAt', 'pageCount', 'status', 'creditsUsed', 'sourceLang', 'targetLang', 'model', 'fileSize', 'processingTime', 'originalFileName'
+];
 
 export async function GET(req: Request) {
   try {
@@ -13,133 +19,146 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
-    // ユーザーIDを取得
     const userId = session.user.id;
-    console.log('履歴取得: ユーザーID', userId);
 
-    // URLからクエリパラメータを取得
     const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const sort = url.searchParams.get('sort') || 'createdAt';
-    const order = url.searchParams.get('order') || 'desc';
-    const search = url.searchParams.get('search') || '';
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
-    const status = url.searchParams.get('status');
-    const sourceLang = url.searchParams.get('sourceLang') as Language | null;
-    const targetLang = url.searchParams.get('targetLang') as Language | null;
+    const searchParams = url.searchParams;
 
-    // ページネーションの計算
+    const pageParam = searchParams.get('page');
+    const limitParam = searchParams.get('limit');
+    const sortParam = searchParams.get('sort') || 'createdAt';
+    const orderParam = searchParams.get('order') || 'desc';
+    const search = searchParams.get('search') || '';
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const statusParam = searchParams.get('status');
+    const sourceLangParam = searchParams.get('sourceLang');
+    const targetLangParam = searchParams.get('targetLang');
+
+    const page = pageParam ? parseInt(pageParam) : 1;
+    const limit = limitParam ? parseInt(limitParam) : 10;
+
+    if (isNaN(page) || page < 1) {
+      return NextResponse.json({ error: '無効なページ番号です' }, { status: 400 });
+    }
+    if (isNaN(limit) || limit < 1 || limit > 100) {
+      return NextResponse.json({ error: '無効な制限数です' }, { status: 400 });
+    }
+
+    if (orderParam !== 'asc' && orderParam !== 'desc') {
+      return NextResponse.json({ error: '無効なソート順序です' }, { status: 400 });
+    }
+
+    // Allow sorting by originalFileName via relation
+    const effectiveSortParam = sortParam === 'originalFileName' ? 'file' : sortParam;
+    if (!allowedSortFields.includes(sortParam as any)) {
+        return NextResponse.json({ error: `無効なソートキーです: ${sortParam}` }, { status: 400 });
+    }
+
+    const sourceLang = sourceLangParam && Object.values(Language).includes(sourceLangParam as Language)
+                       ? sourceLangParam as Language
+                       : null;
+    const targetLang = targetLangParam && Object.values(Language).includes(targetLangParam as Language)
+                       ? targetLangParam as Language
+                       : null;
+    // Validate status param against Enum
+    const status = statusParam && Object.values(TranslationStatus).includes(statusParam as TranslationStatus)
+                   ? statusParam as TranslationStatus
+                   : null;
+
     const skip = (page - 1) * limit;
 
-    try {
-      // フィルター条件の構築
-      const whereCondition: any = {
-        userId: userId,
-      };
+    const whereCondition: Prisma.TranslationHistoryWhereInput = {
+      userId: userId,
+    };
 
-      // 検索キーワードがある場合
-      if (search) {
-        whereCondition.fileName = {
+    if (search) {
+      // Search by originalName in the related File model
+      whereCondition.file = {
+        originalName: {
           contains: search,
           mode: 'insensitive',
+        }
+      };
+    }
+
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (startDate) {
+      try {
+        dateFilter.gte = new Date(startDate);
+      } catch { /* ignore invalid date */ }
+    }
+    if (endDate) {
+      try {
+        dateFilter.lte = new Date(endDate);
+      } catch { /* ignore invalid date */ }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+      whereCondition.createdAt = dateFilter;
+    }
+
+    if (status) {
+      whereCondition.status = status; // Use validated enum value
+    }
+
+    if (sourceLang) {
+      whereCondition.sourceLang = sourceLang;
+    }
+
+    if (targetLang) {
+      whereCondition.targetLang = targetLang;
+    }
+
+    // Handle sorting by related field
+    let orderByCondition: Prisma.TranslationHistoryOrderByWithRelationInput | Prisma.TranslationHistoryOrderByWithRelationInput[];
+    if (sortParam === 'originalFileName') {
+        orderByCondition = {
+            file: {
+                originalName: orderParam,
+            },
         };
-      }
+    } else {
+        orderByCondition = {
+            [sortParam]: orderParam,
+        } as Prisma.TranslationHistoryOrderByWithRelationInput;
+    }
 
-      // 日付範囲フィルター
-      if (startDate) {
-        whereCondition.createdAt = {
-          ...(whereCondition.createdAt || {}),
-          gte: new Date(startDate),
-        };
-      }
-
-      if (endDate) {
-        whereCondition.createdAt = {
-          ...(whereCondition.createdAt || {}),
-          lte: new Date(endDate),
-        };
-      }
-
-      // ステータスフィルター
-      if (status) {
-        whereCondition.status = status;
-      }
-
-      // 言語フィルター
-      if (sourceLang) {
-        whereCondition.sourceLang = sourceLang;
-      }
-
-      if (targetLang) {
-        whereCondition.targetLang = targetLang;
-      }
-
-      // 総件数を取得
-      const totalCount = await prisma.translationHistory.count({
-        where: whereCondition,
-      });
-
-      // ソート条件の構築
-      const orderByCondition: any = {};
-      orderByCondition[sort] = order;
-
-      // 翻訳履歴を取得
-      const history = await prisma.translationHistory.findMany({
+    const [totalCount, history] = await prisma.$transaction([
+      prisma.translationHistory.count({ where: whereCondition }),
+      prisma.translationHistory.findMany({
         where: whereCondition,
         orderBy: orderByCondition,
         skip,
         take: limit,
-      });
-      console.log('取得した翻訳履歴:', history);
-
-      // 利用可能なクレジットを取得
-      const user = await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-        select: {
-          credits: true,
-        },
-      });
-      console.log('ユーザーのクレジット情報:', user);
-
-      // 今月の翻訳数を取得
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      const monthlyCount = await prisma.translationHistory.count({
-        where: {
-          userId: userId,
-          createdAt: {
-            gte: firstDayOfMonth,
+        include: { // Include File to access originalName if needed elsewhere
+          file: {
+            select: {
+              originalName: true,
+            },
           },
         },
-      });
-      console.log('今月の翻訳数:', monthlyCount);
+      }),
+    ]);
 
-      // ページネーション情報を含むレスポンスデータ
-      const responseData = {
-        history,
-        credits: user?.credits || 0,
-        monthlyCount,
-        pagination: {
-          total: totalCount,
-          page,
-          limit,
-          totalPages: Math.ceil(totalCount / limit),
-        },
-      };
-      console.log('レスポンスデータ:', responseData);
+    // Add originalFileName to the history objects for easier frontend use
+    const historyWithFileName = history.map(item => ({
+        ...item,
+        originalFileName: item.file.originalName,
+    }));
 
-      return NextResponse.json(responseData);
-    } catch (dbError) {
-      console.error('データベースエラー:', dbError);
-      throw dbError;
-    }
+    return NextResponse.json({
+      data: historyWithFileName, // Return data with originalFileName
+      total: totalCount,
+      page,
+      limit,
+    });
+
   } catch (error) {
-    console.error('履歴取得エラー:', error);
-    return NextResponse.json({ error: '履歴の取得中にエラーが発生しました' }, { status: 500 });
+    console.error('履歴取得APIエラー:', error);
+    let errorMessage = '履歴の取得中にエラーが発生しました';
+    if (error instanceof Error) {
+      errorMessage = `詳細: ${error.message}`;
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
