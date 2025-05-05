@@ -21,7 +21,6 @@ export interface TextStyle {
 
 // スライド内の個々のテキスト要素
 export interface TextElement {
-  id: string;
   text: string;
   position: Position;
 }
@@ -44,6 +43,14 @@ export interface SlideContent {
   index: number;
   textElements: TextElement[];
   imagePath: string;
+}
+
+// フロントエンド互換のスライド情報
+export interface SlideContentFrontend {
+  index: number;
+  texts: TextElement[];
+  imageUrl: string;
+  translations?: TextElement[];
 }
 
 // PPTXファイル全体の解析結果

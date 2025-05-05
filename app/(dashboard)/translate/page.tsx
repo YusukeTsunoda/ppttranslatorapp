@@ -79,199 +79,113 @@ export default function TranslatePage() {
   const { data: session, status } = useSession();
   const [isDownloading, setIsDownloading] = useState(false);
   const [editingValue, setEditingValue] = useState('');
+  const [fileId, setFileId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // ファイルアップロード処理
-  const handleFileUpload = useCallback(
-    async (file: File) => {
-      if (!file) return;
-      if (!file.name.endsWith('.pptx')) {
-        toast({
-          title: 'エラー',
-          description: 'PPTXファイルのみ対応しています',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // ファイルサイズチェック（20MB）
-      const maxSize = 20 * 1024 * 1024;
-      if (file.size > maxSize) {
-        toast({
-          title: 'エラー',
-          description: 'ファイルサイズは20MB以下にしてください',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setFile(file);
+  const handleFileUpload = async (file: File) => {
+    setIsUploading(true);
+    setUploadError(null);
+    
+    try {
+      console.log('ファイルアップロード開始:', file.name);
+      
       const formData = new FormData();
       formData.append('file', file);
-
-      try {
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      console.log('アップロードAPIのレスポンス詳細:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+        dataKeys: Object.keys(data),
+        success: data.success,
+        fileId: data.fileId,
+        slidesLength: data.slides?.length,
+        firstSlideKeys: data.slides?.[0] ? Object.keys(data.slides[0]) : null,
+        firstSlideImageUrl: data.slides?.[0]?.imageUrl,
+      });
+      
+      if (!response.ok) {
+        console.error('アップロードエラー:', data.error);
+        setUploadError(data.error || 'ファイルのアップロードに失敗しました');
         toast({
-          title: 'アップロード中',
-          description: 'ファイルを処理しています...',
+          title: "アップロードエラー",
+          description: data.error || 'ファイルのアップロードに失敗しました',
+          variant: "destructive"
         });
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include',
-        });
-
-        if (response.status === 401) {
-          toast({
-            title: 'エラー',
-            description: 'セッションが切れました。再度ログインしてください。',
-            variant: 'destructive',
-          });
-          router.push(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
-          return;
-        }
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'アップロードに失敗しました');
-        }
-
-        const data = await response.json();
-
-        // APIレスポンスの詳細をログ出力
-        console.log('=== API Response Debug ===');
-        console.log('Status:', response.status);
-        console.log('Response Data:', {
-          type: typeof data,
-          keys: Object.keys(data),
-          fileId: data.fileId,
-          success: data.success,
-          hasSlides: data.slides && Array.isArray(data.slides),
-          slidesLength: data.slides && Array.isArray(data.slides) ? data.slides.length : 0,
-        });
-
-        // ファイルIDの取得を改善
-        const fileId = data.fileId;
-        if (!fileId) {
-          console.error('=== File ID Error ===');
-          console.error('Expected fileId in response data structure:');
-          console.error('- data.fileId:', data.fileId);
-          throw new Error('ファイルIDが見つかりません');
-        }
-
-        // スライドデータの検証と整形を改善
-        let slides = data.slides;
-        if (!slides || !Array.isArray(slides) || slides.length === 0) {
-          console.error('=== Slides Data Error ===');
-          console.error('Expected slides data structure not found:');
-          console.error('- data.slides:', data.slides);
-          throw new Error('スライドデータの形式が不正です');
-        }
-
-        // スライドデータの詳細をログ出力
-        console.log('=== Slides Data Debug ===');
-        console.log('First slide keys:', Object.keys(slides[0]));
-        console.log(
-          'First slide texts sample:',
-          slides[0].texts && slides[0].texts.length > 0 ? slides[0].texts[0] : 'No texts',
-        );
-
-        // スライドデータの整形
-        const formattedSlides = slides
-          .map((slide: any, index: number) => {
-            if (!slide) {
-              console.error(`Invalid slide data at index ${index}:`, slide);
-              return null;
-            }
-
-            // テキストデータの形式を確認
-            const texts = Array.isArray(slide.texts)
-              ? slide.texts.map((text: any) => {
-                  // TextItem型に変換
-                  if (typeof text === 'string') {
-                    return {
-                      text: text,
-                      position: { x: 0, y: 0, width: 0, height: 0 },
-                    };
-                  } else if (text && typeof text === 'object') {
-                    // 位置情報を取得（APIから返されるピクセル単位の位置情報をそのまま使用）
-                    const position =
-                      text.position && typeof text.position === 'object'
-                        ? {
-                            x: typeof text.position.x === 'number' ? text.position.x : 0,
-                            y: typeof text.position.y === 'number' ? text.position.y : 0,
-                            width: typeof text.position.width === 'number' ? text.position.width : 0,
-                            height: typeof text.position.height === 'number' ? text.position.height : 0,
-                          }
-                        : { x: 0, y: 0, width: 0, height: 0 };
-
-                    // デバッグ用に位置情報を出力
-                    console.log(`Text position for "${text.text || text.content || ''}":`, position);
-
-                    return {
-                      text: text.text || text.content || '',
-                      position: position,
-                    };
-                  } else {
-                    console.error('Invalid text format:', text);
-                    return {
-                      text: '',
-                      position: { x: 0, y: 0, width: 0, height: 0 },
-                    };
-                  }
-                })
-              : [];
-
-            // 画像パスの生成を修正
-            const imagePath = slide.image_path || `slide_${index + 1}.png`;
-            // デバッグ用にパスを出力
-            console.log(`Slide ${index} image path:`, imagePath);
-
-            // 画像URLを生成（相対パスに戻す）
-            // 開発環境では相対パスを使用し、Next.jsのルーティングに任せる
-            const imageUrl = `/api/slides/${fileId}/${imagePath}`;
-            console.log(`Slide ${index} image URL:`, imageUrl);
-
-            return {
-              index,
-              imageUrl: imageUrl,
-              texts: texts,
-              translations: [],
-            };
-          })
-          .filter(Boolean) as Slide[];
-
-        if (formattedSlides.length === 0) {
-          console.error('=== Formatting Error ===');
-          console.error('No valid slides after formatting');
-          throw new Error('有効なスライドデータがありません');
-        }
-
-        // 成功時のデータ構造を確認
-        console.log('=== Success ===');
-        console.log('Formatted Slides Count:', formattedSlides.length);
-        console.log('First formatted slide:', formattedSlides[0]);
-
-        setSlides(formattedSlides);
-        setCurrentSlide(0);
-        setIsTranslated(true);
-
-        toast({
-          title: '成功',
-          description: `${formattedSlides.length}枚のスライドの解析が完了しました`,
-          variant: 'default',
-        });
-      } catch (error) {
-        console.error('=== Upload Error ===');
-        console.error('Error details:', error);
-        toast({
-          title: 'エラー',
-          description: error instanceof Error ? error.message : 'アップロードに失敗しました',
-          variant: 'destructive',
-        });
+        return;
       }
-    },
-    [toast, router],
-  );
+      
+      console.log('アップロード成功:', data);
+      
+      if (!data.slides || !Array.isArray(data.slides) || data.slides.length === 0) {
+        console.error('スライドデータが不正です:', data);
+        setUploadError('スライドデータの取得に失敗しました');
+        toast({
+          title: "データエラー",
+          description: "スライドデータの取得に失敗しました",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // スライドデータの正規化
+      const normalizedSlides = data.slides.map((slide: any, index: number) => {
+        // スライドの基本情報を確認
+        console.log(`スライド ${index} の基本情報:`, {
+          index: slide.index,
+          hasImageUrl: !!slide.imageUrl,
+          hasTexts: Array.isArray(slide.texts),
+          textsLength: Array.isArray(slide.texts) ? slide.texts.length : 0
+        });
+        
+        return {
+          index: slide.index ?? index,
+          imageUrl: slide.imageUrl,
+          texts: Array.isArray(slide.texts) 
+            ? slide.texts.map((text: any) => ({
+                text: text.text || '',
+                position: text.position || { x: 0, y: 0, width: 0, height: 0 }
+              }))
+            : [],
+          translations: Array.isArray(slide.translations)
+            ? slide.translations.map((trans: any) => ({
+                text: trans.text || '',
+                position: trans.position || { x: 0, y: 0, width: 0, height: 0 }
+              }))
+            : []
+        };
+      });
+      
+      console.log('正規化されたスライド:', normalizedSlides);
+      
+      // 正規化されたスライドデータを設定
+      setSlides(normalizedSlides);
+      setCurrentSlide(0);
+      setFileId(data.fileId);
+      setUploadSuccess(true);
+      
+    } catch (error) {
+      console.error('アップロード処理エラー:', error);
+      setUploadError('ファイルのアップロード中にエラーが発生しました');
+      toast({
+        title: "アップロードエラー",
+        description: "ファイルのアップロード中にエラーが発生しました",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // マウスイベントのクリーンアップを最適化
   useEffect(() => {
@@ -338,8 +252,46 @@ export default function TranslatePage() {
     return null;
   }
 
+  // 翻訳ボタンの無効化条件を関数化
+  const isTranslateButtonDisabled = () => {
+    // スライドが存在しない場合
+    if (!slides || slides.length === 0 || currentSlide >= slides.length) {
+      return true;
+    }
+    
+    // 現在のスライドにテキスト要素がない場合
+    const currentSlideData = slides[currentSlide];
+    if (!currentSlideData || !currentSlideData.texts || currentSlideData.texts.length === 0) {
+      return true;
+    }
+    
+    // 翻訳中の場合
+    if (isTranslating) {
+      return true;
+    }
+    
+    return false;
+  };
+
   // 翻訳処理
   const handleTranslate = async () => {
+    // 現在のスライドのテキスト要素を確認
+    console.log('翻訳開始前の確認:');
+    console.log('現在のスライド:', currentSlide);
+    console.log('スライドデータ:', slides[currentSlide]);
+    console.log('テキスト要素:', slides[currentSlide]?.texts);
+    console.log('テキスト要素数:', slides[currentSlide]?.texts?.length);
+    
+    // テキスト要素がない場合は処理を中止
+    if (!slides[currentSlide]?.texts || slides[currentSlide]?.texts?.length === 0) {
+      toast({
+        title: '翻訳できません',
+        description: '現在のスライドにテキスト要素がありません',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsTranslating(true);
     try {
       // 現在のスライドのテキストを抽出
@@ -392,7 +344,7 @@ export default function TranslatePage() {
       console.error('Translation error:', error);
       toast({
         title: 'エラー',
-        description: '翻訳処理中にエラーが発生しました',
+        description: error instanceof Error ? error.message : '翻訳処理中にエラーが発生しました',
       });
     } finally {
       setIsTranslating(false);
@@ -575,7 +527,7 @@ export default function TranslatePage() {
                   <div className="flex items-end">
                     <Button
                       onClick={handleTranslate}
-                      disabled={isTranslating || slides[currentSlide]?.texts?.length === 0}
+                      disabled={isTranslateButtonDisabled()}
                     >
                       {isTranslating ? (
                         <>

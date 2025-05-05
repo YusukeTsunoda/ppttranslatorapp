@@ -21,39 +21,26 @@ interface CustomSession extends Session {
   };
 }
 
-// APIキーの設定状況をログ出力
-console.log('API Key set:', !!process.env.ANTHROPIC_API_KEY);
-console.log(
-  'API Key prefix:',
-  process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.substring(0, 10) + '...' : 'Not set',
-);
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-const getLanguageName = (langCode: string): string => {
-  const languages: Record<string, string> = {
-    ja: '日本語',
-    en: '英語',
-    zh: '中国語',
-    ko: '韓国語',
-    fr: 'フランス語',
-    de: 'ドイツ語',
-    es: 'スペイン語',
-    it: 'イタリア語',
-    ru: 'ロシア語',
-    pt: 'ポルトガル語',
-    // 必要に応じて他の言語を追加
-  };
-  return languages[langCode] || langCode;
-};
-
-export async function POST(req: Request) {
+// 翻訳APIエンドポイント
+export async function POST(request: Request) {
   try {
+    // APIキーの確認
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json(
+        { error: 'API設定が不足しています' },
+        { status: 500 }
+      );
+    }
+
+    // APIクライアントの設定
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    // セッションからユーザー情報を取得
     const session = (await getServerSession(authOptions)) as CustomSession;
     if (!session) {
-      return new NextResponse(JSON.stringify({ error: 'Authentication required' }), {
+      return new NextResponse(JSON.stringify({ error: '認証が必要です' }), {
         status: 401,
         headers: {
           'Content-Type': 'application/json',
@@ -62,14 +49,14 @@ export async function POST(req: Request) {
       });
     }
 
-    const data = await req.json();
+    const data = await request.json();
 
     // リクエストBodyからパラメータ取得
     const { texts, sourceLang, targetLang, model, fileName = 'スライド', slides, fileId } = data;
 
     // ★★★ Check if fileId is provided ★★★
     if (!fileId) {
-      return NextResponse.json({ error: 'File ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'ファイルIDが必要です' }, { status: 400 });
     }
 
     // デフォルトモデルを指定
@@ -87,65 +74,64 @@ export async function POST(req: Request) {
       selectedModel = defaultModel;
     }
 
-    console.log('Received translation request:', {
-      texts,
-      sourceLang,
-      targetLang,
-      model: selectedModel,
-    });
-
     if (!texts || !Array.isArray(texts)) {
       return NextResponse.json({ error: 'テキストが必要です' }, { status: 400 });
     }
 
     let translations: string[] = [];
     let translationError: Error | null = null;
-    const startTime = performance.now(); // Start time measurement
+    const startTime = Date.now(); // Start time measurement
 
     try {
-      translations = await Promise.all(
-        texts.map(async (textObj) => {
-          const prompt = `
-あなたはプレゼンテーション資料の専門翻訳者です。
-以下のテキストを${getLanguageName(sourceLang)}から${getLanguageName(targetLang)}に翻訳してください。
+      // 翻訳処理の実行
+      let translationIndex = 0;
+      const totalTextCount = slides.reduce((count: number, slide: any) => count + slide.textElements.length, 0);
+      const startTime = Date.now();
+      let translationError: Error | null = null;
 
-翻訳の要件：
-1. 原文の構造（見出し、箇条書きなど）を維持すること
-2. 原文のニュアンスと意味を正確に伝えること
-3. 専門用語や固有名詞は適切に処理すること
-4. ${getLanguageName(targetLang)}として自然な表現を使用すること
+      // 翻訳プロミスの作成
+      const translationPromises = slides.flatMap((slide: any) =>
+        slide.textElements.map((element: any) => {
+          if (!element.text || element.text.trim() === '') {
+            return Promise.resolve('');
+          }
 
-原文:
-${textObj.text}
+          // 翻訳プロンプトの作成
+          const prompt = `あなたは高品質な翻訳エンジンです。以下のテキストを${sourceLang}から${targetLang}に翻訳してください。
+元のテキストの意味を正確に保ちながら、自然な${targetLang}に翻訳してください。
+フォーマットや記号は保持し、翻訳のみを行ってください。
 
-翻訳文のみを出力してください。説明や注釈は含めないでください。
-`;
+テキスト: "${element.text}"
 
-          const message = await anthropic.messages.create({
+翻訳:`;
+
+          // Anthropic APIを使用した翻訳
+          return anthropic.messages.create({
             model: selectedModel,
-            max_tokens: 1024,
-            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1000,
+            messages: [
+              { role: 'user', content: prompt }
+            ],
             temperature: 0.7,
+          }).then(message => {
+            return (message.content[0] as any).text.trim();
+          }).catch(error => {
+            // エラーログは残す
+            console.error('翻訳APIエラー:', error instanceof Error ? error.message : String(error));
+            return `[翻訳エラー]`;
           });
-
-          // ★★★ Remove debug log? Consider logging strategy ★★★
-          // console.log('Translation request:', {
-          //   sourceLang,
-          //   targetLang,
-          //   originalText: textObj.text,
-          //   translatedText: (message.content[0] as any).text.trim(),
-          // });
-          return (message.content[0] as any).text.trim();
-        }),
+        })
       );
-      console.log('All translations completed successfully.');
+
+      // 翻訳結果の取得
+      translations = await Promise.all(translationPromises);
+
     } catch (error) {
-      console.error('Anthropic API Error:', error);
+      console.error('翻訳APIエラー:', error instanceof Error ? error.message : String(error));
       translationError = error instanceof Error ? error : new Error(String(error));
-      // If translation fails, we might still want to record history, but with FAILED status
     }
 
-    const endTime = performance.now();
+    const endTime = Date.now();
     const processingTime = Math.round(endTime - startTime); // Calculate processing time in milliseconds
 
     // --- History and Credit Logic ---
@@ -185,15 +171,11 @@ ${textObj.text}
           where: { id: session.user.id },
           data: { credits: { decrement: 1 } },
         });
-        console.log('クレジット消費が完了しました');
       }
 
       const createdHistory = await prisma.translationHistory.create({
         data: historyData,
       });
-
-      console.log('作成された翻訳履歴:', createdHistory);
-      console.log('履歴記録が完了しました');
 
     } catch (dbError) {
       console.error('データベース操作エラー (クレジット更新 or 履歴作成):', dbError);
@@ -203,7 +185,7 @@ ${textObj.text}
 
     // If translation itself failed, return error
     if (translationError) {
-        return new NextResponse(JSON.stringify({ error: 'Translation failed', detail: translationError.message }), {
+        return new NextResponse(JSON.stringify({ error: '翻訳に失敗しました', detail: translationError.message }), {
             status: 500,
             headers: {
                 'Content-Type': 'application/json',
@@ -213,7 +195,6 @@ ${textObj.text}
     }
 
     // Return successful translation
-    console.log('Returning successful translation response.');
     return NextResponse.json({
       success: true,
       translations,
@@ -228,7 +209,7 @@ ${textObj.text}
     // Attempt to record a FAILED history entry even in outer catch block?
     // This might be complex due to potential lack of data (session, fileId etc.)
     // For now, just return a generic error.
-    return new NextResponse(JSON.stringify({ error: 'Translation failed', detail: error instanceof Error ? error.message : String(error) }), {
+    return new NextResponse(JSON.stringify({ error: '翻訳に失敗しました', detail: error instanceof Error ? error.message : String(error) }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',
@@ -263,3 +244,20 @@ export async function GET(req: Request) {
     });
   }
 }
+
+const getLanguageName = (langCode: string): string => {
+  const languages: Record<string, string> = {
+    ja: '日本語',
+    en: '英語',
+    zh: '中国語',
+    ko: '韓国語',
+    fr: 'フランス語',
+    de: 'ドイツ語',
+    es: 'スペイン語',
+    it: 'イタリア語',
+    ru: 'ロシア語',
+    pt: 'ポルトガル語',
+    // 必要に応じて他の言語を追加
+  };
+  return languages[langCode] || langCode;
+};

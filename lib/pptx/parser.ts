@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { PythonShell, PythonShellError } from 'python-shell';
+import { PythonShell } from 'python-shell';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
@@ -27,15 +27,12 @@ export class PPTXParser {
 
   private async ensurePythonScript(): Promise<void> {
     if (!fs.existsSync(this.pythonScriptPath)) {
-      console.error('Python script not found');
       throw new Error('Python script not found');
     }
 
     try {
-      const { stdout } = await execAsync('python3 --version');
-      console.log('Python version:', stdout.trim());
+      await execAsync('python3 --version');
     } catch (error) {
-      console.error('Python environment check failed:', error);
       throw new Error('Python execution error');
     }
   }
@@ -84,11 +81,12 @@ print("All dependencies are installed")
         let hasError = false;
 
         pyshell.on('message', (message) => {
-          console.log(message);
+          if (message.includes('NOT FOUND')) {
+            hasError = true;
+          }
         });
 
         pyshell.on('stderr', (stderr) => {
-          console.error('Python stderr:', stderr);
           hasError = true;
         });
 
@@ -98,14 +96,13 @@ print("All dependencies are installed")
               fs.unlinkSync(checkScriptPath);
             }
           } catch (e) {
-            console.error('Failed to delete temp script:', e);
+            // 一時ファイル削除エラーは無視
           }
 
           if (err) {
-            console.error('Python script error:', err);
             reject(new Error('Python execution error'));
           } else if (hasError) {
-            reject(new Error('Python script reported errors on stderr'));
+            reject(new Error('Python dependencies missing'));
           } else {
             resolve(true);
           }
@@ -114,7 +111,6 @@ print("All dependencies are installed")
 
       return;
     } catch (error) {
-      console.error('Dependency check failed:', error);
       throw error instanceof Error ? error : new Error('Python execution error');
     }
   }
@@ -134,147 +130,116 @@ print("All dependencies are installed")
   }
 
   private async executePythonScript(inputPath: string, outputDir: string): Promise<any> {
-    console.log('Executing Python script with options:', {
-      scriptPath: path.dirname(this.pythonScriptPath),
-      scriptName: path.basename(this.pythonScriptPath),
-      pythonPath: this.pythonPath,
-      inputPath,
-      outputDir,
-    });
+    return new Promise((resolve, reject) => {
+      try {
+        // 出力ディレクトリが存在しない場合は作成
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
 
-    // ディレクトリの存在を確認
-    if (!fs.existsSync(outputDir)) {
-      console.log(`Creating output directory: ${outputDir}`);
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
+        const options = {
+          mode: 'text' as const,
+          pythonPath: this.pythonPath,
+          args: [
+            inputPath,
+            outputDir
+          ],
+        };
 
-    // 入力ファイルの存在を確認
-    if (!fs.existsSync(inputPath)) {
-      console.error(`Input file not found: ${inputPath}`);
-      throw new Error(`Input file not found: ${inputPath}`);
-    }
+        let result: any = null;
+        let errorOutput = '';
+        let stdoutOutput = '';
+        let hasError = false;
 
-    const options = {
-      mode: 'json' as const,
-      pythonPath: this.pythonPath,
-      pythonOptions: ['-u'],
-      scriptPath: path.dirname(this.pythonScriptPath),
-      args: [inputPath, outputDir],
-    };
+        const pyshell = new PythonShell(this.pythonScriptPath, options);
 
-    // スクリプト直接実行のテスト
-    try {
-      const scriptFullPath = path.join(options.scriptPath, path.basename(this.pythonScriptPath));
-      console.log(`Full script path: ${scriptFullPath}`);
-      console.log(`Script exists: ${fs.existsSync(scriptFullPath)}`);
-
-      const testResult = await execAsync(`${this.pythonPath} ${scriptFullPath} "${inputPath}" "${outputDir}"`, {
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      console.log('Direct Python execution stdout:', testResult.stdout);
-      console.log('Direct Python execution stderr:', testResult.stderr);
-    } catch (error) {
-      console.error('Direct Python execution error:', error);
-    }
-
-    return new Promise<any>((resolve, reject) => {
-      const scriptFullPath = path.join(options.scriptPath, path.basename(this.pythonScriptPath));
-
-      const pyshell = new PythonShell(path.basename(this.pythonScriptPath), options);
-      let result: any = null;
-      let hasError = false;
-      let errorOutput = '';
-
-      pyshell.on('message', (message) => {
-        console.log('Python message:', message);
-        try {
-          if (typeof message === 'string') {
-            const parsed = JSON.parse(message);
-            if (parsed && parsed.slides) {
-              result = parsed;
+        pyshell.on('message', (message) => {
+          stdoutOutput += message + '\n';
+          
+          try {
+            // JSONデータを検出して解析
+            if (message.trim().startsWith('{') && message.trim().endsWith('}')) {
+              result = JSON.parse(message);
             }
-          } else if (message && message.slides) {
-            result = message;
+          } catch (e) {
+            errorOutput += `JSON解析エラー: ${e}\n`;
           }
-        } catch (e) {
-          console.error('Failed to parse Python output:', e);
-        }
-      });
+        });
 
-      pyshell.on('stderr', (stderr) => {
-        console.error('Python stderr:', stderr);
-        errorOutput += stderr + '\n';
-        if (stderr.includes('Error') || stderr.includes('Exception') || stderr.includes('Traceback')) {
-          hasError = true;
-        }
-      });
+        pyshell.on('stderr', (stderr) => {
+          errorOutput += stderr + '\n';
+          
+          // 重要なエラーメッセージを検出
+          if (
+            stderr.includes('Error') || 
+            stderr.includes('Exception') || 
+            stderr.includes('Traceback') ||
+            stderr.includes('failed') ||
+            stderr.includes('not found')
+          ) {
+            hasError = true;
+          }
+        });
 
-      pyshell.end((err) => {
-        if (err) {
-          console.error('Python script execution error:', err);
-          console.error('Error output:', errorOutput);
-          reject(new Error(`Python execution error: ${err.message}\n${errorOutput}`));
-        } else if (hasError) {
-          console.error('Python script reported errors on stderr:', errorOutput);
-          reject(new Error(`Python script error: ${errorOutput}`));
-        } else if (!result) {
-          console.error('No valid result from Python script');
-          reject(new Error('No valid result from Python script'));
-        } else {
-          console.log('Python script executed successfully');
-          resolve(result);
-        }
-      });
+        pyshell.end((err) => {
+          if (err) {
+            reject(new Error(`Python実行エラー: ${err.message}\n${errorOutput}`));
+          } else if (hasError) {
+            reject(new Error(`Pythonスクリプトエラー: ${errorOutput}`));
+          } else if (!result) {
+            reject(new Error(`Pythonスクリプトから有効な結果が得られませんでした。`));
+          } else {
+            resolve(result);
+          }
+        });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 
   private validateAndProcessResult(results: any, inputPath: string): PPTXParseResult {
     if (!results || typeof results !== 'object') {
-      throw new Error('Invalid result format: Expected an object');
+      throw new Error('無効な結果形式: オブジェクトが必要です');
     }
 
     if (!Array.isArray(results.slides)) {
-      throw new Error('Invalid result format: slides property must be an array');
+      throw new Error('無効な結果形式: slides プロパティは配列である必要があります');
     }
 
     const slides = results.slides.map((slide: any, index: number) => {
       if (!slide || typeof slide !== 'object') {
-        throw new Error(`Invalid slide data at index ${index}`);
+        throw new Error(`スライド ${index} のデータが無効です`);
       }
 
       if (!Array.isArray(slide.texts)) {
-        throw new Error(`Invalid texts data for slide ${index}`);
+        throw new Error(`スライド ${index} のテキストデータが無効です`);
       }
 
-      if (!Array.isArray(slide.positions)) {
-        throw new Error(`Invalid positions data for slide ${index}`);
-      }
-
-      if (slide.texts.length !== slide.positions.length) {
-        throw new Error(`Mismatch between texts and positions count in slide ${index}`);
-      }
-
-      const textElements: TextElement[] = slide.texts.map((text: string, i: number) => {
-        if (typeof text !== 'string') {
-          throw new Error(`Invalid text data at index ${i} in slide ${index}`);
-        }
-
-        const position: Position = slide.positions[i];
-        if (!position || typeof position !== 'object') {
-          throw new Error(`Invalid position data at index ${i} in slide ${index}`);
-        }
-
-        return {
-          id: uuidv4(),
-          text,
-          position: {
-            x: position.x || 0,
-            y: position.y || 0,
-            width: position.width || 0,
-            height: position.height || 0,
-          },
-        };
-      });
+      const textElements: TextElement[] = Array.isArray(slide.texts) 
+        ? slide.texts.map((text: any, i: number) => {
+            let textContent = '';
+            let position: Position = { x: 0, y: 0, width: 0, height: 0 };
+            
+            if (typeof text === 'string') {
+              textContent = text;
+            } else if (text && typeof text === 'object') {
+              textContent = text.text || text.content || '';
+              position = text.position || position;
+            }
+            
+            return {
+              id: uuidv4(),
+              text: textContent,
+              position: {
+                x: position.x || 0,
+                y: position.y || 0,
+                width: position.width || 0,
+                height: position.height || 0,
+              },
+            };
+          })
+        : [];
 
       return {
         index,

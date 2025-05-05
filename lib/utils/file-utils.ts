@@ -88,7 +88,7 @@ export class FilePathManager {
 
   // スライドディレクトリのパスを取得
   getSlidesPath(userId: string, fileId: string): string {
-    return join(this.config.tempDir, userId, 'slides', fileId);
+    return join(this.config.tempDir, userId, fileId, 'slides');
   }
 
   // 絶対パスを取得

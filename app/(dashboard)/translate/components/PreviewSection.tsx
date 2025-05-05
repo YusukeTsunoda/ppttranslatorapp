@@ -170,7 +170,13 @@ export const PreviewSectionComponent = ({
       const offsetX = rect.left - containerRect.left;
       const offsetY = rect.top - containerRect.top;
 
-      console.log('画像サイズ:', { naturalWidth, naturalHeight, width, height });
+      console.log('画像読み込み成功:', { 
+        imageUrl: currentSlideData?.imageUrl,
+        naturalWidth, 
+        naturalHeight, 
+        width, 
+        height 
+      });
       console.log('画像オフセット:', { offsetX, offsetY });
       console.log('コンテナサイズ:', { width: containerRect.width, height: containerRect.height });
 
@@ -190,7 +196,12 @@ export const PreviewSectionComponent = ({
 
   // 画像読み込みエラー時の再試行
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error('画像読み込みエラー:', currentSlideData?.imageUrl, e);
+    console.error('画像読み込みエラー:', {
+      imageUrl: currentSlideData?.imageUrl,
+      event: e.type,
+      retryCount,
+      maxRetries
+    });
 
     if (retryCount < maxRetries) {
       // 再試行カウントを増やす
@@ -213,6 +224,7 @@ export const PreviewSectionComponent = ({
     } else {
       // 最大再試行回数を超えたらエラー表示
       setImageError(true);
+      console.error('画像読み込み最大再試行回数超過:', currentSlideData?.imageUrl);
     }
   };
 

@@ -2,7 +2,7 @@
 
 ## 技術スタック
 - **RDBMS**: PostgreSQL 15.0
-- **ORM**: Prisma 6.0
+- **ORM**: Prisma 5.0
 - **マイグレーション**: Prisma Migrate
 - **接続プール**: PgBouncer（予定）
 - **バックアップ**: 自動バックアップ（日次）
@@ -21,6 +21,7 @@ model User {
   emailVerified      DateTime?
   image              String?
   password           String?
+  role               UserRole             @default(USER)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   credits            Int                  @default(0)
@@ -29,6 +30,11 @@ model User {
   File               File[]
   Session            Session[]
   TranslationHistory TranslationHistory[]
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 ```
 
@@ -81,6 +87,7 @@ model File {
   updatedAt    DateTime
   User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   Slide        Slide[]
+  TranslationHistory TranslationHistory[]
 }
 
 enum FileStatus {
@@ -102,8 +109,6 @@ model Slide {
   updatedAt DateTime
   File      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
   Text      Text[]
-
-  @@unique([fileId, index])
 }
 ```
 
@@ -142,18 +147,35 @@ model Translation {
 翻訳履歴を管理するテーブル
 ```prisma
 model TranslationHistory {
-  id          String   @id @default(cuid())
-  userId      String
-  fileName    String
-  pageCount   Int      @default(0)
-  status      String
-  creditsUsed Int
-  sourceLang  Language
-  targetLang  Language
-  model       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  userId         String
+  fileId         String
+  pageCount      Int      @default(0)
+  status         TranslationStatus
+  creditsUsed    Int
+  sourceLang     Language
+  targetLang     Language
+  model          String
+  fileSize       Int      @default(0)
+  processingTime Int      @default(0)
+  thumbnailPath  String?
+  tags           Json?
+  metadata       Json?
+  translatedFileKey String?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file           File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([userId, createdAt])
+}
+
+enum TranslationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 ```
 
@@ -171,39 +193,177 @@ model ActivityLog {
 }
 ```
 
-#### UsageStatistics
-使用統計情報を管理するテーブル
-```prisma
-model UsageStatistics {
-  id         String   @id @default(cuid())
-  userId     String
-  tokenCount Int      @default(0)
-  apiCalls   Int      @default(0)
-  month      Int
-  year       Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+## API仕様とフロントエンド連携
 
-  @@unique([userId, month, year])
+### アップロードAPI
+
+#### リクエスト
+- **エンドポイント**: `/api/upload`
+- **メソッド**: POST
+- **コンテンツタイプ**: multipart/form-data
+- **パラメータ**: 
+  - `file`: PPTXファイル
+
+#### レスポンス
+```typescript
+// サーバー側のレスポンス構造
+{
+  success: boolean;
+  fileId: string;
+  slides: Array<{
+    index: number;
+    texts: Array<{
+      text: string;
+      position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    }>;
+    imageUrl: string; // 形式: /api/slides/{fileId}/slides/{imageName}
+    translations: any[];
+  }>;
 }
 ```
 
-### 言語設定
-
-```prisma
-enum Language {
-  ja
-  en
-  zh
-  ko
-  fr
-  de
-  es
-  it
-  ru
-  pt
+#### フロントエンド期待構造
+```typescript
+// フロントエンド側が期待する構造
+{
+  success: boolean;
+  fileId: string;
+  slides: Array<{
+    index: number;
+    texts: Array<{
+      text: string;
+      position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    }>;
+    imageUrl: string;
+    translations: any[];
+  }>;
 }
 ```
+
+### スライド画像API
+
+#### リクエスト
+- **エンドポイント**: `/api/slides/{fileId}/slides/{imageName}`
+- **メソッド**: GET
+- **パラメータ**: 
+  - `fileId`: ファイルID
+  - `imageName`: 画像ファイル名
+
+#### レスポンス
+- 画像ファイル（PNG形式）
+
+#### 代替パス形式
+- **エンドポイント**: `/api/slides/{fileId}/{imageName}`
+- **メソッド**: GET
+- **パラメータ**: 
+  - `fileId`: ファイルID
+  - `imageName`: 画像ファイル名
+
+#### ファイルパス構造
+```
+// パターン1（新形式）
+/tmp/users/{userId}/{fileId}/slides/{imageName}
+
+// パターン2（旧形式 - 後方互換性用）
+/tmp/users/{userId}/slides/{fileId}/{imageName}
+```
+
+### 翻訳API
+
+#### リクエスト
+- **エンドポイント**: `/api/translate`
+- **メソッド**: POST
+- **コンテンツタイプ**: application/json
+- **パラメータ**: 
+```typescript
+{
+  fileId: string;
+  sourceLang: string;
+  targetLang: string;
+  slides: Array<{
+    index: number;
+    texts: Array<{
+      text: string;
+      position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    }>;
+  }>;
+}
+```
+
+#### レスポンス
+```typescript
+{
+  success: boolean;
+  translations: Array<{
+    slideIndex: number;
+    texts: Array<{
+      originalText: string;
+      translatedText: string;
+      position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    }>;
+  }>;
+}
+```
+
+#### フロントエンド期待構造
+```typescript
+{
+  success: boolean;
+  translations: Array<{
+    slideIndex: number;
+    texts: Array<{
+      originalText: string;
+      translatedText: string;
+      position: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    }>;
+  }>;
+}
+```
+
+## 既知の問題と解決策
+
+### アップロードAPIとフロントエンドの連携
+- **問題**: アップロードAPIのログ出力とAPIレスポンスの構造に不一致があった
+- **解決策**: ログ出力にも`slides`プロパティを含めるように修正
+
+### スライドAPIのパス構造
+- **問題**: 複数のパスパターンが存在し、パス解析ロジックが複雑化
+- **解決策**:
+  1. パスパラメータ解析ロジックを明確化
+  2. 2つのパスパターンを明示的に構築し、両方を試すように修正
+  3. 詳細なデバッグログを追加して問題の特定を容易に
+
+### 画像読み込みエラー
+- **問題**: スライド画像の読み込みに失敗することがある
+- **解決策**:
+  1. 画像読み込みエラー時の再試行ロジックを実装
+  2. 詳細なエラーログを追加して問題の特定を容易に
+  3. 画像パスの構築を統一化
 
 ## リレーションシップ
 
@@ -216,6 +376,7 @@ enum Language {
 
 ### ファイル関連
 - File → Slide: 1対多 (1つのファイルは複数のスライドを持つ)
+- File → TranslationHistory: 1対多 (1つのファイルは複数の翻訳履歴を持つ)
 - Slide → Text: 1対多 (1つのスライドは複数のテキスト要素を持つ)
 - Text → Translation: 1対多 (1つのテキストは複数の翻訳を持つことができる)
 
@@ -223,8 +384,8 @@ enum Language {
 
 - ユーザーメールアドレスにユニークインデックス
 - ファイルステータスにインデックス
-- スライドのファイルIDとインデックスの組み合わせにユニークインデックス
-- 翻訳の言語ペア（ソース言語とターゲット言語）にインデックス
+- 翻訳履歴のファイルIDにインデックス
+- 翻訳履歴のユーザーIDと作成日時の組み合わせにインデックス
 - 使用統計のユーザーID、月、年の組み合わせにユニークインデックス
 
 ## データ整合性
@@ -237,7 +398,6 @@ enum Language {
 - ユーザーのメールアドレス
 - セッショントークン
 - アカウントのプロバイダーとプロバイダーアカウントIDの組み合わせ
-- スライドのファイルIDとインデックスの組み合わせ
 - 使用統計のユーザーID、月、年の組み合わせ
 
 ## データ型と制約
@@ -247,7 +407,7 @@ enum Language {
 - テキスト: 標準的な文字列型
 - 長いテキスト: Text型
 - JSON: PostgreSQLのJSONB型
-- 列挙型: 適切な列挙型を使用（Language, FileStatus）
+- 列挙型: 適切な列挙型を使用（Language, FileStatus, UserRole, TranslationStatus）
 
 ## マイグレーション戦略
 
@@ -274,46 +434,16 @@ enum Language {
 ### パフォーマンスチューニング
 - **クエリ最適化**: 実行計画分析
 - **インデックス最適化**: 不要なインデックスの削除
-- **パーティショニング**: 大規模テーブルの分割（予定）
 - **バキューム**: 定期的なメンテナンス
-
-### データ整合性
-- **外部キー制約**: リレーショナルデータの整合性
-- **カスケード削除**: 依存レコードの自動削除
-- **NOT NULL制約**: 必須フィールドの保証
-- **ユニーク制約**: 一意性の保証
-
-## マイグレーション戦略
-
-### 開発フロー
-1. **スキーマ変更**: Prismaスキーマの更新
-2. **マイグレーション生成**: `prisma migrate dev`
-3. **テスト**: 開発環境での検証
-4. **適用**: 本番環境への適用
-
-### バージョン管理
-- **マイグレーションファイル**: Git管理
-- **ロールバック計画**: 問題発生時の対応
-- **データ保全**: バックアップと復元
-
-### シードデータ
-- **初期データ**: 基本設定、マスターデータ
-- **テストデータ**: 開発・テスト環境用
-- **サンプルデータ**: デモ用
 
 ## セキュリティ対策
 
 ### アクセス制御
 - **最小権限の原則**: 必要最小限の権限
-- **ロールベースアクセス**: 役割に応じた権限
+- **ロールベースアクセス**: 役割に応じた権限（UserRole列挙型を使用）
 - **接続制限**: 特定IPからのみアクセス可能
 
 ### データ保護
 - **暗号化**: 保存データの暗号化
 - **マスキング**: 機密データの表示制限
-- **監査ログ**: データアクセスの記録
-
-### コンプライアンス
-- **GDPR対応**: 個人データの保護
-- **データ削除**: 要求に応じたデータ削除
-- **データポータビリティ**: データエクスポート
+- **監査ログ**: データアクセスの記録（ActivityLogテーブルを使用）

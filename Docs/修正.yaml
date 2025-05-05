@@ -550,3 +550,72 @@ jest_test_lessons:
     - "コンポーネントとそのテストファイル間で共有される型定義は、必ず `export` する"
     - "モックする関数の戻り値の型は、実際の関数の戻り値の型（特に非同期処理の解決値）と一致させる必要がある"
     - "テストエラーが発生した場合、エラーメッセージだけでなく、関連する設定ファイル（`jest.config.js`, `babel.config.js`, `jest.setup.js`）やモックの実装も確認する"
+
+# データ形式の不一致
+data_format_inconsistencies:
+  description: "APIからのレスポンスデータ形式とフロントエンドが期待するデータ形式の不一致"
+  
+  # スライドデータの構造に関する不一致
+  slide_structure:
+    api_response:
+      - "index: number"
+      - "texts: Array<{ text: string, position: Position, type?: string }>"
+      - "image_path: string"
+    
+    frontend_expected:
+      - "index: number"
+      - "imageUrl: string"
+      - "texts: Array<{ text: string, position: TextPosition }>"
+      - "translations?: Array<{ text: string, position: TextPosition }>"
+  
+  # 位置情報の型定義の不一致
+  position_type:
+    api:
+      name: "Position"
+      path: "/lib/pptx/types.ts"
+      properties:
+        - "x: number"
+        - "y: number"
+        - "width: number"
+        - "height: number"
+    
+    frontend:
+      name: "TextPosition"
+      path: "/app/(dashboard)/translate/types.ts"
+      properties:
+        - "x: number"
+        - "y: number"
+        - "width: number"
+        - "height: number"
+  
+  # テキスト要素の型定義の不一致
+  text_element_type:
+    api:
+      name: "TextElement"
+      path: "/lib/pptx/types.ts"
+      properties:
+        - "id: string"
+        - "text: string"
+        - "position: Position"
+    
+    frontend:
+      name: "TextItem"
+      path: "/app/(dashboard)/translate/types.ts"
+      properties:
+        - "text: string"
+        - "position: TextPosition"
+  
+  # 主な不一致ポイント
+  key_issues:
+    - "image_path vs imageUrl: APIは 'image_path' を返すが、フロントエンドは 'imageUrl' を期待してている"
+    - "textElements vs texts: APIの型定義では 'textElements' だが、実際のレスポンスでは 'texts' として返してている"
+    - "id フィールド: API側のTextElementには 'id' フィールドがあるが、フロントエンド側のTextItemには存在しない"
+    - "type フィールド: API側の正規化処理で 'type' フィールドを追加していて、フロントエンド側では使用していない"
+
+  # 修正方針
+  fix_strategy:
+    - "アップロードAPIのレスポンス形式を修正: image_path → imageUrl に変更"
+    - "テキスト要素の構造を統一: フロントエンドが期待する形式に合わせる"
+    - "型定義の整合性を確保: 両方の型定義を一致させるか、変換関数を実装"
+    - "不要なフィールドの削除または活用: 'id'や'type'などの扱いを決定"
+    - "スライドデータの正規化処理を改善: 一貫した構造を保証"
