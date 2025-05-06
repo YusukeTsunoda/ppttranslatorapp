@@ -377,6 +377,34 @@ export const PreviewSectionComponent = ({
     }
   }, [currentSlideData]);
 
+  // コンポーネントがマウントされたときに画像URLをログ出力
+  useEffect(() => {
+    if (currentSlideData?.imageUrl) {
+      console.log('スライド画像URL:', {
+        slideIndex: currentSlide,
+        imageUrl: currentSlideData.imageUrl,
+        timestamp: new Date().toISOString()
+      });
+
+      // 画像URLが有効かどうかをチェック
+      fetch(currentSlideData.imageUrl, { method: 'HEAD' })
+        .then(response => {
+          console.log('スライド画像URLチェック結果:', {
+            url: currentSlideData.imageUrl,
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText
+          });
+        })
+        .catch(error => {
+          console.error('スライド画像URLチェックエラー:', {
+            url: currentSlideData.imageUrl,
+            error: error.message
+          });
+        });
+    }
+  }, [currentSlideData, currentSlide]);
+
   const textItems = currentSlideData?.texts || [];
 
   return (

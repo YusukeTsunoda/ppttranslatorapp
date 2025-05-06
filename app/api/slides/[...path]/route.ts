@@ -23,6 +23,10 @@ async function checkFileDetails(path: string) {
 }
 
 export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
+  console.log('スライドAPI - リクエスト受信:', {
+    url: request.url,
+    params: params.path
+  });
   try {
     // パスパラメータからファイルIDと画像名を取得
     if (!params.path || params.path.length < 2) {
