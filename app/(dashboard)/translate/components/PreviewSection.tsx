@@ -159,72 +159,93 @@ export const PreviewSectionComponent = ({
 
   // 画像読み込み時にサイズを取得
   const handleImageLoad = () => {
-    if (imageRef.current && previewRef.current) {
-      const { naturalWidth, naturalHeight, width, height } = imageRef.current;
-      const containerRect = previewRef.current.getBoundingClientRect();
-
-      // 画像の実際の表示位置を取得
-      const rect = imageRef.current.getBoundingClientRect();
-
-      // 画像の相対位置を計算
-      const offsetX = rect.left - containerRect.left;
-      const offsetY = rect.top - containerRect.top;
-
-      console.log('画像読み込み成功:', { 
-        imageUrl: currentSlideData?.imageUrl,
-        naturalWidth, 
-        naturalHeight, 
-        width, 
-        height 
-      });
-      console.log('画像オフセット:', { offsetX, offsetY });
-      console.log('コンテナサイズ:', { width: containerRect.width, height: containerRect.height });
-
-      setImageSize({
-        width,
-        height,
-        offsetX,
-        offsetY,
-        naturalWidth,
-        naturalHeight,
-        containerWidth: containerRect.width,
-        containerHeight: containerRect.height,
-      });
-      setImageError(false);
+    try {
+      if (imageRef.current) {
+        const { naturalWidth, naturalHeight } = imageRef.current;
+        
+        console.log('画像読み込み成功:', {
+          url: currentSlideData?.imageUrl,
+          naturalWidth,
+          naturalHeight,
+          element: imageRef.current,
+          currentSlide,
+          slideIndex: currentSlideData?.index
+        });
+        
+        setImageSize({
+          width: naturalWidth,
+          height: naturalHeight,
+        });
+        
+        // エラー状態をリセット
+        setImageError(false);
+        setRetryCount(0);
+      }
+    } catch (error) {
+      console.error('画像サイズ取得エラー:', error);
     }
   };
 
   // 画像読み込みエラー時の再試行
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.error('画像読み込みエラー:', {
-      imageUrl: currentSlideData?.imageUrl,
-      event: e.type,
+    console.error('画像読み込みエラー発生:', {
+      url: currentSlideData?.imageUrl,
+      element: e.currentTarget,
+      error: e,
       retryCount,
-      maxRetries
+      currentSlide,
+      slideIndex: currentSlideData?.index
     });
 
-    if (retryCount < maxRetries) {
-      // 再試行カウントを増やす
-      setRetryCount((prev) => prev + 1);
+    // 認証情報を含むリクエストを試みる
+    fetch(currentSlideData?.imageUrl || '', {
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    })
+      .then(response => {
+        console.log('画像直接リクエスト結果:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          url: response.url
+        });
+        return response.blob();
+      })
+      .then(blob => {
+        console.log('画像ブロブ取得成功:', {
+          type: blob.type,
+          size: blob.size,
+          url: currentSlideData?.imageUrl
+        });
+      })
+      .catch(error => {
+        console.error('画像直接リクエストエラー:', {
+          error: error.message,
+          url: currentSlideData?.imageUrl
+        });
+      });
 
-      // 少し待ってから再読み込み
+    setImageError(true);
+    
+    if (retryCount < maxRetries) {
+      // 再試行回数を増やす
+      setRetryCount(prev => prev + 1);
+      
+      // 一定時間後に再試行
       setTimeout(() => {
-        if (imageRef.current) {
-          console.log(`画像読み込み再試行 (${retryCount + 1}/${maxRetries}):`, currentSlideData?.imageUrl);
-          // 画像のsrcを再設定して強制的に再読み込み
-          const currentSrc = imageRef.current.src;
-          imageRef.current.src = '';
-          setTimeout(() => {
-            if (imageRef.current) {
-              imageRef.current.src = currentSrc;
-            }
-          }, 100);
-        }
-      }, 1000);
+        console.log(`画像読み込み再試行 (${retryCount + 1}/${maxRetries})...`, {
+          url: currentSlideData?.imageUrl
+        });
+        setImageError(false); // エラー状態をリセットして再読み込み
+      }, 1000 * (retryCount + 1)); // 徐々に待機時間を増やす
     } else {
-      // 最大再試行回数を超えたらエラー表示
-      setImageError(true);
-      console.error('画像読み込み最大再試行回数超過:', currentSlideData?.imageUrl);
+      console.error('最大再試行回数に達しました:', {
+        url: currentSlideData?.imageUrl,
+        maxRetries
+      });
     }
   };
 
@@ -490,18 +511,17 @@ export const PreviewSectionComponent = ({
                 <img
                   ref={imageRef}
                   src={currentSlideData.imageUrl}
-                  alt={`Slide ${currentSlide + 1}`}
-                  className="object-contain"
-                  data-testid="slide-image"
-                  draggable={false}
+                  alt={`スライド ${currentSlideData.index + 1}`}
+                  className="max-w-full max-h-full"
                   style={{
-                    pointerEvents: 'none', // 画像自体のイベントを無効化して親要素に伝播
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    display: 'block',
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'center',
+                    transition: isDragging ? 'none' : 'transform 0.2s',
                   }}
                   onLoad={handleImageLoad}
                   onError={handleImageError}
+                  crossOrigin="anonymous" // CORS対応
+                  data-testid="slide-image"
                 />
                 {imageError && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80">

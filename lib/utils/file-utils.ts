@@ -88,6 +88,7 @@ export class FilePathManager {
 
   // スライドディレクトリのパスを取得
   getSlidesPath(userId: string, fileId: string): string {
+    // 新形式のパス構造のみを使用
     return join(this.config.tempDir, userId, fileId, 'slides');
   }
 
@@ -271,8 +272,14 @@ export async function cleanupOldFiles(userId: string) {
       ? join(FILE_CONFIG.tempDir, userId)
       : join(process.cwd(), FILE_CONFIG.tempDir, userId);
     const uploadsDir = join(baseDir, 'uploads');
-    const slidesDir = join(baseDir, 'slides');
+    
+    console.log('古いファイルのクリーンアップを開始:', {
+      baseDir,
+      uploadsDir,
+      userId
+    });
 
+    // アップロードディレクトリのクリーンアップ
     if (existsSync(uploadsDir)) {
       const files = await readdir(uploadsDir);
       const now = Date.now();
@@ -285,6 +292,7 @@ export async function cleanupOldFiles(userId: string) {
           try {
             await unlink(filePath);
             await logFileOperation(userId, 'delete', file, true);
+            console.log(`古いファイルを削除しました: ${filePath}`);
           } catch (error) {
             if (error instanceof Error) {
               console.error(`Error deleting file ${filePath}:`, error);
@@ -295,26 +303,42 @@ export async function cleanupOldFiles(userId: string) {
       }
     }
 
-    if (existsSync(slidesDir)) {
-      const directories = await readdir(slidesDir);
+    // ファイルIDディレクトリの検索とクリーンアップ
+    const userDir = baseDir;
+    if (existsSync(userDir)) {
+      const fileIdDirs = await readdir(userDir);
       const now = Date.now();
 
-      for (const dir of directories) {
-        const dirPath = join(slidesDir, dir);
-        const dirStat = await stat(dirPath);
+      for (const fileId of fileIdDirs) {
+        // uploadsディレクトリはスキップ
+        if (fileId === 'uploads') continue;
+        
+        const fileIdPath = join(userDir, fileId);
+        const fileIdStat = await stat(fileIdPath);
+        
+        // ディレクトリのみ処理
+        if (!fileIdStat.isDirectory()) continue;
 
-        if (now - dirStat.mtimeMs > FILE_CONFIG.retentionPeriod) {
+        if (now - fileIdStat.mtimeMs > FILE_CONFIG.retentionPeriod) {
           try {
-            const files = await readdir(dirPath);
-            for (const file of files) {
-              await unlink(join(dirPath, file));
+            // スライドディレクトリのクリーンアップ
+            const slidesDir = join(fileIdPath, 'slides');
+            if (existsSync(slidesDir)) {
+              const slideFiles = await readdir(slidesDir);
+              for (const slideFile of slideFiles) {
+                await unlink(join(slidesDir, slideFile));
+              }
+              console.log(`スライドディレクトリをクリーンアップしました: ${slidesDir}`);
             }
-            await unlink(dirPath);
-            await logFileOperation(userId, 'delete', dir, true);
+            
+            // fileIdディレクトリ自体を削除
+            await unlink(fileIdPath);
+            await logFileOperation(userId, 'delete', fileId, true);
+            console.log(`古いファイルIDディレクトリを削除しました: ${fileIdPath}`);
           } catch (error) {
             if (error instanceof Error) {
-              console.error(`Error cleaning up directory ${dirPath}:`, error);
-              await logFileOperation(userId, 'delete', dir, false, error.message);
+              console.error(`Error cleaning up directory ${fileIdPath}:`, error);
+              await logFileOperation(userId, 'delete', fileId, false, error.message);
             }
           }
         }

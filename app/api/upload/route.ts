@@ -7,7 +7,7 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import {
   generateFileId,
   createUserDirectories,
@@ -106,7 +106,30 @@ export async function POST(request: NextRequest) {
 
         if (!imageExists) {
           await logFileOperation(userId, 'access', fileId, false, 'スライド画像の生成に失敗しました');
+          console.error('スライド画像生成失敗:', {
+            firstSlideImagePath,
+            exists: imageExists,
+            slidesDir,
+            userId,
+            fileId
+          });
           return NextResponse.json({ error: 'スライド画像の生成に失敗しました' }, { status: 500 });
+        }
+
+        // スライドディレクトリの内容を確認
+        try {
+          const slidesFiles = readdirSync(slidesDir);
+          console.log('スライドディレクトリの内容:', {
+            slidesDir,
+            fileCount: slidesFiles.length,
+            files: slidesFiles.slice(0, 5), // 最初の5つのファイルのみ表示
+            hasMoreFiles: slidesFiles.length > 5 ? `他 ${slidesFiles.length - 5} ファイル` : null
+          });
+        } catch (error) {
+          console.error('スライドディレクトリの読み取りエラー:', {
+            slidesDir,
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
 
         // スライドデータを正規化して文章情報を強化
@@ -170,9 +193,25 @@ export async function POST(request: NextRequest) {
 
           // 画像パスを構築
           const imagePath = slide.imagePath || slide.image_path || `slide_${index + 1}.png`;
+          
           // スライドの画像URLを構築（相対パスで）
-          // 注意: ここではfileIdとimagePathの間にslidesディレクトリを含める
+          // 新形式のパス構造のみを使用
           const imageUrl = `/api/slides/${fileId}/slides/${imagePath}`;
+          
+          // 実際のファイルパスを確認
+          const actualImagePath = join(slidesDir, imagePath);
+          const actualImageExists = existsSync(actualImagePath);
+          
+          // 最初の数枚のスライドについてのみ詳細情報をログ出力
+          if (index < 3) {
+            console.log(`スライド ${index + 1} の画像情報:`, {
+              imageUrl,
+              actualImagePath,
+              exists: actualImageExists,
+              fileId,
+              imagePath
+            });
+          }
 
           return {
             index: slide.index || index,
