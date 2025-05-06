@@ -4,7 +4,7 @@
 // import { Card } from '@/components/ui/card';
 import { Slide, TextItem, TranslationItem, TextPosition, SlideData, ImageSize } from '../types';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import Image from 'next/image';
+// import Image from 'next/image';
 // import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 // import { Edit2, Save, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
@@ -71,6 +71,31 @@ export const PreviewSectionComponent = ({
     console.log('currentSlide:', currentSlide);
     console.log('slides.length:', slides?.length);
     console.log('Valid slide index?', currentSlide >= 0 && slides && currentSlide < slides.length);
+    
+    // 現在のスライドデータがある場合は詳細情報を出力
+    if (slides && slides.length > 0 && currentSlide >= 0 && currentSlide < slides.length) {
+      const slide = slides[currentSlide];
+      console.log('Current slide data:', slide);
+      console.log('Image URL:', slide.imageUrl);
+      
+      // 画像URLの形式を確認
+      if (slide.imageUrl) {
+        const urlParts = slide.imageUrl.split('/');
+        console.log('Image URL parts:', urlParts);
+        console.log('URL format valid?', 
+          urlParts.length >= 5 && 
+          urlParts[1] === 'api' && 
+          urlParts[2] === 'slides' && 
+          urlParts[4] === 'slides'
+        );
+        
+        // 画像のプリロードを試みる
+        const img = new Image();
+        img.onload = () => console.log('PreviewSection - 画像プリロード成功:', slide.imageUrl);
+        img.onerror = (e: Event) => console.error('PreviewSection - 画像プリロード失敗:', e);
+        img.src = slide.imageUrl;
+      }
+    }
   }, [slides, currentSlide]);
 
   // 未使用の関数をコメントアウト
@@ -508,6 +533,7 @@ export const PreviewSectionComponent = ({
                   maxHeight: '100%',
                 }}
               >
+                {/* スライド画像 - 通常のimgタグを使用 */}
                 <img
                   ref={imageRef}
                   src={currentSlideData.imageUrl}
@@ -524,29 +550,51 @@ export const PreviewSectionComponent = ({
                   data-testid="slide-image"
                 />
                 {imageError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80">
-                    <div className="text-center p-4">
-                      <p className="text-red-500 font-medium">画像の読み込みに失敗しました</p>
-                      <p className="text-sm text-gray-600 mt-2">URL: {currentSlideData.imageUrl}</p>
-                      <button
-                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                        onClick={() => {
-                          setRetryCount(0);
-                          setImageError(false);
-                          if (imageRef.current) {
-                            const currentSrc = imageRef.current.src;
-                            imageRef.current.src = '';
-                            setTimeout(() => {
-                              if (imageRef.current) {
-                                imageRef.current.src = currentSrc;
-                              }
-                            }, 100);
-                          }
-                        }}
-                      >
-                        再読み込み
-                      </button>
-                    </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 bg-opacity-80">
+                    <p className="text-red-500 font-medium mb-2">画像の読み込みに失敗しました</p>
+                    <p className="text-sm text-gray-600 mb-4">URL: {currentSlideData.imageUrl}</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setImageError(false);
+                        setRetryCount(0);
+                        console.log('画像の再読み込みを試みます:', currentSlideData.imageUrl);
+                        
+                        // 直接fetchを試みる
+                        fetch(currentSlideData.imageUrl, {
+                          credentials: 'include',
+                          cache: 'no-cache'
+                        })
+                          .then(res => {
+                            console.log('画像直接fetch結果:', {
+                              status: res.status,
+                              statusText: res.statusText,
+                              headers: Object.fromEntries(res.headers.entries()),
+                              url: res.url
+                            });
+                            return res.blob();
+                          })
+                          .then(blob => {
+                            console.log('画像ブロブ取得成功:', {
+                              type: blob.type,
+                              size: blob.size
+                            });
+                            
+                            // Blobから一時URLを作成して表示
+                            const url = URL.createObjectURL(blob);
+                            if (imageRef.current) {
+                              imageRef.current.src = url;
+                            }
+                          })
+                          .catch(error => {
+                            console.error('画像直接fetch失敗:', error);
+                          });
+                      }}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      再読み込み
+                    </Button>
                   </div>
                 )}
 

@@ -102,85 +102,76 @@ export default function TranslatePage() {
       
       const data = await response.json();
       
-      console.log('アップロードAPIのレスポンス詳細:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText,
-        dataKeys: Object.keys(data),
-        success: data.success,
-        fileId: data.fileId,
-        slidesLength: data.slides?.length,
-        firstSlideKeys: data.slides?.[0] ? Object.keys(data.slides[0]) : null,
-        firstSlideImageUrl: data.slides?.[0]?.imageUrl,
-      });
+      console.log('アップロードAPIレスポンス（フロントエンド）:', data);
       
-      if (!response.ok) {
-        console.error('アップロードエラー:', data.error);
-        setUploadError(data.error || 'ファイルのアップロードに失敗しました');
-        toast({
-          title: "アップロードエラー",
-          description: data.error || 'ファイルのアップロードに失敗しました',
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      console.log('アップロード成功:', data);
-      
-      if (!data.slides || !Array.isArray(data.slides) || data.slides.length === 0) {
-        console.error('スライドデータが不正です:', data);
-        setUploadError('スライドデータの取得に失敗しました');
-        toast({
-          title: "データエラー",
-          description: "スライドデータの取得に失敗しました",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // スライドデータの正規化
-      const normalizedSlides = data.slides.map((slide: any, index: number) => {
-        // スライドの基本情報を確認
-        console.log(`スライド ${index} の基本情報:`, {
-          index: slide.index,
-          hasImageUrl: !!slide.imageUrl,
-          hasTexts: Array.isArray(slide.texts),
-          textsLength: Array.isArray(slide.texts) ? slide.texts.length : 0
+      if (data.success) {
+        setFile(file);
+        setFileId(data.fileId);
+        setSlides(data.slides);
+        setCurrentSlide(0);
+        setUploadSuccess(true);
+        
+        // スライドデータの詳細をログ出力
+        console.log('スライドデータ詳細:', {
+          slidesCount: data.slides.length,
+          firstSlide: data.slides[0],
+          imageUrl: data.slides[0]?.imageUrl,
+          urlParts: data.slides[0]?.imageUrl?.split('/') || []
         });
         
-        return {
-          index: slide.index ?? index,
-          imageUrl: slide.imageUrl,
-          texts: Array.isArray(slide.texts) 
-            ? slide.texts.map((text: any) => ({
-                text: text.text || '',
-                position: text.position || { x: 0, y: 0, width: 0, height: 0 }
-              }))
-            : [],
-          translations: Array.isArray(slide.translations)
-            ? slide.translations.map((trans: any) => ({
-                text: trans.text || '',
-                position: trans.position || { x: 0, y: 0, width: 0, height: 0 }
-              }))
-            : []
-        };
-      });
-      
-      console.log('正規化されたスライド:', normalizedSlides);
-      
-      // 正規化されたスライドデータを設定
-      setSlides(normalizedSlides);
-      setCurrentSlide(0);
-      setFileId(data.fileId);
-      setUploadSuccess(true);
-      
+        // 画像のプリロードを試みる
+        if (data.slides[0]?.imageUrl) {
+          const img = new Image();
+          img.onload = () => console.log('画像プリロード成功:', data.slides[0].imageUrl);
+          img.onerror = (e) => console.error('画像プリロード失敗:', e);
+          img.src = data.slides[0].imageUrl;
+          
+          // 直接fetchでも試してみる
+          fetch(data.slides[0].imageUrl, {
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          })
+            .then(res => {
+              console.log('画像fetch結果:', {
+                status: res.status,
+                statusText: res.statusText,
+                headers: Object.fromEntries(res.headers.entries()),
+                url: res.url
+              });
+              return res.blob();
+            })
+            .then(blob => {
+              console.log('画像ブロブ取得成功:', {
+                type: blob.type,
+                size: blob.size
+              });
+            })
+            .catch(error => {
+              console.error('画像fetch失敗:', error);
+            });
+        }
+        
+        toast({
+          title: 'アップロード成功',
+          description: `${file.name}のアップロードが完了しました。`,
+        });
+      } else {
+        setUploadError(data.error || 'アップロードに失敗しました');
+        toast({
+          variant: 'destructive',
+          title: 'アップロード失敗',
+          description: data.error || 'アップロードに失敗しました',
+        });
+      }
     } catch (error) {
-      console.error('アップロード処理エラー:', error);
-      setUploadError('ファイルのアップロード中にエラーが発生しました');
+      console.error('アップロードエラー:', error);
+      setUploadError('アップロード中にエラーが発生しました');
       toast({
-        title: "アップロードエラー",
-        description: "ファイルのアップロード中にエラーが発生しました",
-        variant: "destructive"
+        variant: 'destructive',
+        title: 'アップロード失敗',
+        description: 'アップロード中にエラーが発生しました',
       });
     } finally {
       setIsUploading(false);

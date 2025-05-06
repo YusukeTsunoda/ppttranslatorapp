@@ -41,7 +41,8 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     url: request.url,
     params: params.path,
     headers: Object.fromEntries(request.headers.entries()),
-    method: request.method
+    method: request.method,
+    timestamp: new Date().toISOString()
   });
   try {
     // パスパラメータからファイルIDと画像名を取得
@@ -70,7 +71,8 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
       fileId,
       imageName,
       fullPath: params.path.join('/'),
-      pathLength: params.path.length
+      pathLength: params.path.length,
+      timestamp: new Date().toISOString()
     });
 
     // セッションからユーザー情報を取得
@@ -135,17 +137,21 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
                 fileId,
                 imageName
               });
-              
-              return new NextResponse(imageBuffer, {
-                headers: {
-                  'Content-Type': contentType,
-                  'Cache-Control': 'public, max-age=3600',
-                  'Access-Control-Allow-Origin': '*',
-                  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-                  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-                  'Access-Control-Allow-Credentials': 'true',
-                },
-              });
+
+              // CORSヘッダーを改善
+              const headers = {
+                'Content-Type': contentType,
+                'Cache-Control': 'public, max-age=3600',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+                'Access-Control-Allow-Credentials': 'true',
+                'Access-Control-Max-Age': '86400',
+              };
+
+              console.log('スライドAPI - レスポンスヘッダー:', headers);
+
+              return new NextResponse(imageBuffer, { headers });
             } catch (error) {
               console.error('スライドAPI - ファイル読み込みエラー:', {
                 path: possiblePath,
@@ -184,7 +190,8 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
       fileId,
       imageName,
       tempDir: FILE_CONFIG.tempDir,
-      fullPath: params.path.join('/')
+      fullPath: params.path.join('/'),
+      timestamp: new Date().toISOString()
     });
 
     // ファイルの存在確認
@@ -215,19 +222,24 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
         contentType,
         userId,
         fileId,
-        imageName
+        imageName,
+        timestamp: new Date().toISOString()
       });
 
-      return new NextResponse(imageBuffer, {
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=3600',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          'Access-Control-Allow-Credentials': 'true',
-        },
-      });
+      // CORSヘッダーを改善
+      const headers = {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Max-Age': '86400',
+      };
+
+      console.log('スライドAPI - レスポンスヘッダー:', headers);
+
+      return new NextResponse(imageBuffer, { headers });
     } catch (error) {
       // ファイル読み込みエラー
       return NextResponse.json(
@@ -249,16 +261,23 @@ export async function OPTIONS(request: NextRequest) {
   console.log('スライドAPI - OPTIONSリクエスト:', {
     url: request.url,
     headers: Object.fromEntries(request.headers.entries()),
-    method: request.method
+    method: request.method,
+    timestamp: new Date().toISOString()
   });
+  
+  // CORSヘッダーを改善
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400',
+  };
+
+  console.log('スライドAPI - OPTIONSレスポンスヘッダー:', headers);
   
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Credentials': 'true',
-    },
+    headers,
   });
 }
