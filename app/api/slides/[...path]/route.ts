@@ -88,7 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     // 開発環境では認証をバイパスする処理
     if (process.env.NODE_ENV === 'development' && !session) {
       // 開発環境でのみ、すべてのユーザーディレクトリを検索
-      const uploadsDir = join(FILE_CONFIG.tempDir, 'users');
+      const uploadsDir = join(process.cwd(), FILE_CONFIG.tempDir);
       
       if (existsSync(uploadsDir)) {
         const userDirs = readdirSync(uploadsDir).filter(dir => 
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
 
     // 画像ファイルのパスを構築
     // 新形式のパス構造のみを使用
-    const imagePath = join(FILE_CONFIG.tempDir, 'users', userId, fileId, 'slides', imageName);
+    const imagePath = join(process.cwd(), FILE_CONFIG.tempDir, userId, fileId, 'slides', imageName);
 
     console.log('スライドAPI - 認証済みユーザーのファイルパス:', {
       imagePath,

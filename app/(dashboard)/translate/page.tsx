@@ -84,6 +84,14 @@ export default function TranslatePage() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // URLからfileIdを抽出するヘルパー関数
+  const extractFileIdFromUrl = (url?: string): string => {
+    if (!url) return '';
+    // /api/slides/{fileId}/slides/{imageName} の形式からfileIdを抽出
+    const matches = url.match(/\/api\/slides\/([^\/]+)\/slides\//);
+    return matches ? matches[1] : '';
+  };
+
   // ファイルアップロード処理
   const handleFileUpload = async (file: File) => {
     setIsUploading(true);
@@ -303,13 +311,16 @@ export default function TranslatePage() {
           targetLang: targetLang,
           model: selectedModel,
           fileName: file?.name || 'スライド',
-          slides: slides, // スライドデータを送信
+          slides: [slides[currentSlide]], // 現在のスライドデータのみを送信
+          fileId: extractFileIdFromUrl(slides[0]?.imageUrl), // URLからfileIdを正しく抽出
         }),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('翻訳APIの呼び出しに失敗しました');
+        const errorData = await response.json();
+        console.error('翻訳APIエラー:', errorData);
+        throw new Error(errorData.error || '翻訳APIの呼び出しに失敗しました');
       }
 
       const data = await response.json();

@@ -32,7 +32,7 @@ export const PreviewSectionComponent = ({
 }: PreviewSectionProps) => {
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const MAX_RETRY_COUNT = 3;
   // 未使用の状態変数をコメントアウト
   // const [editingIndex, setEditingIndex] = useState<number | null>(null);
   // const [editValue, setEditValue] = useState('');
@@ -92,7 +92,7 @@ export const PreviewSectionComponent = ({
         // 画像のプリロードを試みる
         const img = new Image();
         img.onload = () => console.log('PreviewSection - 画像プリロード成功:', slide.imageUrl);
-        img.onerror = (e: Event) => console.error('PreviewSection - 画像プリロード失敗:', e);
+        img.onerror = () => console.error('PreviewSection - 画像プリロード失敗:', slide.imageUrl);
         img.src = slide.imageUrl;
       }
     }
@@ -212,65 +212,61 @@ export const PreviewSectionComponent = ({
   };
 
   // 画像読み込みエラー時の再試行
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const handleImageError = () => {
     console.error('画像読み込みエラー発生:', {
       url: currentSlideData?.imageUrl,
-      element: e.currentTarget,
-      error: e,
+      element: imageRef.current,
       retryCount,
       currentSlide,
       slideIndex: currentSlideData?.index
     });
 
-    // 認証情報を含むリクエストを試みる
-    fetch(currentSlideData?.imageUrl || '', {
-      credentials: 'include',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    })
-      .then(response => {
-        console.log('画像直接リクエスト結果:', {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          url: response.url
-        });
-        return response.blob();
+    // 画像URLを直接フェッチして問題を診断
+    if (currentSlideData?.imageUrl) {
+      fetch(currentSlideData.imageUrl, { 
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
       })
-      .then(blob => {
-        console.log('画像ブロブ取得成功:', {
-          type: blob.type,
-          size: blob.size,
-          url: currentSlideData?.imageUrl
+        .then(response => {
+          console.log('画像直接フェッチ結果:', {
+            status: response.status,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries()),
+            url: response.url
+          });
+          
+          if (!response.ok) {
+            throw new Error(`画像取得エラー: ${response.status}`);
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          console.log('画像Blob取得成功:', {
+            type: blob.type,
+            size: blob.size,
+            url: currentSlideData.imageUrl
+          });
+          
+          // Blobから一時URLを作成して表示
+          const objectUrl = URL.createObjectURL(blob);
+          if (imageRef.current) {
+            imageRef.current.src = objectUrl;
+            setImageError(false);
+          }
+        })
+        .catch(error => {
+          console.error('画像フェッチエラー:', error);
+          setImageError(true);
         });
-      })
-      .catch(error => {
-        console.error('画像直接リクエストエラー:', {
-          error: error.message,
-          url: currentSlideData?.imageUrl
-        });
-      });
+    }
 
-    setImageError(true);
-    
-    if (retryCount < maxRetries) {
-      // 再試行回数を増やす
-      setRetryCount(prev => prev + 1);
-      
-      // 一定時間後に再試行
-      setTimeout(() => {
-        console.log(`画像読み込み再試行 (${retryCount + 1}/${maxRetries})...`, {
-          url: currentSlideData?.imageUrl
-        });
-        setImageError(false); // エラー状態をリセットして再読み込み
-      }, 1000 * (retryCount + 1)); // 徐々に待機時間を増やす
+    // 最大再試行回数を超えた場合はエラー表示
+    if (retryCount >= MAX_RETRY_COUNT) {
+      setImageError(true);
     } else {
-      console.error('最大再試行回数に達しました:', {
-        url: currentSlideData?.imageUrl,
-        maxRetries
-      });
+      setRetryCount(prev => prev + 1);
     }
   };
 
@@ -455,232 +451,222 @@ export const PreviewSectionComponent = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">プレビュー</h2>
+      <div className="flex justify-between items-center mb-2">
+        <h2 className="text-lg font-medium">プレビュー</h2>
         <div className="flex items-center space-x-2">
-          {/* ズームコントロール */}
-          <div className="flex items-center mr-4 space-x-1">
-            <Button variant="outline" size="sm" onClick={handleZoomOut} title="縮小" className="h-8 w-8 p-0">
-              <Minus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomReset}
-              title="ズームリセット"
-              className="h-8 w-8 p-0"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleZoomIn} title="拡大" className="h-8 w-8 p-0">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* スライド切り替えコントロール */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onSlideChange(Math.max(0, currentSlide - 1))}
-            disabled={currentSlide === 0}
+            onClick={handleZoomOut}
+            disabled={scale <= 0.5}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <Minus className="h-4 w-4" />
           </Button>
-          <span className="text-sm">
-            {currentSlide + 1} / {slides.length}
-          </span>
+          <span className="text-sm">{Math.round(scale * 100)}%</span>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onSlideChange(Math.min(slides.length - 1, currentSlide + 1))}
-            disabled={currentSlide === slides.length - 1}
+            onClick={handleZoomIn}
+            disabled={scale >= 2}
           >
-            <ChevronRight className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomReset}
+          >
+            <RotateCcw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 h-full">
-        <div
-          ref={previewRef}
-          className="relative flex-1 border rounded-md overflow-hidden bg-gray-100"
-          data-testid="slide-preview"
-          style={{
-            cursor: isDragging ? 'grabbing' : scale > 1 ? 'grab' : 'default',
-            minHeight: '400px', // 最小高さを設定
-            height: '60vh', // 画面の60%の高さを確保
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          {currentSlideData ? (
+      {/* スライドプレビュー - 上部 */}
+      <div className="flex-1 border rounded-md overflow-hidden bg-gray-50 relative">
+        {currentSlideData ? (
+          <div
+            className="relative w-full h-full flex justify-center items-center"
+            style={{
+              cursor: isDragging ? 'grabbing' : scale > 1 ? 'grab' : 'default',
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          >
             <div
-              className="relative w-full h-full flex justify-center items-center"
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
+              className="relative"
+              style={{
+                transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
+                transformOrigin: 'center',
+                transition: isDragging ? 'none' : 'transform 0.2s ease',
+                pointerEvents: 'auto', // イベントを確実に受け取る
+                maxWidth: '100%',
+                maxHeight: '100%',
+              }}
             >
-              <div
-                className="relative"
+              {/* スライド画像 - 通常のimgタグを使用 */}
+              <img
+                ref={imageRef}
+                src={currentSlideData.imageUrl}
+                alt={`スライド ${currentSlideData.index + 1}`}
+                className="max-w-full max-h-full"
                 style={{
-                  transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
+                  transform: `scale(${scale})`,
                   transformOrigin: 'center',
-                  transition: isDragging ? 'none' : 'transform 0.2s ease',
-                  pointerEvents: 'auto', // イベントを確実に受け取る
-                  maxWidth: '100%',
-                  maxHeight: '100%',
+                  transition: isDragging ? 'none' : 'transform 0.2s',
                 }}
-              >
-                {/* スライド画像 - 通常のimgタグを使用 */}
-                <img
-                  ref={imageRef}
-                  src={currentSlideData.imageUrl}
-                  alt={`スライド ${currentSlideData.index + 1}`}
-                  className="max-w-full max-h-full"
-                  style={{
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'center',
-                    transition: isDragging ? 'none' : 'transform 0.2s',
-                  }}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                  crossOrigin="anonymous" // CORS対応
-                  data-testid="slide-image"
-                />
-                {imageError && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 bg-opacity-80">
-                    <p className="text-red-500 font-medium mb-2">画像の読み込みに失敗しました</p>
-                    <p className="text-sm text-gray-600 mb-4">URL: {currentSlideData.imageUrl}</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setImageError(false);
-                        setRetryCount(0);
-                        console.log('画像の再読み込みを試みます:', currentSlideData.imageUrl);
-                        
-                        // 直接fetchを試みる
-                        fetch(currentSlideData.imageUrl, {
-                          credentials: 'include',
-                          cache: 'no-cache'
-                        })
-                          .then(res => {
-                            console.log('画像直接fetch結果:', {
-                              status: res.status,
-                              statusText: res.statusText,
-                              headers: Object.fromEntries(res.headers.entries()),
-                              url: res.url
-                            });
-                            return res.blob();
-                          })
-                          .then(blob => {
-                            console.log('画像ブロブ取得成功:', {
-                              type: blob.type,
-                              size: blob.size
-                            });
-                            
-                            // Blobから一時URLを作成して表示
-                            const url = URL.createObjectURL(blob);
-                            if (imageRef.current) {
-                              imageRef.current.src = url;
-                            }
-                          })
-                          .catch(error => {
-                            console.error('画像直接fetch失敗:', error);
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                crossOrigin="anonymous" // CORS対応
+                data-testid="slide-image"
+              />
+              {imageError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 bg-opacity-80">
+                  <p className="text-red-500 font-medium mb-2">画像の読み込みに失敗しました</p>
+                  <p className="text-xs text-gray-600 mb-4">URL: {currentSlideData.imageUrl}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setImageError(false);
+                      setRetryCount(0);
+                      console.log('画像の再読み込みを試みます:', currentSlideData.imageUrl);
+                      
+                      // 直接fetchを試みる
+                      fetch(currentSlideData.imageUrl, {
+                        credentials: 'include',
+                        cache: 'no-cache'
+                      })
+                        .then(res => {
+                          console.log('画像直接fetch結果:', {
+                            status: res.status,
+                            statusText: res.statusText,
+                            headers: Object.fromEntries(res.headers.entries()),
+                            url: res.url
                           });
-                      }}
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      再読み込み
-                    </Button>
-                  </div>
-                )}
-
-                {/* テキスト位置のハイライト表示 */}
-                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                  {textItems.map((text, index) => {
-                    const isHovered = internalHoveredTextIndex === index;
-                    const isSelected = internalSelectedTextIndex === index;
-
-                    return (
-                      <div
-                        key={`highlight-${index}`}
-                        style={{
-                          ...getHighlightStyle(text.position, isHovered, isSelected),
-                          // ハイライト要素は常にドラッグよりも優先してクリックできるように
-                          pointerEvents: 'auto',
-                          zIndex: isSelected ? 50 : isHovered ? 40 : 30,
-                        }}
-                        onClick={() => handleTextClick(index)}
-                        onMouseEnter={() => handleTextHover(index)}
-                        onMouseLeave={() => handleTextHover(null)}
-                        className="cursor-pointer"
-                        data-testid={`text-highlight-${index}`}
-                      />
-                    );
-                  })}
+                          return res.blob();
+                        })
+                        .then(blob => {
+                          console.log('画像ブロブ取得成功:', {
+                            type: blob.type,
+                            size: blob.size
+                          });
+                          
+                          // Blobから一時URLを作成して表示
+                          const url = URL.createObjectURL(blob);
+                          if (imageRef.current) {
+                            imageRef.current.src = url;
+                          }
+                        })
+                        .catch(error => {
+                          console.error('画像直接fetch失敗:', error);
+                        });
+                    }}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    再読み込み
+                  </Button>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">スライドがありません</p>
-            </div>
-          )}
-        </div>
+              )}
 
-        {/* 原文と翻訳テキストの表示セクション - すべてのテキストを表示 */}
-        {currentSlideData && textItems.length > 0 && (
-          <div className="lg:w-1/3 border rounded-md bg-white flex flex-col h-full" data-testid="translation-text">
-            <div className="p-3 border-b sticky top-0 bg-white z-10">
-              <h3 className="font-medium">スライド内のテキスト</h3>
-              <p className="text-xs text-gray-500">プレビューを確認しながらテキストを検証できます</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3" style={{ maxHeight: 'calc(60vh - 60px)' }}>
-              <div className="space-y-3">
+              {/* テキスト位置のハイライト表示 */}
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
                 {textItems.map((text, index) => {
+                  const isHovered = internalHoveredTextIndex === index;
                   const isSelected = internalSelectedTextIndex === index;
+                  const style = getHighlightStyle(text.position, isHovered, isSelected);
+
                   return (
                     <div
-                      key={`text-item-${index}`}
-                      className={`p-2 rounded-md transition-colors duration-200 ${
-                        isSelected
-                          ? 'bg-blue-50 border-2 border-blue-300 shadow-sm'
-                          : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                      }`}
-                      onClick={() => handleTextClick(index)}
-                    >
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1 flex justify-between items-center">
-                            <span>原文:</span>
-                            {isSelected && (
-                              <span className="text-blue-600 text-xs px-2 py-0.5 bg-blue-100 rounded-full">選択中</span>
-                            )}
-                          </p>
-                          <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
-                            {text.text || 'テキストがありません'}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">翻訳:</p>
-                          <div className="p-2 bg-white rounded-md min-h-[40px] border border-gray-100 text-sm">
-                            {currentSlideData.translations && currentSlideData.translations[index]
-                              ? currentSlideData.translations[index].text
-                              : '翻訳がありません'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      key={`highlight-${index}`}
+                      style={style}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTextClick(index);
+                      }}
+                      onMouseEnter={() => handleTextHover(index)}
+                      onMouseLeave={() => handleTextHover(null)}
+                      data-testid={`text-highlight-${index}`}
+                    />
                   );
                 })}
               </div>
             </div>
           </div>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-500">スライドがありません</p>
+          </div>
         )}
       </div>
+
+      {/* ページネーションコントロール */}
+      <div className="flex justify-between items-center my-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onSlideChange(Math.max(0, currentSlide - 1))}
+          disabled={currentSlide === 0}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm">
+          {currentSlide + 1} / {slides.length}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onSlideChange(Math.min(slides.length - 1, currentSlide + 1))}
+          disabled={currentSlide === slides.length - 1}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* スライド内テキスト - ページ選択ボタンの下 */}
+      {currentSlideData && textItems.length > 0 && (
+        <div className="mt-4 border rounded-md overflow-hidden">
+          <div className="p-3 bg-gray-100 border-b">
+            <h3 className="text-sm font-medium">スライド内のテキスト</h3>
+            <p className="text-xs text-gray-500">プレビューを確認しながらテキストを編集できます</p>
+          </div>
+          
+          <div className="overflow-y-auto max-h-[300px]">
+            {textItems.map((text, index) => {
+              const isSelected = internalSelectedTextIndex === index;
+              const translation = currentSlideData.translations && 
+                currentSlideData.translations[index];
+              
+              return (
+                <div 
+                  key={`text-${index}`}
+                  className={`p-3 border-b hover:bg-gray-50 transition-colors ${
+                    isSelected ? 'bg-blue-50' : ''
+                  }`}
+                  onClick={() => handleTextClick(index)}
+                >
+                  <div className="flex flex-row">
+                    {/* 原文 - 左側 */}
+                    <div className="flex-1 mr-2">
+                      <p className="text-xs text-gray-500 mb-1">原文:</p>
+                      <p className="text-sm">{text.text}</p>
+                    </div>
+                    
+                    {/* 翻訳 - 右側 */}
+                    <div className="flex-1 ml-2">
+                      <p className="text-xs text-gray-500 mb-1">翻訳:</p>
+                      <p className="text-sm">
+                        {translation ? translation.text : '翻訳がありません'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -274,8 +274,6 @@ model ActivityLog {
 // パターン1（新形式）
 /tmp/users/{userId}/{fileId}/slides/{imageName}
 
-// パターン2（旧形式 - 後方互換性用）
-/tmp/users/{userId}/slides/{fileId}/{imageName}
 ```
 
 ### 翻訳API

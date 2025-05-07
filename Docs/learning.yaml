@@ -1,0 +1,146 @@
+title: "スライド画像表示と翻訳APIの不具合分析と学び"
+date: "2025-05-07"
+author: "開発チーム"
+
+# 今回発生した不具合の概要
+issues:
+  - id: "issue-001"
+    title: "スライド画像が表示されない問題"
+    description: "アップロードしたスライドの画像が正しく表示されず、画像読み込みエラーが発生していた"
+    root_cause: "ファイルパスの構築に問題があり、'users'が二重に含まれるパス構造になっていた"
+    
+  - id: "issue-002"
+    title: "翻訳APIのエラー"
+    description: "翻訳ボタンを押すとAPIエラーが発生していた"
+    root_cause: "翻訳リクエストにおいてfileIdの取得方法が不適切で、正しいfileIdが送信されていなかった"
+    
+  - id: "issue-003"
+    title: "スライド内テキストのレイアウト問題"
+    description: "スライド内テキストが右側に表示されており、ユーザビリティに問題があった"
+    root_cause: "UIレイアウトの設計が最適化されておらず、ユーザーの期待と異なるレイアウトになっていた"
+
+# 原因の分析
+root_causes_analysis:
+  - category: "パス構造の一貫性の欠如"
+    description: "ファイルパス構造の定義が複数の場所に散在しており、一貫性が保たれていなかった"
+    examples:
+      - "スライドAPIでは `/tmp/users/users/{userId}/{fileId}/slides/{imageName}` というパス構造を使用"
+      - "実際のファイル構造は `/tmp/users/{userId}/{fileId}/slides/{imageName}` であった"
+      - "FILE_CONFIGの設定とパス構築の間に不整合があった"
+  
+  - category: "APIインターフェースの不明確さ"
+    description: "翻訳APIのインターフェース定義が不明確で、必要なパラメータの取得方法が適切に実装されていなかった"
+    examples:
+      - "fileIdの取得方法が文字列分割（split）に依存しており、URLの構造変更に弱かった"
+      - "APIのパラメータ要件がコード内に散在し、一元管理されていなかった"
+  
+  - category: "テスト不足"
+    description: "エッジケースや異常系のテストが不足しており、実際の環境での問題が見逃されていた"
+    examples:
+      - "異なるパス構造でのファイル読み込みテストが不足"
+      - "APIリクエストの失敗ケースのテストが不足"
+
+# 問題解決に時間がかかった理由
+time_consuming_factors:
+  - factor: "ログ情報の不足"
+    description: "初期実装では詳細なデバッグ情報が出力されておらず、問題の特定に時間がかかった"
+    
+  - factor: "パス構造の複雑さ"
+    description: "複数のパス構造が混在しており、実際のファイルシステムとの整合性確認に時間がかかった"
+    
+  - factor: "コードの分散"
+    description: "ファイルパス関連のロジックが複数のファイルに分散しており、全体像の把握が困難だった"
+
+# 実装時に気づけなかった理由
+implementation_blindspots:
+  - blindspot: "設計ドキュメントとの乖離"
+    description: "実装が進むにつれて設計ドキュメントとの乖離が生じ、参照されなくなっていた"
+    
+  - blindspot: "段階的な変更による副作用"
+    description: "パス構造の変更が段階的に行われ、古い構造と新しい構造が混在する状態になっていた"
+    
+  - blindspot: "クロスチェックの不足"
+    description: "コードレビューやペアプログラミングなどのクロスチェック機会が不足していた"
+
+# 今後の改善策
+improvements:
+  - area: "設計と実装の一貫性確保"
+    actions:
+      - "ファイルパス構造を一元管理するクラスやモジュールを強化し、すべての箇所で同じ方法でパスを構築する"
+      - "設計ドキュメントを常に最新の状態に保ち、実装との乖離を防ぐ"
+      - "変更履歴を明確に記録し、移行期間中の互換性を確保する"
+  
+  - area: "テスト強化"
+    actions:
+      - "ファイルパス構築のユニットテストを追加"
+      - "APIインターフェースの入出力テストを強化"
+      - "エッジケースや異常系のテストケースを追加"
+  
+  - area: "ログとデバッグ情報"
+    actions:
+      - "重要なポイントでの詳細なログ出力を標準化"
+      - "エラー発生時の詳細情報収集を自動化"
+      - "ユーザー体験に影響を与えない範囲でのデバッグ情報の充実"
+  
+  - area: "コードレビューとペアプログラミング"
+    actions:
+      - "複雑なロジックや重要な変更に対するペアプログラミングの実施"
+      - "コードレビューチェックリストの作成と活用"
+      - "定期的なコードウォークスルーの実施"
+
+# 学びと教訓
+lessons_learned:
+  - lesson: "パス構造の一元管理の重要性"
+    description: "ファイルパスなどの重要な構造は一元管理し、すべての箇所で同じ方法で構築することが重要"
+    
+  - lesson: "段階的な変更の管理"
+    description: "段階的な変更を行う場合は、移行計画を明確にし、古い構造と新しい構造の共存期間を最小限にする"
+    
+  - lesson: "早期かつ詳細なログ出力"
+    description: "問題解決の効率化のために、早い段階から詳細なログ出力を実装することが重要"
+    
+  - lesson: "APIインターフェースの明確な定義"
+    description: "APIのインターフェース定義を明確にし、ドキュメント化することで実装ミスを防ぐ"
+    
+  - lesson: "テスト駆動開発の活用"
+    description: "複雑なロジックや重要な機能は、テスト駆動開発で実装することで品質を確保する"
+
+# 今後のベストプラクティス
+best_practices:
+  - practice: "パスヘルパー関数の活用"
+    description: "ファイルパスの構築には専用のヘルパー関数を使用し、直接的な文字列操作を避ける"
+    example: |
+      // 悪い例
+      const path = `/tmp/users/${userId}/${fileId}/slides/${imageName}`;
+      
+      // 良い例
+      const path = filePathManager.getSlidePath(userId, fileId, imageName);
+    
+  - practice: "APIパラメータの抽出関数"
+    description: "URLやパスからのパラメータ抽出には専用の関数を使用し、正規表現などで堅牢に実装する"
+    example: |
+      // 悪い例
+      const fileId = url.split('/')[3];
+      
+      // 良い例
+      const fileId = extractFileIdFromUrl(url);
+    
+  - practice: "段階的な変更の管理"
+    description: "パス構造などの重要な変更は、移行計画を立て、古い構造と新しい構造の共存期間を明確にする"
+    example: |
+      // 移行計画の例
+      // 1. 新しいパス構造を追加（両方をサポート）
+      // 2. 新しいパス構造への移行を促進（古い構造は非推奨）
+      // 3. 古いパス構造のサポートを削除
+    
+  - practice: "詳細なログ出力"
+    description: "重要なポイントでは詳細なログを出力し、問題解決を効率化する"
+    example: |
+      console.log('スライドAPI - パスパラメータ:', {
+        path: params.path,
+        fileId,
+        imageName,
+        fullPath: params.path.join('/'),
+        pathLength: params.path.length,
+        timestamp: new Date().toISOString()
+      });
