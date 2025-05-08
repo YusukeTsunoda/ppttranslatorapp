@@ -15,7 +15,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/translate';
+  const callbackUrl = searchParams?.get('callbackUrl') || '/translate';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

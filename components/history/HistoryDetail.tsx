@@ -104,8 +104,15 @@ export function HistoryDetail({ historyId, historyData, onBack }: HistoryDetailP
               <div className="flex justify-between">
                 <dt className="font-medium text-gray-500">ステータス</dt>
                 <dd>
-                  <Badge variant={historyItem.status === '完了' ? 'success' : historyItem.status === 'エラー' ? 'destructive' : 'default'}>
-                    {historyItem.status}
+                  <Badge variant={
+                    historyItem.status === 'COMPLETED' ? 'success' :
+                    historyItem.status === 'FAILED' ? 'destructive' :
+                    'default'
+                  }>
+                    {historyItem.status === 'COMPLETED' ? '完了' :
+                     historyItem.status === 'FAILED' ? 'エラー' :
+                     historyItem.status === 'PROCESSING' ? '処理中' :
+                     historyItem.status}
                   </Badge>
                 </dd>
               </div>

@@ -15,9 +15,9 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/translate';
-  const priceId = searchParams.get('priceId');
-  const inviteId = searchParams.get('inviteId');
+  const redirect = searchParams?.get('redirect') || '/translate';
+  const priceId = searchParams?.get('priceId');
+  const inviteId = searchParams?.get('inviteId');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

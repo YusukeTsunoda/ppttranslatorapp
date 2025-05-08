@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
-  const plan = searchParams.get('plan');
+  const plan = searchParams?.get('plan');
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
