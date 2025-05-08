@@ -144,3 +144,32 @@ best_practices:
         pathLength: params.path.length,
         timestamp: new Date().toISOString()
       });
+
+# learning.yaml
+
+- title: npm run build で発生した主なエラーと対応・再発防止策
+  items:
+    - error: "Type error: Parameter 'index' implicitly has an 'any' type."
+      cause: "TypeScriptの暗黙any型禁止設定により、map等のコールバック引数の型が明示されていない場合に発生。"
+      solution: "index: number など、明示的に型注釈を付与する。"
+      prevention: "TypeScriptのstrict設定を維持し、コールバック引数には必ず型注釈を付与する習慣を徹底する。"
+
+    - error: "Type error: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'."
+      cause: "外部ライブラリ（react-day-picker）のカスタムコンポーネント仕様を正しく理解せず、存在しないプロパティ（IconLeft/IconRight）を指定した。"
+      solution: "公式ドキュメントを確認し、PreviousMonthButton/NextMonthButtonやChevronなど、正しいカスタマイズ方法を使う。"
+      prevention: "外部ライブラリのAPIや型定義は必ず公式ドキュメント・型定義ファイルで確認し、独自解釈でpropsを追加しない。"
+
+    - error: "Type error: Property 'direction' does not exist on type ..."
+      cause: "react-day-pickerのChevronカスタムコンポーネントにdirectionというpropsが渡されると誤解した。"
+      solution: "directionではなく、PreviousMonthButton/NextMonthButtonで左右ボタンを個別にカスタマイズする。"
+      prevention: "カスタムコンポーネントのpropsは型定義を必ず確認し、存在しないpropsを受け取らない。"
+
+    - error: "Type error: 'searchParams' is possibly 'null'."
+      cause: "useSearchParams()の戻り値がnullの可能性を考慮せず、nullチェックを怠った。"
+      solution: "searchParamsがnullの場合の分岐を追加し、デフォルト値を返すように修正。"
+      prevention: "nullを返す可能性のあるAPI利用時は必ずnullチェックを行う。"
+
+    - error: "Type error: Argument of type 'string | null' is not assignable to parameter of type 'string'."
+      cause: "router.push等の引数にstring | null型が渡る可能性を考慮していなかった。"
+      solution: "router.push(newUrl || '') のように、必ずstring型を渡すよう修正。"
+      prevention: "string型が必須のAPIには、型アサーションやデフォルト値で型を保証してから渡す。"

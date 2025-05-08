@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     // トランザクションを使用して保存処理を実行
     try {
       const body = await request.json();
-      const { slides, translations, currentSlide, sourceLang, targetLang } = body;
+      const { slides, translations, currentSlide, sourceLang, targetLang, fileId } = body;
 
       const result = await prisma.$transaction(async (tx) => {
         // ユーザーの存在確認
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
             sourceLang: sourceLang || 'ja',
             targetLang: targetLang || 'en',
             model: 'claude-3-haiku-20240307',
+            fileId: fileId,
           },
         });
 

@@ -49,6 +49,9 @@ export function useHistoryFilter(): HistoryFilterResult {
   
   // URLからフィルター状態を初期化
   const initializeFromUrl = useCallback(() => {
+    if (!searchParams) {
+      return { ...defaultFilterState };
+    }
     return {
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '10'),
@@ -81,7 +84,7 @@ export function useHistoryFilter(): HistoryFilterResult {
     if (newFilters.targetLang) params.set('targetLang', newFilters.targetLang);
     
     const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    router.push(newUrl);
+    router.push(newUrl || "");
   }, [pathname, router]);
 
   // フィルター変更時にURLを更新

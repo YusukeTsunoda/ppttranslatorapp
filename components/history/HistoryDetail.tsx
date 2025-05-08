@@ -126,7 +126,7 @@ export function HistoryDetail({ historyId, historyData, onBack }: HistoryDetailP
               </div>
               <div className="flex justify-between">
                 <dt className="font-medium text-gray-500">翻訳言語</dt>
-                <dd data-testid="translation-languages">{languageNames[historyItem.sourceLang]} → {languageNames[historyItem.targetLang]}</dd>
+                <dd data-testid="translation-languages">{languageNames[historyItem.sourceLang as Language]} → {languageNames[historyItem.targetLang as Language]}</dd>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
@@ -192,13 +192,13 @@ export function HistoryDetail({ historyId, historyData, onBack }: HistoryDetailP
                   )}
                 </div>
                 <TabsList className="grid grid-flow-col auto-cols-fr overflow-x-auto">
-                  {slides.map((_, index) => (
+                  {slides.map((_: any, index: number) => (
                     <TabsTrigger key={index} value={index.toString()}>
                       {index + 1}
                     </TabsTrigger>
                   ))}
                 </TabsList>
-                {slides.map((slide, index) => (
+                {slides.map((slide: any, index: number) => (
                   <TabsContent key={index} value={index.toString()} className="mt-4">
                     <h4 className="font-medium mb-2">スライド {index + 1} のテキスト</h4>
                     {slide.texts && slide.texts.length > 0 ? (
