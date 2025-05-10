@@ -7,31 +7,31 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
+const ACCENT = 'text-blue-600'; // アクセントカラー（青）
+const ACCENT_BG = 'bg-blue-600';
+const ACCENT_BTN = 'bg-blue-600 hover:bg-blue-700 text-white';
+
 const plans = [
   {
-    id: 'price_H5UGwpxnJVWdmh', // Stripeの価格ID
-    name: 'ベーシックプラン',
+    id: 'price_H5UGwpxnJVWdmh',
+    name: 'ベーシック',
     price: '¥1,000',
-    description: '個人向け有料プラン',
     features: [
-      '月100ページ分（約10万文字）まで翻訳可能',
-      '月10件までのファイル翻訳',
-      'ファイルサイズ上限10MB',
-      '年間契約で最大20%割引',
+      '月100ページまで翻訳',
+      'ファイル10件/月',
+      '10MB/ファイル',
     ],
     buttonText: '無料で始める',
   },
   {
-    id: 'price_H5UGxyzABCDefg', // Stripeの価格ID
-    name: 'プレミアムプラン',
+    id: 'price_H5UGxyzABCDefg',
+    name: 'プレミアム',
     price: '¥3,000',
-    description: 'ヘビーユーザー向け',
     features: [
-      '月500ページ分（約50万文字）まで翻訳可能',
-      '月50〜100件のファイル翻訳',
-      'ファイルサイズ上限25MB',
-      'Glossary機能強化',
-      'チーム利用対応（用語集10件まで共有可）',
+      '月500ページまで翻訳',
+      'ファイル100件/月',
+      '25MB/ファイル',
+      'チーム利用対応',
     ],
     buttonText: '無料で始める',
     featured: true,
@@ -46,26 +46,15 @@ export default function PricingPage() {
   const handleSubscribe = async (priceId: string) => {
     try {
       setLoading(priceId);
-
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priceId }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'チェックアウトの作成に失敗しました');
-      }
-
-      if (data.url) {
-        router.push(data.url);
-      }
+      if (!response.ok) throw new Error(data.error || 'チェックアウトの作成に失敗しました');
+      if (data.url) router.push(data.url);
     } catch (error) {
-      console.error('Checkout error:', error);
       toast({
         title: 'エラー',
         description: error instanceof Error ? error.message : 'チェックアウトの作成に失敗しました',
@@ -77,59 +66,53 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="py-24 sm:py-32">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="text-base font-semibold leading-7 text-orange-600">料金プラン</h1>
-          <p className="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-            あなたのニーズに合わせたプランをお選びください
-          </p>
-        </div>
-        <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2 lg:gap-x-8 xl:gap-x-12">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* ヒーローセクション */}
+      <section className="flex-1 flex flex-col items-center justify-center px-4 pt-24 pb-12">
+        <h1 className="text-5xl sm:text-6xl font-extrabold text-black mb-6 tracking-tight text-center">
+          <span className="block">AIで</span>
+          <span className={`block ${ACCENT}`}>パワポ翻訳</span>
+          <span className="block">をもっとシンプルに</span>
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-700 max-w-2xl text-center mb-12">
+          高精度AIでPowerPoint資料を一括翻訳。<br className="hidden sm:inline" />
+          シンプルな料金プランで、すぐに始められます。
+        </p>
+      </section>
+
+      {/* プラン比較セクション */}
+      <section className="w-full flex-1 flex flex-col items-center justify-center px-4 pb-24">
+        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
           {plans.map((plan) => (
             <Card
               key={plan.name}
-              className={`relative ring-1 ring-gray-200 rounded-3xl p-8 xl:p-10 ${plan.featured ? 'bg-orange-50' : ''}`}
+              className={`flex flex-col items-center p-10 rounded-3xl border border-gray-200 shadow-none bg-white transition-transform hover:scale-105 ${plan.featured ? 'ring-2 ring-black' : ''}`}
             >
-              {plan.featured && (
-                <div className="absolute -top-4 right-8">
-                  <div className="rounded-full bg-orange-600 px-4 py-1 text-xs font-semibold leading-5 text-white">
-                    おすすめ
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-col h-full">
-                <div className="mb-8">
-                  <h2 className="text-lg font-semibold leading-8 text-gray-900">{plan.name}</h2>
-                  <p className="mt-4 text-sm leading-6 text-gray-600">{plan.description}</p>
-                  <p className="mt-6 flex items-baseline gap-x-1">
-                    <span className="text-4xl font-bold tracking-tight text-gray-900">{plan.price}</span>
-                    <span className="text-sm font-semibold leading-6 text-gray-600">/月額</span>
-                  </p>
-                  <ul role="list" className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex gap-x-3">
-                        <Check className="h-6 w-5 flex-none text-orange-600" aria-hidden="true" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="mt-auto">
-                  <Button
-                    onClick={() => handleSubscribe(plan.id)}
-                    disabled={loading === plan.id}
-                    className={`w-full ${plan.featured ? 'bg-orange-600 hover:bg-orange-500' : ''}`}
-                    data-testid={`select-plan-${plan.name.toLowerCase()}`}
-                  >
-                    {loading === plan.id ? '処理中...' : plan.buttonText}
-                  </Button>
-                </div>
+              <h2 className="text-2xl font-bold text-black mb-2 tracking-tight">{plan.name}</h2>
+              <div className="mb-8">
+                <span className="text-5xl font-extrabold text-black">{plan.price}</span>
+                <span className="text-base text-gray-500 ml-2">/月</span>
               </div>
+              <ul className="mb-10 space-y-3 w-full max-w-xs">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center text-gray-800 text-base">
+                    <Check className={`h-5 w-5 mr-2 ${ACCENT}`} aria-hidden="true" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <Button
+                onClick={() => handleSubscribe(plan.id)}
+                disabled={loading === plan.id}
+                className={`w-full py-4 text-lg font-semibold rounded-xl shadow-none border-none ${plan.featured ? ACCENT_BTN : 'bg-black hover:bg-gray-900 text-white'}`}
+                data-testid={`select-plan-${plan.name.toLowerCase()}`}
+              >
+                {loading === plan.id ? '処理中...' : plan.buttonText}
+              </Button>
             </Card>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
