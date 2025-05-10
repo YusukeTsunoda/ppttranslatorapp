@@ -1,621 +1,298 @@
 # PPTXTranslator 移行計画
-# Prisma + NextAuth + Vercel から Drizzle + Supabase + Cloudflare Pages への移行
 
-# 移行概要
-migration_overview:
-  current_stack:
-    database: "Prisma ORM with PostgreSQL"
-    authentication: "NextAuth.js"
-    deployment: "Vercel"
-  
-  target_stack:
-    database: "Cloudflare D1 / KV"
-    orm: "Drizzle"
-    authentication: "Supabase"
-    deployment: "Cloudflare Pages"
-  
-  affected_areas:
-    - "データベースモデルとスキーマ定義"
-    - "認証システム"
-    - "APIルート"
-    - "環境変数"
-    - "デプロイメント設定"
+# デザイン統一・ダーク/ライトテーマ導入 修正計画
 
-# 移行ステップ
-migration_steps:
-  # ステップ1: プロジェクト依存関係の更新
-  update_dependencies:
-    description: "新しい依存関係をインストールし、古い依存関係を削除します"
-    commands:
-      - "npm uninstall @prisma/client prisma next-auth"
-      - "npm install drizzle-orm @supabase/supabase-js @cloudflare/workers-types"
-      - "npm install -D drizzle-kit wrangler"
-    files_to_update:
-      - "package.json"
-      - "package-lock.json"
+- step: 1
+  title: Tailwind設定・グローバルCSSの統一
+  items:
+    - Tailwindの設定ファイル（tailwind.config.cjs/ts）をdesignReferrenceの内容で統一
+    - グローバルCSS（globals.css）をdesignReferrenceの内容で統一
+    - カスタム変数・アニメーション・ユーティリティクラスも反映
+    - 既存のカスタムCSSやクラス名の競合を整理
 
-  # ステップ2: 環境変数の更新
-  update_environment_variables:
-    description: "新しい環境変数を設定し、古い環境変数を削除します"
-    files_to_update:
-      - ".env"
-      - ".env.local"
-      - ".env.production"
-    old_variables:
-      - "DATABASE_URL"
-      - "NEXTAUTH_SECRET"
-      - "NEXTAUTH_URL"
-    new_variables:
-      - "SUPABASE_URL"
-      - "SUPABASE_ANON_KEY"
-      - "SUPABASE_SERVICE_ROLE_KEY"
-      - "CLOUDFLARE_ACCOUNT_ID"
-      - "CLOUDFLARE_API_TOKEN"
+- step: 2
+  title: テーマProvider/トグルの導入
+  items:
+    - ThemeProvider, ThemeToggle, 必要に応じてtheme-mode-toggleをdesignReferrenceから移植
+    - _app.tsxやlayout.tsxで全体をThemeProviderでラップ
+    - next-themesの設定（attribute="class"/defaultTheme/system）を反映
 
-  # ステップ3: データベーススキーマの移行
-  migrate_database_schema:
-    description: "PrismaスキーマをDrizzleスキーマに変換します"
-    old_files:
-      - "prisma/schema.prisma"
-    new_files:
-      - "drizzle/schema.ts"
-    steps:
-      - "DrizzleスキーマディレクトリとファイルをSetupする: `mkdir -p drizzle`"
-      - "各テーブルのスキーマをPrismaからDrizzle形式に変換"
-      - "マイグレーション設定を作成: `touch drizzle.config.ts`"
-      - "マイグレーションスクリプトを実行: `npx drizzle-kit generate`"
-    schema_mapping:
-      users:
-        prisma: |
-          model User {
-            id            String    @id @default(cuid())
-            name          String?
-            email         String?   @unique
-            emailVerified DateTime?
-            image         String?
-            role          String?   @default("user")
-            createdAt     DateTime  @default(now()) @map("created_at")
-            updatedAt     DateTime  @updatedAt @map("updated_at")
-            accounts      Account[]
-            sessions      Session[]
-          }
-        drizzle: |
-          import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-          
-          export const users = sqliteTable('users', {
-            id: text('id').primaryKey(),
-            name: text('name'),
-            email: text('email').unique(),
-            emailVerified: integer('email_verified', { mode: 'timestamp_ms' }),
-            image: text('image'),
-            role: text('role').default('user'),
-            createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().defaultNow(),
-            updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().defaultNow(),
-          });
-      # 他のテーブルも同様に変換
+- step: 3
+  title: 共通レイアウト・ナビゲーションの統一
+  items:
+    - ヘッダー・ナビゲーション・フッター等の共通レイアウトをdesignReferrenceのものに統一
+    - 各ページで同じナビ・テーマトグルUIを利用
+    - レスポンシブ対応・アクセシビリティも考慮
 
-  # ステップ4: データベース接続の更新
-  update_database_connection:
-    description: "データベース接続をPrismaからDrizzleに更新します"
-    old_files:
-      - "lib/prisma.ts"
-      - "lib/db.ts"
-    new_files:
-      - "lib/db/index.ts"
-      - "lib/db/drizzle.ts"
-    code_changes:
-      old_prisma_connection: |
-        // lib/prisma.ts
-        import { PrismaClient } from '@prisma/client';
+- step: 4
+  title: 各ページのデザイン反映
+  items:
+    - page: / (app/(marketing)/page.tsx)
+      status: 完了
+    - page: /pricing (app/(marketing)/pricing/page.tsx)
+      status: 完了
+    - page: /translate (app/(dashboard)/translate/page.tsx)
+      status: 完了
+    - page: /profile (app/(dashboard)/profile/page.tsx)
+      status: 完了
+    - page: /dashboard/history (app/(dashboard)/history/page.tsx)
+      status: 完了
+    - page: /dashboard/admin (app/(dashboard)/admin/page.tsx)
+      status: 完了
+    - page: /dashboard/settings (app/(dashboard)/settings/page.tsx)
+      status: 完了
+    - page: /dashboard/activity (app/(dashboard)/activity/page.tsx)
+      status: 完了
+    - page: /dashboard/checkout (app/(dashboard)/checkout/page.tsx)
+      status: 完了
 
-        let prisma: PrismaClient;
+- step: 5
+  title: UIコンポーネントの移植・統合
+  items:
+    - designReferrence/components/ui/配下のUIコンポーネントを現行アプリに移植・統合
+    - 既存のUIコンポーネントとの重複・競合を整理
+    - 共通化できる部分は共通化
 
-        if (process.env.NODE_ENV === 'production') {
-          prisma = new PrismaClient();
-        } else {
-          if (!global.prisma) {
-            global.prisma = new PrismaClient();
-          }
-          prisma = global.prisma;
-        }
+- step: 6
+  title: アニメーション・ユーティリティの反映
+  items:
+    - カスタムアニメーション・ユーティリティクラスをglobals.cssごと反映
+    - ページ・コンポーネントで必要な箇所に適用
 
-        export default prisma;
-      new_drizzle_connection: |
-        // lib/db/drizzle.ts
-        import { drizzle } from 'drizzle-orm/d1';
-        import { env } from '@/lib/env';
-        
-        // D1データベースのインスタンスを取得
-        export function getDb(context?: { cloudflare?: { env?: { DB: D1Database } } }) {
-          // Cloudflare D1 インスタンスを取得
-          if (context?.cloudflare?.env?.DB) {
-            return drizzle(context.cloudflare.env.DB);
-          }
-          
-          // 開発環境ではバインドされたD1インスタンスを使用
-          if (process.env.NODE_ENV !== 'production') {
-            // ローカル開発用のモックD1
-            return null; // 開発環境用のモックを実装
-          }
-          
-          throw new Error('D1 database instance not found');
-        }
-        
-        // KVストレージインスタンスを取得
-        export function getKV(context?: { cloudflare?: { env?: { KV: KVNamespace } } }) {
-          if (context?.cloudflare?.env?.KV) {
-            return context.cloudflare.env.KV;
-          }
-          
-          if (process.env.NODE_ENV !== 'production') {
-            // ローカル開発用のモックKV
-            return null; // 開発環境用のモックを実装
-          }
-          
-          throw new Error('KV namespace not found');
-        }
+- step: 7
+  title: 動作検証・不具合修正
+  items:
+    - テーマ切り替え、各ページの表示、レスポンシブ、アクセシビリティ等を検証
+    - サードパーティUIや画像のダーク対応も確認
+    - 不具合があれば修正・再検証
 
-  # ステップ5: 認証システムの移行
-  migrate_authentication:
-    description: "NextAuthからSupabaseの認証に移行します"
-    old_files:
-      - "auth.ts"
-      - "lib/auth/session.ts"
-      - "app/api/auth/[...nextauth]/route.ts"
-    new_files:
-      - "lib/supabase/index.ts"
-      - "lib/supabase/server.ts"
-      - "lib/supabase/client.ts"
-      - "lib/supabase/auth.ts"
-    code_changes:
-      supabase_client: |
-        // lib/supabase/client.ts
-        import { createClient } from '@supabase/supabase-js';
-        
-        export const supabaseClient = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-      supabase_server: |
-        // lib/supabase/server.ts
-        import { createServerClient } from '@supabase/supabase-js';
-        import { cookies } from 'next/headers';
-        
-        export function createServerSupabaseClient() {
-          const cookieStore = cookies();
-          
-          return createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-              cookies: {
-                get(name) {
-                  return cookieStore.get(name)?.value;
-                },
-                set(name, value, options) {
-                  cookieStore.set({ name, value, ...options });
-                },
-                remove(name, options) {
-                  cookieStore.set({ name, value: '', ...options });
-                },
-              },
-            }
-          );
-        }
-      auth_utils: |
-        // lib/supabase/auth.ts
-        import { createServerSupabaseClient } from './server';
-        
-        export async function getUser() {
-          const supabase = createServerSupabaseClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          return user;
-        }
-        
-        export async function isAdmin() {
-          const user = await getUser();
-          if (!user) return false;
-          
-          const { data, error } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-            
-          return data?.role === 'admin';
-        }
+# クライアントコンポーネント直import・直呼び出し調査結果
 
-  # ステップ6: API Routes の更新
-  update_api_routes:
-    description: "Prisma及びNextAuthを使用しているAPIルートをDrizzleとSupabaseに更新します"
-    files_to_update:
-      - "app/api/auth/login/route.ts"
-      - "app/api/auth/register/route.ts"
-      - "app/api/auth/role/route.ts"
-      - "app/api/pptx/parse/route.ts"
-      - "app/api/pptx/generate/route.ts"
-      - "app/api/translate/route.ts"
-      - "app/api/upload/route.ts"
-      - "app/api/health/route.ts"
-    example_changes:
-      old_auth_role_api: |
-        // app/api/auth/role/route.ts
-        import { NextResponse } from 'next/server';
-        import { getServerSession } from 'next-auth/next';
-        import prisma from '@/lib/prisma';
-        
-        export async function GET() {
-          try {
-            const session = await getServerSession();
-            
-            if (!session?.user?.email) {
-              return NextResponse.json({ isAdmin: false }, { status: 401 });
-            }
-            
-            const user = await prisma.user.findUnique({
-              where: { email: session.user.email },
-              select: { role: true },
-            });
-            
-            const isAdmin = user?.role === 'admin';
-            
-            return NextResponse.json({ isAdmin });
-          } catch (error) {
-            console.error('Role check error:', error);
-            return NextResponse.json({ isAdmin: false }, { status: 500 });
-          }
-        }
-      new_auth_role_api: |
-        // app/api/auth/role/route.ts
-        import { NextResponse } from 'next/server';
-        import { createServerSupabaseClient } from '@/lib/supabase/server';
-        import { isAdmin } from '@/lib/supabase/auth';
-        
-        export async function GET() {
-          try {
-            const supabase = createServerSupabaseClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (!user) {
-              return NextResponse.json({ isAdmin: false }, { status: 401 });
-            }
-            
-            const adminStatus = await isAdmin();
-            
-            return NextResponse.json({ isAdmin: adminStatus });
-          } catch (error) {
-            console.error('Role check error:', error);
-            return NextResponse.json({ isAdmin: false }, { status: 500 });
-          }
-        }
+# 各ページごとに記載
 
-  # ステップ7: ミドルウェアの更新
-  update_middleware:
-    description: "認証ミドルウェアをNextAuthからSupabaseに更新します"
-    files_to_update:
-      - "middleware.ts"
-    code_changes:
-      old_middleware: |
-        import { withAuth } from "next-auth/middleware";
-        import { NextResponse } from "next/server";
-        
-        export default withAuth(
-          function middleware(req) {
-            const token = req.nextauth.token;
-            const isAdminPanel = req.nextUrl.pathname.startsWith("/admin");
-            
-            if (isAdminPanel && token?.role !== "admin") {
-              return NextResponse.redirect(new URL("/", req.url));
-            }
-          },
-          {
-            callbacks: {
-              authorized: ({ token }) => !!token,
-            },
-          }
-        );
-        
-        export const config = {
-          matcher: ["/admin/:path*", "/dashboard/:path*"],
-        };
-      new_middleware: |
-        import { NextResponse } from 'next/server';
-        import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-        
-        export async function middleware(req) {
-          const res = NextResponse.next();
-          const supabase = createMiddlewareClient({ req, res });
-          
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          
-          // 認証が必要なページで未認証の場合はリダイレクト
-          if (!session && (req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/admin'))) {
-            return NextResponse.redirect(new URL('/login', req.url));
-          }
-          
-          // 管理者ページへのアクセス制限
-          if (req.nextUrl.pathname.startsWith('/admin')) {
-            const { data: userData } = await supabase
-              .from('users')
-              .select('role')
-              .eq('id', session?.user?.id)
-              .single();
-              
-            if (userData?.role !== 'admin') {
-              return NextResponse.redirect(new URL('/', req.url));
-            }
-          }
-          
-          return res;
-        }
-        
-        export const config = {
-          matcher: ['/dashboard/:path*', '/admin/:path*'],
-        };
+# --- サーバー→クライアントimport・default参照の厳密調査 ---
 
-  # ステップ8: コンポーネントの更新
-  update_components:
-    description: "認証関連のコンポーネントを更新します"
-    files_to_update:
-      - "components/auth/LoginForm.tsx"
-      - "components/auth/RegisterForm.tsx"
-      - "app/(dashboard)/layout.tsx"
-    example_changes:
-      login_form: |
-        // components/auth/LoginForm.tsx
-        'use client';
-        
-        import { useState } from 'react';
-        import { useForm } from 'react-hook-form';
-        import { supabaseClient } from '@/lib/supabase/client';
-        import { useRouter } from 'next/navigation';
-        
-        export function LoginForm() {
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState('');
-          const router = useRouter();
-          const { register, handleSubmit } = useForm();
-          
-          const onSubmit = async (data) => {
-            setIsLoading(true);
-            setError('');
-            
-            try {
-              const { error } = await supabaseClient.auth.signInWithPassword({
-                email: data.email,
-                password: data.password,
-              });
-              
-              if (error) throw error;
-              
-              router.push('/dashboard');
-              router.refresh();
-            } catch (error) {
-              setError(error.message || 'ログインに失敗しました');
-            } finally {
-              setIsLoading(false);
-            }
-          };
-          
-          return (
-            <form onSubmit={handleSubmit(onSubmit)}>
-              {/* フォームの内容 */}
-            </form>
-          );
-        }
+- app/layout.tsx:
+    result: NavBarWrapper経由でクライアント呼び出し、直import・default参照なし
+- app/providers.tsx:
+    result: 'use client'明記、問題なし
+- app/not-found.tsx:
+    result: 問題なし
+- app/(dashboard)/layout.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/activity/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/admin/layout.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
+- app/(dashboard)/admin/page.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
+- app/(dashboard)/admin/statistics/page.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
+- app/(dashboard)/admin/users/page.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
+- app/(dashboard)/admin/logs/page.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
+- app/(dashboard)/history/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/history/[id]/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/translate/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/translate/components/PreviewSection.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/translate/components/FileUpload.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/translate/components/Translation.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/translate/translate-client.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/integrations/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/profile/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/settings/page.tsx:
+    result: 'use client'明記、問題なし
+- app/(dashboard)/settings/subscription/page.tsx:
+    result: サーバーコンポーネント、クライアントimportなし
 
-  # ステップ9: デプロイメント設定の更新
-  update_deployment_settings:
-    description: "VercelからCloudflare Pagesへのデプロイメント設定を更新します"
-    files_to_remove:
-      - "vercel.json"
-    files_to_add:
-      - "wrangler.toml"
-    code_changes:
-      wrangler_toml: |
-        # wrangler.toml
-        name = "ppttranslator"
-        main = ".next/server/index.js"
-        compatibility_date = "2023-12-01"
-        
-        [build]
-        command = "npm run build"
-        
-        [site]
-        bucket = ".next/static"
-        
-        [[d1_databases]]
-        binding = "DB"
-        database_name = "ppttranslator_db"
-        database_id = "YOUR_D1_DATABASE_ID"
-        
-        [[kv_namespaces]]
-        binding = "KV"
-        id = "YOUR_KV_NAMESPACE_ID"
-        
-        [env.production]
-        workers_dev = false
-        route = "your-domain.com/*"
-        
-        [env.production.vars]
-        NEXT_PUBLIC_SUPABASE_URL = "YOUR_SUPABASE_URL"
-        NEXT_PUBLIC_SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
+# 各ページごとに記載
 
-  # ステップ10: データ移行
-  migrate_data:
-    description: "PostgreSQLからCloudflare D1へのデータ移行"
-    steps:
-      - "PostgreSQLからデータをエクスポート: `pg_dump -t users -t sessions ... > data.sql`"
-      - "SQLiteの形式に変換するスクリプトを作成"
-      - "変換したデータをCloudflare D1にインポート: `wrangler d1 execute ppttranslator_db --file=data.sqlite`"
-    migration_scripts:
-      export_script: |
-        #!/bin/bash
-        # PostgreSQLからデータをエクスポート
-        pg_dump -U postgres -d your_database -t users -t accounts -t sessions -t translations -t slides -t textElements -t activities > exported_data.sql
-      import_script: |
-        #!/bin/bash
-        # 変換したSQLiteデータをD1にインポート
-        wrangler d1 execute ppttranslator_db --file=converted_data.sql
+- app/layout.tsx:
+    result: NavBarWrapper経由で呼び出し、直import・直呼び出しなし
+    default_export: あり（RootLayout, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/providers.tsx:
+    result: 問題なし（use client明記、ThemeProvider等はクライアントコンポーネントとして正しく利用）
+    default_export: なし（export functionのみ、問題なし）
+- app/not-found.tsx:
+    result: 問題なし
+    default_export: あり（NotFound, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/layout.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（DashboardLayout, 'use client'明記、問題なし）
+- app/(dashboard)/history/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（HistoryPage, 'use client'明記、問題なし）
+- app/(dashboard)/history/[id]/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（HistoryDetailPage, 'use client'明記、問題なし）
+- app/(dashboard)/translate/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（TranslatePage, 'use client'明記、問題なし）
+- app/(dashboard)/translate/components/PreviewSection.tsx:
+    result: 'use client'明記、問題なし
+    default_export: なし（export functionのみ、問題なし）
+- app/(dashboard)/translate/components/FileUpload.tsx:
+    result: 'use client'明記、問題なし
+    default_export: なし（export functionのみ、問題なし）
+- app/(dashboard)/translate/components/Translation.tsx:
+    result: 'use client'明記、問題なし
+    default_export: なし（export functionのみ、問題なし）
+- app/(dashboard)/translate/translate-client.tsx:
+    result: 'use client'明記、問題なし
+    default_export: なし（export functionのみ、問題なし）
+- app/(dashboard)/admin/layout.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（AdminLayout, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/admin/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（AdminDashboard, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/admin/logs/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（AdminLogsPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/admin/statistics/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（StatisticsPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/admin/users/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（AdminUsersPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/integrations/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（IntegrationsPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/profile/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（ProfilePage, 'use client'明記、問題なし）
+- app/(dashboard)/settings/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（SettingsPage, 'use client'明記、問題なし）
+- app/(dashboard)/settings/subscription/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（SubscriptionPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(dashboard)/activity/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（ActivityPage, 'use client'明記、問題なし）
+- app/(dashboard)/checkout/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（CheckoutPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(marketing)/layout.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（MarketingLayout, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(marketing)/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（HomePage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(marketing)/pricing/page.tsx:
+    result: サーバーコンポーネント、クライアントコンポーネントの直import・直呼び出しなし
+    default_export: あり（PricingPage, サーバーコンポーネント、クライアントコンポーネントのdefault参照なし）
+- app/(auth)/reset-password/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（ResetPasswordPage, 'use client'明記、問題なし）
+- app/(auth)/reset-password/confirm/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（ResetPasswordConfirmPage, 'use client'明記、問題なし）
+- app/(auth)/signin/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（SignInPage, 'use client'明記、問題なし）
+- app/(auth)/signup/page.tsx:
+    result: 'use client'明記、問題なし
+    default_export: あり（SignUpPage, 'use client'明記、問題なし）
 
-# 移行テスト計画
-testing_plan:
-  local_testing:
-    - "ローカル環境でDrizzleとSupabaseを設定してテスト"
-    - "認証機能のテスト（ログイン、登録、ロールベースアクセス）"
-    - "データベース操作のテスト（CRUD操作）"
-    - "ファイルアップロードと処理のテスト"
-    - "翻訳機能のテスト"
-  
-  integration_testing:
-    - "Cloudflare Pagesへのステージングデプロイ"
-    - "D1データベースとの接続テスト"
-    - "KVストレージの操作テスト"
-    - "エンドツーエンドテスト"
-  
-  rollback_plan:
-    - "移行前のコードとデータベースのバックアップを作成"
-    - "段階的なデプロイと問題が発生した場合の復旧手順"
-    - "Vercel設定とPrismaスキーマの保持（緊急時の復旧用）"
+# --- 全ファイルimport情報（2024-06-XX時点） ---
 
-# テスト環境の課題と学び
-testing_environment_challenges:
-  - title: "JestとNext.js (SWC) の互換性問題"
-    description: |
-      初期のテスト実行時に`Failed to load SWC binary`エラーが頻発しました。
-      これは、JestがNext.jsのデフォルトコンパイラであるSWC（Speedy Web Compiler）を
-      テスト環境で正しくロードできない場合に発生します。
-    cause: |
-      - JestがSWCのバイナリを見つけられない、または実行できない。
-      - `next/jest`の設定が不十分または環境と互換性がない。
-      - `NODE_OPTIONS`フラグ（`--no-experimental-fetch`など）がSWCの動作に影響を与える可能性がある。
-    solution: |
-      - `package.json`のテストスクリプトに`NODE_OPTIONS=--no-experimental-fetch`を追加。
-      - `jest.config.js`を修正し、`next/jest`ラッパーを使用せず、直接Babelトランスフォーマーを使用するように設定。
-      - `babel.config.js`または`.babelrc`でテスト環境用のBabel設定を明示的に行い、`@babel/plugin-transform-modules-commonjs`を使用してESモジュールをCommonJSに変換。
-      - `jest.config.js`の`transformIgnorePatterns`に必要なモジュール（swr, @babel, @anthropic-ai, react, react-domなど）を追加。
-      - `jest.config.js`の`moduleNameMapper`でNext.jsの内部モジュールを適切にマッピング。
-    learnings: |
-      - Next.jsプロジェクトでJestを使用する場合、SWCとの互換性に注意が必要。
-      - BabelをJestのトランスフォーマーとして明示的に設定することで、SWC関連の問題を回避できる場合がある。
-      - Jestの設定（特に`transformIgnorePatterns`, `moduleNameMapper`）とBabelの設定（presets, plugins）を環境に合わせて慎重に調整する必要がある。
+# app/(dashboard)/admin/page.tsx
+imports:
+  - { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  - { prisma } from '@/lib/prisma'
+  - { UserRole } from '@prisma/client'
+  - Link from 'next/link'
+  - { redirect } from 'next/navigation'
+  - { getServerSession } from 'next-auth'
+  - { authOptions } from '@/lib/auth'
 
-  - title: "ESモジュール構文の解析エラー"
-    description: |
-      SWCの問題を解決した後も、一部のテストファイル（特にReactコンポーネントを含む`.tsx`ファイル）で
-      `SyntaxError: Cannot use import statement outside a module`エラーが発生しました。
-    cause: |
-      - JestがデフォルトでESモジュール構文を直接解釈できない。
-      - Babelの設定が不十分で、テストファイル内の`import`文が正しくCommonJSの`require`文に変換されていない。
-    solution: |
-      - `babel.config.js`または`.babelrc`のテスト環境設定で`@babel/preset-env`の`modules`オプションを`commonjs`に設定し、`@babel/plugin-transform-modules-commonjs`プラグインを使用。
-      - `jest.config.js`の`transform`セクションでBabelの設定を正しく指定。
-    learnings: |
-      - Jest環境でTypeScriptやJSXを使用する場合、Babelによる適切なトランスパイル設定が不可欠。
-      - ESモジュールとCommonJSの混在環境では、モジュール解決と変換の設定に特に注意が必要。
+# app/(dashboard)/admin/logs/page.tsx
+imports:
+  - { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+  - { prisma } from '@/lib/prisma'
+  - { UserRole } from '@prisma/client'
+  - Link from 'next/link'
+  - { redirect } from 'next/navigation'
+  - { getServerSession } from 'next-auth'
+  - { authOptions } from '@/lib/auth'
 
-# 注意点と推奨事項
-recommendations:
-  - "Cloudflare D1はSQLiteベースであり、PostgreSQLと完全に互換性があるわけではないため、複雑なクエリやトランザクションを使用している場合は特に注意が必要です"
-  - "Cloudflare D1はプレビュー段階の技術であるため、本番環境に移行する前に十分なテストを行ってください"
-  - "SupabaseとCloudflare Pagesの統合には追加の設定が必要な場合があります"
-  - "KVストレージにはサイズ制限があるため、大きなファイルの保存には適していない可能性があります"
-  - "Python処理を使用している部分については、Cloudflare Workersでの実行方法を検討する必要があります（例：Pyodide）"
+# app/(dashboard)/admin/statistics/page.tsx
+imports:
+  - { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+  - { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+  - { prisma } from '@/lib/prisma'
+  - { UserRole } from '@prisma/client'
+  - Link from 'next/link'
+  - { redirect } from 'next/navigation'
+  - { getServerSession } from 'next-auth'
+  - { authOptions } from '@/lib/auth'
 
-# 移行後の検証
-post_migration_verification:
-  - "全てのAPIエンドポイントが正常に動作することを確認"
-  - "認証フローが正常に機能することを確認"
-  - "ファイルのアップロードと処理が正常に動作することを確認"
-  - "管理者ダッシュボードへのアクセス制限が機能していることを確認"
-  - "パフォーマンスメトリクスを収集し、移行前と比較"
-  - "エラーログをモニタリングし、新たな問題がないか確認"
+# app/(dashboard)/admin/users/page.tsx
+imports:
+  - { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+  - { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+  - { prisma } from '@/lib/prisma'
+  - { UserRole } from '@prisma/client'
+  - Link from 'next/link'
+  - { redirect } from 'next/navigation'
+  - { getServerSession } from 'next-auth'
+  - { authOptions } from '@/lib/auth'
 
-# Jestテストに関する学び (Translation.test.tsx)
-jest_test_lessons:
-  problem: "Jestテストで `ReferenceError: fetch is not defined` と TypeScript の型エラーが発生"
-  root_cause:
-    - "`jest.mock` のファクトリ関数内で `global.fetch` を暗黙的に参照しようとしたが、Jest のスコープ制限により参照できなかった"
-    - "モックコンポーネントで使用する型定義 (`TranslationProps`, `TextItemType`, `TranslationType`) が元のコンポーネントファイルで `export` されていなかったため、テストファイルでインポートできなかった"
-    - "`fetch` モックの `json()` メソッドが返すオブジェクトの型が、実際のAPIレスポンスと一致していなかった (`translations` プロパティの欠落)"
-  improvement:
-    - "`jest.mock` のファクトリ関数内で `global.fetch` を明示的に参照するように修正"
-    - "必要な型定義を `export` するように元のコンポーネントファイルを修正"
-    - "テストファイル内で型定義を正しくインポート"
-    - "`fetch` モックの `json()` が返すオブジェクトに `translations` プロパティを追加"
-  lessons_learned:
-    - "`jest.mock` のファクトリ関数から外部スコープの変数（特にグローバル変数）を参照する場合は、`global.` プレフィックスを付けて明示的に参照する必要がある"
-    - "コンポーネントとそのテストファイル間で共有される型定義は、必ず `export` する"
-    - "モックする関数の戻り値の型は、実際の関数の戻り値の型（特に非同期処理の解決値）と一致させる必要がある"
-    - "テストエラーが発生した場合、エラーメッセージだけでなく、関連する設定ファイル（`jest.config.js`, `babel.config.js`, `jest.setup.js`）やモックの実装も確認する"
+# --- 今回の不具合に関する情報 ---
 
-# データ形式の不一致
-data_format_inconsistencies:
-  description: "APIからのレスポンスデータ形式とフロントエンドが期待するデータ形式の不一致"
-  
-  # スライドデータの構造に関する不一致
-  slide_structure:
-    api_response:
-      - "index: number"
-      - "texts: Array<{ text: string, position: Position, type?: string }>"
-      - "image_path: string"
-    
-    frontend_expected:
-      - "index: number"
-      - "imageUrl: string"
-      - "texts: Array<{ text: string, position: TextPosition }>"
-      - "translations?: Array<{ text: string, position: TextPosition }>"
-  
-  # 位置情報の型定義の不一致
-  position_type:
-    api:
-      name: "Position"
-      path: "/lib/pptx/types.ts"
-      properties:
-        - "x: number"
-        - "y: number"
-        - "width: number"
-        - "height: number"
-    
-    frontend:
-      name: "TextPosition"
-      path: "/app/(dashboard)/translate/types.ts"
-      properties:
-        - "x: number"
-        - "y: number"
-        - "width: number"
-        - "height: number"
-  
-  # テキスト要素の型定義の不一致
-  text_element_type:
-    api:
-      name: "TextElement"
-      path: "/lib/pptx/types.ts"
-      properties:
-        - "id: string"
-        - "text: string"
-        - "position: Position"
-    
-    frontend:
-      name: "TextItem"
-      path: "/app/(dashboard)/translate/types.ts"
-      properties:
-        - "text: string"
-        - "position: TextPosition"
-  
-  # 主な不一致ポイント
-  key_issues:
-    - "image_path vs imageUrl: APIは 'image_path' を返すが、フロントエンドは 'imageUrl' を期待してている"
-    - "textElements vs texts: APIの型定義では 'textElements' だが、実際のレスポンスでは 'texts' として返してている"
-    - "id フィールド: API側のTextElementには 'id' フィールドがあるが、フロントエンド側のTextItemには存在しない"
-    - "type フィールド: API側の正規化処理で 'type' フィールドを追加していて、フロントエンド側では使用していない"
+- admin配下の各ページ（page.tsx, logs/page.tsx, statistics/page.tsx, users/page.tsx）で、
+  サーバーコンポーネントからクライアントコンポーネントのdefault参照やPromise的参照が発生している場合、
+  Next.jsのビルド時に「Cannot access default.then on the server」「n._ is not a function」等のエラーが発生。
+- すべてのimportはnamed importで統一されており、default importは存在しない。
+- UIコンポーネント（card, table, tabs等）はすべてnamed exportのみで、default exportは存在しない。
+- それでもエラーが発生する場合、import先のファイルが内部でdefault exportやクライアントモジュールのPromise的参照を返していないか、
+  もしくはNext.jsのバージョンやビルドキャッシュの問題も考慮する必要がある。
 
-  # 修正方針
-  fix_strategy:
-    - "アップロードAPIのレスポンス形式を修正: image_path → imageUrl に変更"
-    - "テキスト要素の構造を統一: フロントエンドが期待する形式に合わせる"
-    - "型定義の整合性を確保: 両方の型定義を一致させるか、変換関数を実装"
-    - "不要なフィールドの削除または活用: 'id'や'type'などの扱いを決定"
-    - "スライドデータの正規化処理を改善: 一貫した構造を保証"
+# --- 原因まとめ ---
+- サーバー→クライアントのimport境界は原則守られているが、
+  Next.jsのバンドル・ビルド時に何らかの形でdefault参照やPromise的参照が混入している可能性。
+- 主要なUIコンポーネント・import方法自体には現状問題は見当たらない。
+- さらなる原因特定には、importチェーンの全てのファイル・export方法の再確認、
+  およびNext.jsのバージョン・キャッシュクリア・node_modules再インストール等も推奨。
+
+# --- 現在のビルドエラー・調査状況まとめ（2024-06-XX） ---
+
+## 現在のエラー内容
+- ビルド時に以下のエラーが発生：
+  - Error: Cannot access default.then on the server. You cannot dot into a client module from a server component. You can only pass the imported name through.
+  - TypeError: n._ is not a function
+- 発生ページ例：
+  - /admin/statistics
+  - /admin/logs
+  - /admin
+  - /admin/users
+- いずれも「サーバーコンポーネントからクライアントコンポーネントのdefault参照やPromise的参照」が疑われるNext.js特有のエラー
+
+## 推定原因
+- サーバーコンポーネントからクライアントコンポーネントのdefault参照やPromise的参照がどこかで発生している可能性
+- ただし、importはすべてnamed importで統一されており、UIコンポーネントもnamed exportのみでdefault exportは存在しない
+- importチェーンのどこかでdefault exportやPromise的参照が混入している、またはNext.jsのバージョン・ビルドキャッシュの問題も考えられる
+
+## 現状までの調査・確認結果
+- app/(dashboard)/admin配下の全ページ、components/ui配下の全UIコンポーネントについて、
+  - import/export方法はすべてnamedで統一されていることを確認
+  - default importやdefault exportは存在しない
+  - 'use client'の有無も適切に分かれている
+- PrismaやDB関連のimportも問題なし
+- .then等のPromise的参照もクライアントコンポーネント内のみで利用されている
+- それでもビルド時に上記エラーが発生するため、
+  - importチェーンのさらに深い部分（lib/hooks/utils等）や、
+  - Next.jsのバージョン・キャッシュ・node_modulesの状態も含めて再調査が必要
+
+# --- ここまでの調査・修正履歴は本ファイルに記載 ---

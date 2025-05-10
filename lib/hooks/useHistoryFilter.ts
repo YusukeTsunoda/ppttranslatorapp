@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Language } from '@prisma/client';
+// import { Language } from '@prisma/client'; // ← 削除
+
+type Language = string;
 
 export interface HistoryFilterState {
   page: number;

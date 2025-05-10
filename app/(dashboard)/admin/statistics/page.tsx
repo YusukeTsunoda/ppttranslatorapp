@@ -2,10 +2,15 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/CardClientWrapper';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/TabsClientWrapper';
 import Link from 'next/link';
 import { UserRole } from '@prisma/client';
+
+console.log("=== [admin/statistics/page.tsx] SSR実行 ===");
+console.log("imported Card:", Card);
+console.log("imported prisma:", prisma);
+console.log("imported UserRole:", UserRole);
 
 // 月ごとの翻訳数を集計する関数
 async function getMonthlyTranslations() {
@@ -100,142 +105,113 @@ async function getLanguageStats() {
 }
 
 export default async function StatisticsPage() {
-  const session = await getServerSession(authOptions);
+  try {
+    console.log("=== [admin/statistics/page.tsx] StatisticsPage SSR実行 ===");
+    const session = await getServerSession(authOptions);
 
-  if (!session || !session.user) {
-    redirect('/signin');
-  }
+    if (!session || !session.user) {
+      redirect('/signin');
+    }
 
-  // 管理者権限チェック
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
+    // 管理者権限チェック
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
 
-  if (!user || user.role !== UserRole.ADMIN) {
-    redirect('/dashboard');
-  }
+    if (!user || user.role !== UserRole.ADMIN) {
+      redirect('/dashboard');
+    }
 
-  // 統計データを取得
-  const monthlyTranslations = await getMonthlyTranslations();
-  const languageStats = await getLanguageStats();
+    // 統計データを取得
+    const monthlyTranslations = await getMonthlyTranslations();
+    const languageStats = await getLanguageStats();
 
-  // 総計を計算
-  const totalTranslations = await prisma.translationHistory.count();
-  const totalCreditsUsed = await prisma.translationHistory.aggregate({
-    _sum: {
-      creditsUsed: true,
-    },
-  });
+    // 総計を計算
+    const totalTranslations = await prisma.translationHistory.count();
+    const totalCreditsUsed = await prisma.translationHistory.aggregate({
+      _sum: {
+        creditsUsed: true,
+      },
+    });
 
-  // アクティブユーザー数
-  const activeUsers = await prisma.user.count({
-    where: {
-      TranslationHistory: {
-        some: {
-          createdAt: {
-            gte: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    // アクティブユーザー数
+    const activeUsers = await prisma.user.count({
+      where: {
+        TranslationHistory: {
+          some: {
+            createdAt: {
+              gte: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+            },
           },
         },
       },
-    },
-  });
+    });
 
-  return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">統計・分析</h1>
-        <Link href="/admin" className="text-blue-600 hover:underline">
-          ← 管理者ダッシュボードに戻る
-        </Link>
-      </div>
+    return (
+      <div className="container mx-auto py-10">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">統計・分析</h1>
+          <Link href="/admin" className="text-blue-600 hover:underline">
+            ← 管理者ダッシュボードに戻る
+          </Link>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>総翻訳数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold">{totalTranslations}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>総消費クレジット</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold">{totalCreditsUsed._sum.creditsUsed || 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>アクティブユーザー</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold">{activeUsers}</p>
-            <p className="text-sm text-gray-500">過去30日間</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="monthly" className="mb-8">
-        <TabsList>
-          <TabsTrigger value="monthly">月別統計</TabsTrigger>
-          <TabsTrigger value="language">言語別統計</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="monthly">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle>月別翻訳数</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle>総翻訳数</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-2">月</th>
-                      <th className="text-right p-2">翻訳数</th>
-                      <th className="text-right p-2">消費クレジット</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthlyTranslations.map((item) => (
-                      <tr key={item.month} className="border-t">
-                        <td className="p-2">{item.month}</td>
-                        <td className="text-right p-2">{item.count}</td>
-                        <td className="text-right p-2">{item.credits}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <p className="text-4xl font-bold">{totalTranslations}</p>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="language">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>総消費クレジット</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold">{totalCreditsUsed._sum.creditsUsed || 0}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>アクティブユーザー</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold">{activeUsers}</p>
+              <p className="text-sm text-gray-500">過去30日間</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="monthly" className="mb-8">
+          <TabsList>
+            <TabsTrigger value="monthly">月別統計</TabsTrigger>
+            <TabsTrigger value="language">言語別統計</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="monthly">
             <Card>
               <CardHeader>
-                <CardTitle>ソース言語</CardTitle>
+                <CardTitle>月別翻訳数</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr>
-                        <th className="text-left p-2">言語</th>
+                        <th className="text-left p-2">月</th>
                         <th className="text-right p-2">翻訳数</th>
                         <th className="text-right p-2">消費クレジット</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {languageStats.sourceLanguages.map((item) => (
-                        <tr key={item.language} className="border-t">
-                          <td className="p-2">{item.language}</td>
+                      {monthlyTranslations.map((item) => (
+                        <tr key={item.month} className="border-t">
+                          <td className="p-2">{item.month}</td>
                           <td className="text-right p-2">{item.count}</td>
                           <td className="text-right p-2">{item.credits}</td>
                         </tr>
@@ -245,37 +221,72 @@ export default async function StatisticsPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>ターゲット言語</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr>
-                        <th className="text-left p-2">言語</th>
-                        <th className="text-right p-2">翻訳数</th>
-                        <th className="text-right p-2">消費クレジット</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {languageStats.targetLanguages.map((item) => (
-                        <tr key={item.language} className="border-t">
-                          <td className="p-2">{item.language}</td>
-                          <td className="text-right p-2">{item.count}</td>
-                          <td className="text-right p-2">{item.credits}</td>
+          <TabsContent value="language">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>ソース言語</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left p-2">言語</th>
+                          <th className="text-right p-2">翻訳数</th>
+                          <th className="text-right p-2">消費クレジット</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+                      </thead>
+                      <tbody>
+                        {languageStats.sourceLanguages.map((item) => (
+                          <tr key={item.language} className="border-t">
+                            <td className="p-2">{item.language}</td>
+                            <td className="text-right p-2">{item.count}</td>
+                            <td className="text-right p-2">{item.credits}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>ターゲット言語</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left p-2">言語</th>
+                          <th className="text-right p-2">翻訳数</th>
+                          <th className="text-right p-2">消費クレジット</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {languageStats.targetLanguages.map((item) => (
+                          <tr key={item.language} className="border-t">
+                            <td className="p-2">{item.language}</td>
+                            <td className="text-right p-2">{item.count}</td>
+                            <td className="text-right p-2">{item.credits}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  } catch (error) {
+    console.error('[admin/statistics/page.tsx] SSR/ビルド時エラー:', error);
+    throw error;
+  }
 }
