@@ -113,7 +113,7 @@ def extract_slide_content(slide, presentation_width: int, presentation_height: i
             text_element = {
                 "id": str(uuid.uuid4()),
                 "text": shape.text.strip(),
-                "position": raw_position,
+                "position": raw_position,  # ← x, y, width, height を必ず含める
                 "style": extract_text_style(shape.text_frame.paragraphs[0].runs[0]) if shape.text_frame.paragraphs and shape.text_frame.paragraphs[0].runs else {}
             }
             texts.append(text_element)

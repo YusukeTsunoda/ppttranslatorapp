@@ -19,10 +19,12 @@ const config = {
     '^next/server$': '<rootDir>/node_modules/next/server.js'
   },
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest', 
+    // 削除対象:
+    // '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(@next|next|swr|@babel|@anthropic-ai|react|react-dom)/)'
+    // 削除対象:
+    // '/node_modules/(?!(@next|next|swr|@babel|@anthropic-ai|react|react-dom)/)'
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testRegex: '(/__tests__|/tests/)(.*)(test|spec)\\.[jt]sx?$',

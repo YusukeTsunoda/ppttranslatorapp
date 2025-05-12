@@ -38,32 +38,32 @@ const pricingPlans: PricingPlan[] = [
 
 export default function SubscriptionPage() {
   return (
-    <div className="bg-white">
+    <div className="bg-card">
       <div className="mx-auto max-w-7xl px-6 lg:px-8 py-12">
         <div className="mx-auto max-w-2xl">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">サブスクリプション設定</h1>
-          <p className="mt-4 text-lg text-gray-600">現在のプランと利用状況を確認・変更できます。</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">サブスクリプション設定</h1>
+          <p className="mt-4 text-lg text-muted-foreground">現在のプランと利用状況を確認・変更できます。</p>
         </div>
 
         <div className="mt-16 grid gap-8 md:grid-cols-2 lg:max-w-4xl lg:mx-auto">
           {pricingPlans.map((plan) => (
-            <div key={plan.name} className="rounded-3xl border p-8 shadow-sm hover:shadow-lg transition-shadow">
-              <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
-              <p className="mt-2 text-gray-600">{plan.description}</p>
-              <div className="mt-4 text-3xl font-bold text-gray-900">
-                {plan.price} <span className="text-base font-normal text-gray-600">{plan.period}</span>
+            <div key={plan.name} className="rounded-3xl border border-border p-8 shadow-sm hover:shadow-lg transition-shadow bg-card">
+              <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
+              <p className="mt-2 text-muted-foreground">{plan.description}</p>
+              <div className="mt-4 text-3xl font-bold text-foreground">
+                {plan.price} <span className="text-base font-normal text-muted-foreground">{plan.period}</span>
               </div>
-              <ul className="mt-6 space-y-3 text-gray-600">
+              <ul className="mt-6 space-y-3 text-muted-foreground">
                 {plan.features.map((feature, index) => (
                   <li key={index} className="flex items-center">
-                    <svg className="h-5 w-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     {feature}
                   </li>
                 ))}
               </ul>
-              <button className="mt-8 block w-full rounded-md bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2">
+              <button className="mt-8 block w-full rounded-md bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                 プランを変更する
               </button>
             </div>
@@ -71,7 +71,7 @@ export default function SubscriptionPage() {
         </div>
 
         <div className="mt-12 text-center">
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             プラン変更は次回の請求サイクルから適用されます。
             <br />
             ご不明な点がございましたら、サポートまでお問い合わせください。

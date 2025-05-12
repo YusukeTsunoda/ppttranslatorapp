@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/CardClientWrapper';
+import { authOptions } from '@/lib/auth/auth-options';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db/prisma';
 import Link from 'next/link';
 import { UserRole } from '@prisma/client';
 
@@ -22,14 +22,20 @@ export default async function AdminDashboard() {
     }
 
     // 管理者権限チェック
+    console.log("[admin/page.tsx] 管理者権限チェック開始 - ユーザーID:", session.user.id);
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true },
     });
 
+    console.log("[admin/page.tsx] 取得したユーザー情報:", user);
+    
     if (!user || user.role !== UserRole.ADMIN) {
-      redirect('/dashboard');
+      console.log("[admin/page.tsx] 管理者権限なし - /translateにリダイレクト");
+      redirect('/translate');
     }
+    
+    console.log("[admin/page.tsx] 管理者権限確認OK");
 
     // 統計情報の取得
     const userCount = await prisma.user.count();

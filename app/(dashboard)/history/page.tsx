@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CreditsDisplay } from '@/components/credits/CreditsDisplay';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,7 @@ export default function HistoryPage() {
   }, [filter]);
 
   const { data: apiResponse, error, isLoading } = useSWR<ApiResponse>(apiUrl, fetcher);
+  const { data: creditsData, error: creditsError, isLoading: creditsLoading } = useSWR<{credits: number}>('/api/user/credits', fetcher);
 
   const pagination: PaginationInfo | null = useMemo(() => {
     if (!apiResponse) return null;
@@ -120,31 +122,17 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">履歴とクレジット</h1>
-        <p className="mt-1 text-sm text-gray-500">翻訳履歴と利用可能なクレジットを確認できます。</p>
+        <h1 className="text-2xl font-semibold text-foreground">履歴とクレジット</h1>
+        <p className="mt-1 text-sm text-muted-foreground">翻訳履歴と利用可能なクレジットを確認できます。</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Clock className="mr-2 h-5 w-5 text-orange-500" />
-              利用可能なクレジット
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-10 w-20" />
-            ) : (
-              <div className="text-3xl font-bold text-gray-900">0</div>
-            )}
-          </CardContent>
-        </Card>
+        <CreditsDisplay />
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <FileText className="mr-2 h-5 w-5 text-orange-500" />
+              <FileText className="mr-2 h-5 w-5 text-primary" />
               今月の翻訳数
             </CardTitle>
           </CardHeader>
@@ -152,7 +140,7 @@ export default function HistoryPage() {
             {isLoading ? (
               <Skeleton className="h-10 w-20" />
             ) : (
-              <div className="text-3xl font-bold text-gray-900">0</div>
+              <div className="text-3xl font-bold text-foreground">0</div>
             )}
           </CardContent>
         </Card>

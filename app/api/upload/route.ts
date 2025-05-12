@@ -223,6 +223,40 @@ export async function POST(request: NextRequest) {
 
         await logFileOperation(userId, 'access', fileId, true);
         
+        // ファイル情報をデータベースに登録
+        try {
+          // prismaをインポート
+          const { prisma } = await import('@/lib/db/prisma');
+          
+          // 既存のファイルレコードを確認
+          const existingFile = await prisma.file.findUnique({
+            where: { id: fileId }
+          });
+          
+          if (existingFile) {
+            console.log(`ファイルID ${fileId} は既にデータベースに存在します`);
+          } else {
+            // ファイル情報をデータベースに登録
+            const createdFile = await prisma.file.create({
+              data: {
+                id: fileId,
+                userId: userId,
+                originalName: file.name,
+                storagePath: filePath,
+                status: 'READY', // FileStatusの列挙型の値
+                fileSize: file.size,
+                mimeType: file.type,
+                updatedAt: new Date(), // updatedAtフィールドは必須
+              }
+            });
+            
+            console.log(`ファイルID ${fileId} をデータベースに登録しました:`, createdFile);
+          }
+        } catch (dbError) {
+          console.error('データベース登録エラー:', dbError);
+          // データベースエラーが発生しても、ファイル自体は処理されているので続行する
+        }
+        
         // レスポンスデータをログ出力
         console.log('アップロードAPIレスポンス:', {
           success: true,

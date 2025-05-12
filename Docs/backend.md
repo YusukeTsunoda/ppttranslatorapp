@@ -136,6 +136,26 @@ middleware.ts                 # グローバルミドルウェア
 }
 ```
 
+### PPTXパースAPIの仕様変更
+- 各スライド・テキストごとに、座標・サイズ情報（position: { x, y, width, height }）を含めて返却する。
+- 例:
+```json
+{
+  "slides": [
+    {
+      "index": 1,
+      "imageUrl": "/api/slides/xxx/slides/1.png",
+      "texts": [
+        {
+          "text": "Welcome to our presentation.",
+          "position": { "x": 120, "y": 80, "width": 400, "height": 60 }
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## 認証・認可
 
 ### 認証フロー

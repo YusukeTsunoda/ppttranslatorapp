@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 // ミドルウェアのランタイムを指定しない（デフォルトでEdgeになる）
 
@@ -29,8 +30,20 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
     
-    // 管理者ページへのアクセス制限は、APIルート側で行う
-    // ここではセッションの存在のみをチェック
+    // 管理者ページへのアクセス制限
+    if (path.startsWith('/admin')) {
+      // JWTトークンからユーザー情報を取得
+      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+      console.log('[middleware] 管理者ページアクセスチェック:', token);
+      
+      // 管理者権限がない場合は翻訳ページにリダイレクト
+      if (!token || token.role !== 'ADMIN') {
+        console.log('[middleware] 管理者権限なし - 翻訳ページにリダイレクト');
+        return NextResponse.redirect(new URL('/translate', request.url));
+      }
+      
+      console.log('[middleware] 管理者権限確認OK');
+    }
   }
 
   return NextResponse.next();

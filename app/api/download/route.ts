@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PythonShell } from 'python-shell';
 import path from 'path';
+import { join } from 'path';
 import fs from 'fs/promises';
+import { readdir } from 'fs/promises';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { v4 as uuidv4 } from 'uuid';
 import { filePathManager, logFileOperation, withRetry, FILE_CONFIG } from '@/lib/utils/file-utils';
+import { prisma } from '@/lib/db/prisma';
 
 // セッション型の定義
 interface CustomSession {
@@ -94,20 +97,71 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // fileIdから元のファイルパスを構築
-    const originalFilePath = filePathManager.getTempPath(session.user.id, fileId, 'original');
-
-    // 元のファイルパスと出力ファイルパスの生成
-    const originalFullPath = filePathManager.getAbsolutePath(originalFilePath);
+    // デバッグ用にリクエストデータを詳細にログ出力
+    console.log('ダウンロードリクエストデータ:', {
+      fileId,
+      slidesLength: slides?.length,
+      userId: session.user.id,
+      timestamp: new Date().toISOString(),
+    });
+    
+    // データベースからファイル情報を取得
+    const fileRecord = await prisma.file.findUnique({
+      where: { id: fileId }
+    });
+    
+    console.log('データベースからのファイル情報:', {
+      fileRecord,
+      fileId,
+      timestamp: new Date().toISOString(),
+    });
+    
+    // データベースにファイルレコードが存在する場合はそのパスを使用
+    let originalFullPath = '';
+    if (fileRecord?.storagePath) {
+      originalFullPath = fileRecord.storagePath;
+      console.log('データベースからのパスを使用:', originalFullPath);
+    } else {
+      // データベースにレコードがない場合はファイルシステムから探索
+      // fileIdから元のファイルパスを構築
+      const originalFilePath = filePathManager.getTempPath(session.user.id, fileId, 'original');
+      originalFullPath = filePathManager.getAbsolutePath(originalFilePath);
+      console.log('ファイルパスを生成:', originalFullPath);
+    }
+    
     const translatedFileName = `${fileId}_translated.pptx`;
 
     // 実際のファイルパスを検索 - 修正部分
-    const actualOriginalFilePath = await filePathManager.findActualFilePath(session.user.id, fileId, 'original');
+    // ディレクトリ内のファイルを探索する方法を改善
+    // FILE_CONFIGを直接使用してアクセス
+    const uploadsDir = join(FILE_CONFIG.tempDir, session.user.id, 'uploads');
+    console.log('アップロードディレクトリを探索:', uploadsDir);
+    
+    let actualOriginalFilePath = null;
+    try {
+      const files = await readdir(filePathManager.getAbsolutePath(uploadsDir));
+      console.log('ディレクトリ内のファイル:', files);
+      
+      // fileIdで始まるファイルを探す
+      const originalFile = files.find(f => f.startsWith(fileId) && !f.includes('_translated'));
+      if (originalFile) {
+        actualOriginalFilePath = join(uploadsDir, originalFile);
+        console.log('元ファイルを発見:', {
+          originalFile,
+          actualOriginalFilePath
+        });
+      }
+    } catch (error) {
+      console.error('ディレクトリ読み取りエラー:', error);
+    }
+    
+    // ファイルが見つからない場合はエラーを返す
     if (!actualOriginalFilePath) {
       console.error('元のファイルが見つかりません:', {
         fileId,
         userId: session.user.id,
         searchPath: originalFullPath,
+        uploadsDir,
         timestamp: new Date().toISOString(),
       });
       return NextResponse.json(
@@ -128,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     // ファイルパスのデバッグ情報
     console.log('ファイルパス情報:', {
-      originalPath: originalFilePath,
+      originalFullPath, // 元のファイルパス
       actualOriginalFilePath, // 実際のファイルパスをログ出力
       tempTranslatedPath,
       tempTranslatedFullPath,
