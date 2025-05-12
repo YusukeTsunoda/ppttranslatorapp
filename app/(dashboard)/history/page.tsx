@@ -34,6 +34,7 @@ interface HistoryItem {
   fileSize: number | null;
   processingTime: number | null;
   thumbnailPath?: string;
+  tags?: string[];
   sourceLang: Language;
   targetLang: Language;
   file: { originalName: string };
@@ -166,10 +167,14 @@ export default function HistoryPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>サムネイル</TableHead>
                       <TableHead>ファイル名</TableHead>
                       <TableHead className="hidden md:table-cell">ページ数</TableHead>
                       <TableHead className="hidden md:table-cell">日付</TableHead>
                       <TableHead>ステータス</TableHead>
+                      <TableHead className="hidden md:table-cell">ファイルサイズ</TableHead>
+                      <TableHead className="hidden md:table-cell">処理時間</TableHead>
+                      <TableHead className="hidden md:table-cell">タグ</TableHead>
                       <TableHead className="hidden md:table-cell text-right">消費クレジット</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
@@ -177,7 +182,7 @@ export default function HistoryPage() {
                   <TableBody>
                     {history.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4 text-gray-500">
+                        <TableCell colSpan={10} className="text-center py-4 text-gray-500">
                           翻訳履歴がありません
                         </TableCell>
                       </TableRow>
@@ -190,6 +195,13 @@ export default function HistoryPage() {
                           className="cursor-pointer hover:bg-gray-50"
                         >
                           <TableCell>
+                            {item.thumbnailPath ? (
+                              <img src={item.thumbnailPath} alt="サムネイル" className="w-16 h-12 object-cover rounded" />
+                            ) : (
+                              <span className="text-xs text-gray-400">なし</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className="font-medium">{item.originalFileName}</div>
                             <div className="text-sm text-gray-500 md:hidden">
                               {formatDate(new Date(item.createdAt))} · {item.pageCount}ページ
@@ -201,6 +213,19 @@ export default function HistoryPage() {
                             <Badge variant={getBadgeVariant(item.status)} className="whitespace-nowrap">
                               {item.status}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">{item.fileSize ? formatBytes(item.fileSize) : '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell">{item.processingTime ? `${(item.processingTime / 1000).toFixed(1)}秒` : '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {item.tags && Array.isArray(item.tags) && item.tags.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {item.tags.map((tag, idx) => (
+                                  <Badge key={idx} variant="outline">{tag}</Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">なし</span>
+                            )}
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-right">{item.creditsUsed}</TableCell>
                           <TableCell className="text-right">

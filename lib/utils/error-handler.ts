@@ -21,6 +21,7 @@ export class AppError extends Error {
 
   constructor(details: ErrorDetails) {
     super(details.message);
+    Object.setPrototypeOf(this, AppError.prototype);
     this.name = 'AppError';
     this.type = details.type;
     this.code = details.code;

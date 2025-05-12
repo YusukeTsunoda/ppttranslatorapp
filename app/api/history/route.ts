@@ -130,7 +130,7 @@ export async function GET(req: Request) {
         orderBy: orderByCondition,
         skip,
         take: limit,
-        include: { // Include File to access originalName if needed elsewhere
+        include: {
           file: {
             select: {
               originalName: true,
@@ -140,14 +140,19 @@ export async function GET(req: Request) {
       }),
     ]);
 
-    // Add originalFileName to the history objects for easier frontend use
+    // Add originalFileNameと新フィールドをhistory objectsに追加
     const historyWithFileName = history.map(item => ({
         ...item,
         originalFileName: item.file.originalName,
-    }));
+        tags: item.tags,
+        metadata: item.metadata,
+        thumbnailPath: item.thumbnailPath,
+        processingTime: item.processingTime,
+        fileSize: item.fileSize,
+      }));
 
     return NextResponse.json({
-      data: historyWithFileName, // Return data with originalFileName
+      data: historyWithFileName,
       total: totalCount,
       page,
       limit,
