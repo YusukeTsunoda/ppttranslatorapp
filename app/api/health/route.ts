@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { verifyJwtAccessToken, isTokenExpired } from '@/lib/auth/jwt';
 import { getAuthErrorMessage } from '@/lib/auth/errors';
 import { headers } from 'next/headers';
+import { withAPILogging, logAPIBuildStatus } from '@/lib/utils/api-logging';
 
 // Node.jsランタイムを使用（Prismaクライアントの要件）
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+
+// アプリケーション起動時にAPI構築状況をログに記録
+logAPIBuildStatus();
 
 // 環境変数のヘルスチェック
 const checkEnvironmentVariables = () => {
@@ -126,12 +129,13 @@ const checkErrorHandling = () => {
   }
 };
 
-export async function GET(request: Request) {
+// ヘルスチェックエンドポイント
+async function handler(req: NextRequest) {
   const headersList = headers();
   const userAgent = headersList.get('user-agent') || 'unknown';
   
   // URLからクエリパラメータを取得
-  const url = new URL(request.url);
+  const url = new URL(req.url);
   const skipDb = url.searchParams.get('skip_db') === 'true';
   
   // 各コンポーネントのヘルスチェックを実行
@@ -184,3 +188,6 @@ export async function GET(request: Request) {
   
   return NextResponse.json(response, { status: httpStatus });
 }
+
+// ログ機能を適用したハンドラをエクスポート
+export const GET = withAPILogging(handler, 'health');
