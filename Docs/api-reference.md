@@ -30,6 +30,58 @@
    - [トークン更新](#トークン更新)
    - [アクセス制御](#アクセス制御)
 
+### バッチアップロードAPI
+
+**エンドポイント**: POST /api/batch-upload  
+**リクエスト**: multipart/form-data, files[]  
+**レスポンス**: { jobId: string, accepted: number, rejected: number }
+
+### APIキー管理API
+
+- GET /api/api-keys
+- POST /api/api-keys
+- DELETE /api/api-keys/:id
+
+**レスポンス例**:
+```json
+[
+  { "id": "dummy", "key": "xxxx-xxxx", "isActive": true }
+]
+```
+
+### APIキー使用量監視API
+
+- GET /api/api-keys/usage
+- 認証ユーザーのAPIキーごとの使用量（tokenCount, apiCalls, month, year）を返す
+- レスポンス例:
+```json
+[
+  { "userId": "user1", "tokenCount": 100, "apiCalls": 10, "month": 4, "year": 2025 }
+]
+```
+
+### 請求書PDF生成API
+
+- POST /api/invoice/generate
+- リクエスト: { userId, amount, items, ... }
+- レスポンス: PDFバイナリ
+
+### 請求書メール送信API
+
+- POST /api/invoice/send
+- リクエスト: { to, subject, pdfBase64 }
+- レスポンス: { success: true, message: string } または { error: string, detail?: string }
+
+### 統計データAPI
+
+- GET /api/statistics
+- レスポンス: { dailyTranslations: number[], creditUsage: number[] }
+
+### 統計エクスポートAPI
+
+- GET /api/statistics/export
+- レスポンス: CSVファイル（userId,tokenCount,apiCalls,month,year...）
+
 ---
 
 ## 認証API
@@ -401,6 +453,27 @@ Content-Disposition: attachment; filename="translated_presentation.pptx"
 [ファイルデータ]
 ```
 
+### サムネイル画像遅延ロード
+
+**エンドポイント例**: `GET /api/slides/:fileId/thumbnail/:index`
+
+- サムネイル画像はリクエスト時にのみ生成・返却
+- フロントエンドは `<img loading="lazy">` や IntersectionObserver で遅延ロード
+- レスポンス: `Content-Type: image/png` など
+
+### 履歴APIのクエリパラメータ対応
+
+**エンドポイント例**: `GET /api/history?status=COMPLETED&tag=foo&page=1&limit=20`
+
+- クエリでフィルタ・ソート・ページネーション可能
+- レスポンス例・パラメータ説明を追記
+
+### クライアントキャッシュ戦略
+
+- SWR/react-query等でAPIレスポンスをキャッシュ
+- キャッシュ有効期間や再検証戦略を明記
+- 例: `useSWR('/api/history', fetcher, { revalidateOnFocus: true })`
+
 ---
 
 ## エラーハンドリング
@@ -535,5 +608,44 @@ export async function GET(req: Request) {
   
   // 認証・認可が成功した場合の処理
   // ...
+}
+```
+
+## 2024年4月 パフォーマンス最適化・テスト拡充 着手
+
+- PPTXファイル処理の速度・メモリ効率改善（API/フロント）
+- 画像サムネイルの遅延ロードAPI設計
+- クエリパラメータによるサーバーサイドフィルタリング
+- クライアントキャッシュ活用
+- テストカバレッジ向上（API・UI・E2E）
+
+## /api/batch-upload
+
+### POST
+- multipart/form-dataでpptxファイルをアップロード
+- formidable等でパースし、public/uploads/配下に保存予定
+- DBにはuserId, status, files（相対パスのみ）, progress, totalを登録
+- 現状: multipart未対応（501エラー返却）
+
+#### レスポンス例
+```
+{
+  "jobId": "xxxx",
+  "accepted": 1,
+  "rejected": 0
+}
+```
+
+### GET
+- クエリ: jobId
+- 指定jobの進捗・状態を返す
+
+#### レスポンス例
+```
+{
+  "status": "PENDING",
+  "progress": 0,
+  "total": 1,
+  "error": null
 }
 ``` 

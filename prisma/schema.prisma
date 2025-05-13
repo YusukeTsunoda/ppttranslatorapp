@@ -48,17 +48,17 @@ model Translation {
 }
 
 model File {
-  id           String     @id
-  userId       String
-  originalName String
-  storagePath  String
-  status       FileStatus @default(PROCESSING)
-  fileSize     Int
-  mimeType     String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Slide        Slide[]
+  id                 String               @id
+  userId             String
+  originalName       String
+  storagePath        String
+  status             FileStatus           @default(PROCESSING)
+  fileSize           Int
+  mimeType           String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  User               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Slide              Slide[]
   TranslationHistory TranslationHistory[]
 }
 
@@ -77,7 +77,7 @@ model Text {
   id          String        @id
   slideId     String
   text        String
-  position    Json // { x: number, y: number, width: number, height: number } 形式の座標・サイズ情報を格納
+  position    Json
   createdAt   DateTime      @default(now())
   updatedAt   DateTime
   Slide       Slide         @relation(fields: [slideId], references: [id], onDelete: Cascade)
@@ -91,38 +91,40 @@ model User {
   emailVerified      DateTime?
   image              String?
   password           String?
-  role               UserRole             @default(USER)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   credits            Int                  @default(0)
+  role               UserRole             @default(USER)
   Account            Account[]
   ActivityLog        ActivityLog[]
+  ApiKey             ApiKey[]
+  BatchJob           BatchJob[]
   File               File[]
   Session            Session[]
   TranslationHistory TranslationHistory[]
 }
 
 model TranslationHistory {
-  id             String   @id @default(cuid())
-  userId         String
-  fileId         String
-  pageCount      Int      @default(0)
-  status         TranslationStatus
-  creditsUsed    Int
-  sourceLang     Language
-  targetLang     Language
-  model          String
-  fileSize       Int      @default(0)
-  processingTime Int      @default(0)
-  thumbnailPath  String?
-  tags           Json?
-  metadata       Json?
+  id                String            @id @default(cuid())
+  userId            String
+  creditsUsed       Int
+  sourceLang        Language
+  targetLang        Language
+  model             String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  pageCount         Int               @default(0)
+  fileSize          Int               @default(0)
+  metadata          Json?
+  processingTime    Int               @default(0)
+  tags              Json?
+  thumbnailPath     String?
+  fileId            String
+  errorMessage      String?
   translatedFileKey String?
-  errorMessage   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  file           File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  status            TranslationStatus
+  file              File              @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([fileId])
   @@index([userId, createdAt])
@@ -151,6 +153,29 @@ model UsageStatistics {
   @@unique([userId, month, year])
 }
 
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  key       String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  lastUsed  DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model BatchJob {
+  id        String         @id @default(cuid())
+  userId    String
+  status    BatchJobStatus @default(PENDING)
+  files     Json
+  progress  Int            @default(0)
+  total     Int            @default(0)
+  error     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 enum FileStatus {
   PROCESSING
   READY
@@ -176,6 +201,13 @@ enum UserRole {
 }
 
 enum TranslationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum BatchJobStatus {
+  PENDING
   PROCESSING
   COMPLETED
   FAILED
