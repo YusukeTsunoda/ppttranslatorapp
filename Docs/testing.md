@@ -433,3 +433,16 @@ export default defineConfig({
 - pending/skipとなっているテストの実装・修正を優先
 - 既存テストのカバレッジ維持
 - 新機能追加時は必ずテスト追加
+
+### バッチアップロードAPI/ワーカー/進捗API E2E検証
+
+- curlでpptxファイルをアップロード→jobId取得→GETで進捗確認のE2E検証を実施中
+- 現状: multipart/form-data未対応のためPOSTは501エラー返却
+- GETはjobId指定で進捗・エラー取得可能
+- 今後: formidable等でmultipart対応後、curlでのE2E検証を自動化予定
+
+#### curl例
+```
+curl -X POST http://localhost:3000/api/batch-upload -F "files=@public/uploads/xxx/test.pptx"
+curl http://localhost:3000/api/batch-upload?jobId=xxxx
+```
