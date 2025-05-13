@@ -31,172 +31,52 @@ import { toast } from '@/components/ui/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
 
-function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    // 管理者権限の確認
-    const checkAdminRole = async () => {
-      if (session?.user?.id) {
-        try {
-          const response = await fetch('/api/user/role');
-          if (response.ok) {
-            const data = await response.json();
-            setIsAdmin(data.isAdmin);
-          }
-        } catch (error) {
-          console.error('管理者権限の確認に失敗しました:', error);
-        }
-      }
-    };
-
-    checkAdminRole();
-  }, [session]);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      await signOut({
-        redirect: true,
-        callbackUrl: '/signin',
-      });
-      toast({
-        title: 'ログアウト成功',
-        description: 'ログアウトしました',
-      });
-    } catch (error) {
-      console.error('ログアウトエラー:', error);
-      toast({
-        title: 'エラー',
-        description: 'ログアウトに失敗しました',
-        variant: 'destructive',
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      console.log('Header: 未認証状態 - ログインページへリダイレクト');
-      toast({
-        title: 'セッションエラー',
-        description: '再度ログインしてください',
-        variant: 'destructive',
-      });
-      router.push('/signin');
-      return;
-    }
-
-    if (status === 'loading') {
-      console.log('Header: セッション読み込み中');
-      return;
-    }
-
-    if (!session?.user) {
-      console.log('Header: ユーザー情報なし - ログインページへリダイレクト');
-      router.push('/signin');
-      return;
-    }
-  }, [status, session, router]);
-
-  if (status === 'loading' || !session?.user) {
-    return (
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <LoadingSpinner text="読み込み中..." />
-        </div>
-      </header>
-    );
-  }
-
-  return (
-    <header className="bg-white shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/translate" className="flex items-center">
-          <CircleIcon className="h-6 w-6 text-orange-500" />
-          <span className="ml-2 text-lg font-medium text-gray-900">PPT翻訳アプリ</span>
-        </Link>
-        <div className="flex items-center space-x-6">
-          <Link
-            href="/pricing"
-            className="text-sm text-gray-600 hover:text-gray-900"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            料金プラン
-          </Link>
-          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-menu">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage alt={session.user.name || ''} />
-                  <AvatarFallback>{session.user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem asChild>
-                <Link href="/profile">
-                  <User className="mr-2 h-4 w-4" />
-                  プロフィール
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  設定
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/activity">
-                  <Activity className="mr-2 h-4 w-4" />
-                  アクティビティ
-                </Link>
-              </DropdownMenuItem>
-              {isAdmin && (
-                <DropdownMenuItem asChild>
-                  <Link href="/admin">
-                    <ShieldAlert className="mr-2 h-4 w-4" />
-                    管理者ダッシュボード
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={handleSignOut} data-testid="logout-button">
-                <LogOut className="mr-2 h-4 w-4" />
-                ログアウト
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 function Sidebar() {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
   const { data: session } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
-    // 管理者権限の確認
-    const checkAdminRole = async () => {
+    // ユーザー情報（管理者権限とクレジット残高）の取得
+    const fetchUserInfo = async () => {
       if (session?.user?.id) {
         try {
-          const response = await fetch('/api/user/role');
-          if (response.ok) {
-            const data = await response.json();
-            setIsAdmin(data.isAdmin);
+          console.log("[layout.tsx] ユーザー情報取得開始 - ユーザーID:", session.user.id);
+          
+          // 管理者権限の確認
+          const roleResponse = await fetch('/api/user/role');
+          if (roleResponse.ok) {
+            const roleData = await roleResponse.json();
+            console.log("[layout.tsx] 管理者権限確認結果:", roleData);
+            setIsAdmin(roleData.isAdmin);
+          } else {
+            console.error("[layout.tsx] 管理者権限確認失敗 - ステータスコード:", roleResponse.status);
+            setIsAdmin(false); // 確認失敗時は管理者でないとみなす
+          }
+          
+          // クレジット残高の取得
+          const creditsResponse = await fetch('/api/user/credits');
+          if (creditsResponse.ok) {
+            const creditsData = await creditsResponse.json();
+            console.log("[layout.tsx] クレジット残高取得結果:", creditsData);
+            setCredits(creditsData.credits);
+          } else {
+            console.error("[layout.tsx] クレジット残高取得失敗 - ステータスコード:", creditsResponse.status);
+            setCredits(0); // 取得失敗時は0として表示
           }
         } catch (error) {
-          console.error('管理者権限の確認に失敗しました:', error);
+          console.error('ユーザー情報の取得に失敗しました:', error);
+          setIsAdmin(false); // エラー時は管理者でないとみなす
+          setCredits(0); // エラー時は0として表示
         }
+      } else {
+        console.log("[layout.tsx] ユーザーセッションが存在しないため、情報取得をスキップ");
       }
     };
 
-    checkAdminRole();
+    fetchUserInfo();
   }, [session]);
 
   const handleToggle = useCallback(() => {
@@ -218,12 +98,12 @@ function Sidebar() {
     <div className="relative h-full">
       <button
         onClick={handleToggle}
-        className="absolute -right-4 top-2 bg-white rounded-full p-1.5 shadow-md hover:bg-gray-50 z-50 cursor-pointer border border-gray-200"
+        className="absolute -right-4 top-2 bg-card rounded-full p-1.5 shadow-md hover:bg-muted z-50 cursor-pointer border border-border"
       >
         {isExpanded ? (
-          <ChevronLeft className="h-4 w-4 text-gray-600" />
+          <ChevronLeft className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-600" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
       <nav
@@ -232,6 +112,24 @@ function Sidebar() {
           isExpanded ? 'w-64' : 'w-16',
         )}
       >
+        {/* クレジット残高表示 */}
+        <div className={cn(
+          'mb-4 p-3 bg-primary/5 rounded-md flex items-center',
+          isExpanded ? 'justify-between' : 'justify-center'
+        )}>
+          <div className="flex items-center">
+            <CircleIcon className="h-4 w-4 text-primary mr-2" />
+            {isExpanded && <span className="text-xs font-medium">クレジット</span>}
+          </div>
+          {(credits !== null) && (
+            <span className={cn(
+              'text-sm font-bold text-primary',
+              !isExpanded && 'hidden'
+            )}>
+              {credits}
+            </span>
+          )}
+        </div>
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -239,7 +137,7 @@ function Sidebar() {
               <a
                 className={cn(
                   'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative',
-                  isActive ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                  isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary',
                   !isExpanded && 'justify-center',
                 )}
                 title={!isExpanded ? item.name : undefined}
@@ -248,7 +146,7 @@ function Sidebar() {
                   className={cn(
                     'h-5 w-5 flex-shrink-0',
                     isExpanded ? 'mr-3' : 'mr-0',
-                    isActive ? 'text-orange-600' : 'text-gray-400',
+                    isActive ? 'text-primary' : 'text-muted-foreground',
                   )}
                   aria-hidden="true"
                 />
@@ -276,24 +174,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <LoadingSpinner size="lg" text="セッション確認中..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+    <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {error ? (
           <ErrorMessage message={error} variant="destructive" className="mb-4" />
         ) : (
           <div className="flex gap-8 h-full">
-            <aside className="bg-white shadow-sm rounded-lg h-full">
+            <aside className="bg-card shadow-sm rounded-lg h-full">
               <Sidebar />
             </aside>
-            <main className="flex-1 bg-white shadow-sm rounded-lg p-6">{children}</main>
+            <main className="flex-1 bg-card shadow-sm rounded-lg p-6">{children}</main>
           </div>
         )}
       </div>

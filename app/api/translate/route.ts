@@ -53,10 +53,41 @@ export async function POST(request: Request) {
 
     // リクエストBodyからパラメータ取得
     const { texts, sourceLang, targetLang, model, fileName = 'スライド', slides, fileId } = data;
+    
+    // デバッグ用にリクエストデータをログ出力
+    console.log('翻訳APIリクエストデータ:', {
+      fileId,
+      sourceLang,
+      targetLang,
+      model,
+      slidesProvided: !!slides,
+      slidesLength: slides?.length,
+      textsProvided: !!texts,
+      textsLength: texts?.length
+    });
 
     // ★★★ Check if fileId is provided ★★★
     if (!fileId) {
       return NextResponse.json({ error: 'ファイルIDが必要です' }, { status: 400 });
+    }
+    
+    // fileIdがデータベースに存在するか確認
+    try {
+      const existingFile = await prisma.file.findUnique({
+        where: { id: fileId }
+      });
+      
+      if (!existingFile) {
+        console.error(`ファイルID ${fileId} がデータベースに存在しません`);
+        // 存在しない場合はエラーを返す
+        return NextResponse.json({ 
+          error: '指定されたファイルIDがデータベースに存在しません', 
+          detail: 'ファイルを再アップロードしてください' 
+        }, { status: 404 });
+      }
+    } catch (dbError) {
+      console.error('ファイル存在確認エラー:', dbError);
+      // データベースエラーの場合は続行する
     }
 
     // デフォルトモデルを指定
@@ -79,21 +110,50 @@ export async function POST(request: Request) {
     }
 
     let translations: string[] = [];
+    let translatedSlides: any[] = []; // 翻訳結果を格納する配列を宣言
     let translationError: Error | null = null;
     const startTime = Date.now(); // Start time measurement
 
     try {
       // 翻訳処理の実行
       let translationIndex = 0;
-      const totalTextCount = slides.reduce((count: number, slide: any) => count + slide.textElements.length, 0);
-      const startTime = Date.now();
-      let translationError: Error | null = null;
+      
+      // slidesが存在しない場合のエラー処理
+      if (!slides || !Array.isArray(slides)) {
+        console.error('翻訳APIエラー: slides配列が存在しません');
+        return NextResponse.json({ 
+          error: 'スライドデータが不正です', 
+          detail: 'ファイルを再アップロードしてください' 
+        }, { status: 400 });
+      }
+      
 
-      // 翻訳プロミスの作成
-      const translationPromises = slides.flatMap((slide: any) =>
-        slide.textElements.map((element: any) => {
-          if (!element.text || element.text.trim() === '') {
-            return Promise.resolve('');
+      // 翻訳結果を格納する配列
+      const translatedSlides = [];
+      
+      // スライドごとに処理
+      for (let slideIndex = 0; slideIndex < slides.length; slideIndex++) {
+        const slide = slides[slideIndex];
+        
+        if (!slide || !slide.texts || !Array.isArray(slide.texts)) {
+          console.log(`スライド ${slide?.index || slideIndex} にテキストがありません`);
+          translatedSlides.push({
+            index: slide?.index || slideIndex,
+            translations: []
+          });
+          continue;
+        }
+        
+        console.log(`スライド ${slideIndex} の翻訳対象テキスト数: ${slide.texts.length}`);
+        
+        // このスライドの翻訳プロミスを作成
+        const slideTranslationPromises = slide.texts.map((element: any, textIndex: number) => {
+          if (!element || !element.text || element.text.trim() === '') {
+            return Promise.resolve({
+              index: textIndex,
+              text: '',
+              originalText: element?.text || ''
+            });
           }
 
           // 翻訳プロンプトの作成
@@ -114,17 +174,74 @@ export async function POST(request: Request) {
             ],
             temperature: 0.7,
           }).then(message => {
-            return (message.content[0] as any).text.trim();
+            // 翻訳結果から余分なテキストを削除する
+            let translatedText = (message.content[0] as any).text.trim();
+            
+            // 余分なパターンを削除
+            const patterns = [
+              /^Here is the translation from .+ to .+:\s*/i,
+              /^Translation:\s*/i,
+              /^Translated text:\s*/i,
+              /^The translation is:\s*/i,
+              /^In English:\s*/i,
+              /^In Japanese:\s*/i,
+              /^The text "([^"]+)" translates to:\s*/i,  // The text "..." translates to: パターンを削除
+              /^The text "([^"]+)" translates to English as:\s*/i,  // The text "..." translates to English as: パターンを削除
+              /^The text "([^"]+)" can be translated to English as:\s*/i,  // The text "..." can be translated to English as: パターンを削除
+              /^The text "([^"]+)" in English is:\s*/i,  // The text "..." in English is: パターンを削除
+              /^The English translation of "([^"]+)" is:\s*/i,  // The English translation of "..." is: パターンを削除
+              /^\"(.+)\"$/,  // 引用符で囲まれたテキストから引用符を削除
+              /^(.+):$/,     // ダブルコロンで終わるパターンを削除
+            ];
+            
+            // 各パターンにマッチする場合は削除
+            patterns.forEach(pattern => {
+              translatedText = translatedText.replace(pattern, '$1');
+            });
+            
+            // 引用符で囲まれた場合の処理
+            if (translatedText.startsWith('"') && translatedText.endsWith('"')) {
+              translatedText = translatedText.substring(1, translatedText.length - 1);
+            }
+            
+            // 最終的なクリーンアップ
+            translatedText = translatedText.trim();
+            
+            return {
+              index: textIndex,
+              text: translatedText,
+              originalText: element.text
+            };
           }).catch(error => {
             // エラーログは残す
             console.error('翻訳APIエラー:', error instanceof Error ? error.message : String(error));
-            return `[翻訳エラー]`;
+            return {
+              index: textIndex,
+              text: '[翻訳エラー]',
+              originalText: element.text
+            };
           });
-        })
-      );
-
-      // 翻訳結果の取得
-      translations = await Promise.all(translationPromises);
+        });
+        
+        // このスライドの翻訳結果を取得
+        const slideTranslations = await Promise.all(slideTranslationPromises);
+        
+        // 翻訳結果をスライドに追加
+        translatedSlides.push({
+          index: slide.index || slideIndex,
+          translations: slideTranslations
+        });
+        
+        // 全体の翻訳配列にも追加（後方互換性のため）
+        slideTranslations.forEach(t => {
+          translations.push(t.text);
+        });
+      }
+      
+      console.log(`翻訳完了: ${translations.length}個のテキストを翻訳しました`);
+      if (translatedSlides.length > 0 && translatedSlides[0].translations.length > 0) {
+        console.log('翻訳サンプル:', translatedSlides[0].translations[0]);
+      }
 
     } catch (error) {
       console.error('翻訳APIエラー:', error instanceof Error ? error.message : String(error));
@@ -145,15 +262,19 @@ export async function POST(request: Request) {
       historyStatus = TranslationStatus.COMPLETED;
     }
 
+    // ページ数に基づいて必要なクレジット数を計算
+    const pageCount = slides?.length ?? 0;
+    const requiredCredits = pageCount; // 1ページあたり1クレジット
+    
     // Prepare history data regardless of DB operation success
     const historyData = {
       // id: uuidv4(), // Let Prisma handle default cuid()
       userId: session.user.id,
       fileId: fileId, // Use provided fileId
       // fileName: fileName, // Removed, get from File model if needed
-      pageCount: slides?.length ?? 0, // Use provided slides array or default to 0
+      pageCount: pageCount,
       status: historyStatus,
-      creditsUsed: historyStatus === TranslationStatus.COMPLETED ? 1 : 0, // Only consume credit on success
+      creditsUsed: historyStatus === TranslationStatus.COMPLETED ? requiredCredits : 0, // ページ数分のクレジットを消費
       sourceLang: sourceLang as Language,
       targetLang: targetLang as Language,
       model: selectedModel,
@@ -163,13 +284,41 @@ export async function POST(request: Request) {
       errorMessage: historyErrorMessage,
     };
 
-    // Attempt to update credits (only on success) and create history record
+    // ユーザーの現在のクレジット残高を確認
+    let userCredits = 0;
     try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { credits: true }
+      });
+      
+      if (!user) {
+        return NextResponse.json(
+          { error: 'ユーザーが見つかりません' },
+          { status: 404 }
+        );
+      }
+      
+      userCredits = user.credits;
+      
+      // クレジットが不足している場合はエラーを返す
+      if (userCredits < requiredCredits) {
+        return NextResponse.json(
+          { 
+            error: 'クレジットが不足しています', 
+            requiredCredits,
+            availableCredits: userCredits 
+          },
+          { status: 403 }
+        );
+      }
+      
+      // Attempt to update credits (only on success) and create history record
       if (historyStatus === TranslationStatus.COMPLETED) {
-        // Decrement credit only if translation was successful
+        // ページ数分のクレジットを減算
         await prisma.user.update({
           where: { id: session.user.id },
-          data: { credits: { decrement: 1 } },
+          data: { credits: { decrement: requiredCredits } },
         });
       }
 
@@ -194,10 +343,11 @@ export async function POST(request: Request) {
         });
     }
 
-    // Return successful translation
+    // Return successful translation with structured data
     return NextResponse.json({
       success: true,
-      translations,
+      translations, // 後方互換性のため残す
+      translatedSlides, // スライドごとの翻訳結果
       metadata: {
         sourceLang,
         targetLang,

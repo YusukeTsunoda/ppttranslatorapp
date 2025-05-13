@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/CardClientWrapper';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -87,8 +87,8 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">API連携</h1>
-        <p className="mt-1 text-sm text-gray-500">Anthropic APIの接続状態を確認・管理できます</p>
+        <h1 className="text-2xl font-semibold text-foreground">API連携</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Anthropic APIの接続状態を確認・管理できます</p>
       </div>
 
       <Card>

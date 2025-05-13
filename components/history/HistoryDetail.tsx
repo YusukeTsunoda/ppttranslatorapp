@@ -90,6 +90,13 @@ export function HistoryDetail({ historyId, historyData, onBack }: HistoryDetailP
         </div>
       </div>
 
+      {/* サムネイル表示 */}
+      {historyItem.thumbnailPath && (
+        <div className="w-full flex justify-center mb-4">
+          <Image src={historyItem.thumbnailPath} alt="サムネイル" width={180} height={120} className="rounded shadow" />
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -164,6 +171,24 @@ export function HistoryDetail({ historyId, historyData, onBack }: HistoryDetailP
                       <Badge key={index} variant="outline">{tag}</Badge>
                     ))}
                   </dd>
+                </div>
+              )}
+              {historyItem.metadata && (
+                <div className="flex justify-between">
+                  <dt className="font-medium text-gray-500">メタデータ</dt>
+                  <dd className="text-xs text-right max-w-xs break-all">{JSON.stringify(historyItem.metadata)}</dd>
+                </div>
+              )}
+              {historyItem.errorMessage && (
+                <div className="flex justify-between">
+                  <dt className="font-medium text-red-500">エラーメッセージ</dt>
+                  <dd className="text-xs text-red-500 text-right max-w-xs break-all">{historyItem.errorMessage}</dd>
+                </div>
+              )}
+              {historyItem.translatedFileKey && (
+                <div className="flex justify-between">
+                  <dt className="font-medium text-gray-500">翻訳済みファイルキー</dt>
+                  <dd className="text-xs text-right max-w-xs break-all">{historyItem.translatedFileKey}</dd>
                 </div>
               )}
             </dl>

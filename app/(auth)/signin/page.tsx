@@ -106,7 +106,7 @@ function SignInContent() {
       <div className="w-full max-w-md space-y-8">
         <div>
           <div className="flex justify-center">
-            <CircleIcon className="h-12 w-12 text-orange-500" />
+            <CircleIcon className="h-12 w-12 text-blue-600" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">PPT Translatorにサインイン</h2>
           <p className="mt-2 text-center text-sm text-gray-600">アカウント情報を入力してください</p>
@@ -137,7 +137,7 @@ function SignInContent() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">パスワード</Label>
-              <Link href="/reset-password" className="text-sm font-medium text-orange-600 hover:text-orange-500">
+              <Link href="/reset-password" className="text-sm font-medium text-blue-600 hover:text-blue-500">
                 パスワードをお忘れの方
               </Link>
             </div>
@@ -170,7 +170,7 @@ function SignInContent() {
             <div className="text-sm text-center">
               <p>
                 アカウントをお持ちでない方は{' '}
-                <Link href="/signup" className="font-medium text-orange-600 hover:text-orange-500">
+                <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
                   新規登録
                 </Link>
               </p>

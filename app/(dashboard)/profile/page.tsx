@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 
 export default function ProfilePage() {
   const { user, setUser } = useUser();
@@ -81,8 +82,8 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">プロフィール設定</h1>
-        <p className="mt-1 text-sm text-gray-500">アカウント情報の確認と更新ができます。</p>
+        <h1 className="text-2xl font-semibold text-foreground">プロフィール設定</h1>
+        <p className="mt-1 text-sm text-muted-foreground">アカウント情報の確認と更新ができます。</p>
       </div>
 
       <Card>
@@ -107,17 +108,47 @@ export default function ProfilePage() {
               />
               <p className="mt-1 text-sm text-gray-500">メールアドレスの変更はサポートまでお問い合わせください。</p>
             </div>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  保存中...
-                </>
-              ) : (
-                '保存'
-              )}
-            </Button>
+            <div className="flex justify-between">
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  '保存'
+                )}
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="destructive" 
+                onClick={() => signOut({ callbackUrl: '/' })}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                ログアウト
+              </Button>
+            </div>
           </form>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>アカウント管理</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">セッションを終了し、安全にログアウトします。</p>
+            <Button 
+              variant="destructive" 
+              className="w-full" 
+              onClick={() => signOut({ callbackUrl: '/' })}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              ログアウト
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

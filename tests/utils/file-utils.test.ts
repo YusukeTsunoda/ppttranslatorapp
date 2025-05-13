@@ -289,7 +289,7 @@ describe('FilePathManager Implementation Tests', () => {
   it('getSlidesPathが正しいパスを返す（実装）', () => {
     const slidesPath = manager.getSlidesPath(userId, fileId);
 
-    expect(slidesPath).toBe(join(FILE_CONFIG.tempDir, userId, 'slides', fileId));
+    expect(slidesPath).toBe(join(FILE_CONFIG.tempDir, userId, fileId, 'slides'));
   });
 
   it('getAbsolutePathが相対パスを絶対パスに変換する（実装）', () => {

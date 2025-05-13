@@ -19,6 +19,8 @@ export interface PreviewSectionProps {
   onTextSelect?: (index: number | null) => void;
   hoveredTextIndex?: number | null;
   onTextHover?: (index: number | null) => void;
+  // 編集した翻訳を親コンポーネントに伝えるためのコールバック関数
+  onTranslationEdit?: (slideIndex: number, textIndex: number, newTranslation: string) => void;
 }
 
 export const PreviewSectionComponent = ({
@@ -29,6 +31,7 @@ export const PreviewSectionComponent = ({
   onTextSelect,
   hoveredTextIndex: externalHoveredTextIndex,
   onTextHover,
+  onTranslationEdit,
 }: PreviewSectionProps) => {
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -49,6 +52,11 @@ export const PreviewSectionComponent = ({
   );
   const [imageSize, setImageSize] = useState<ImageSize>({ width: 0, height: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
+  
+  // 翻訳テキスト編集用の状態
+  const [editingTranslationIndex, setEditingTranslationIndex] = useState<number | null>(null);
+  const [editTranslationValue, setEditTranslationValue] = useState('');
+  const [editedTranslations, setEditedTranslations] = useState<Record<number, string>>({});
 
   // 外部から渡されたselectedTextIndexが変更されたら内部状態を更新
   useEffect(() => {
@@ -317,15 +325,26 @@ export const PreviewSectionComponent = ({
       containerWidth = 1,
     } = imageSize;
 
-    // スケール係数を計算（画像の実際の表示サイズに基づく）
-    // PPTの横幅に合わせるため、コンテナ幅を基準にスケールを計算
-    const containerScale = containerWidth / naturalWidth;
-
-    // 実際の表示スケールを計算
-    const scaleX = width / naturalWidth;
-    const scaleY = height / naturalHeight;
-
-    // 位置を調整（画像のオフセットを考慮）
+    // PowerPointの座標系から画像の座標系への変換
+    // スライドの実際の表示サイズに合わせる
+  
+    // スケーリング係数の計算
+    // 実際の画像サイズに合わせる
+    const scaleX = width / 3650; // 横方向のスケール係数
+    const scaleY = height / 2050; // 縦方向のスケール係数
+  
+    // デバッグ出力
+    console.log('スケーリング情報:', {
+      scaleX,
+      scaleY,
+      imageWidth: width,
+      imageHeight: height,
+      originalPosition: position
+    });
+  
+    // 位置情報をスケーリング
+    // 実際のスライド上の位置に合わせて調整
+    // スライド上の相対位置を考慮して調整
     return {
       x: position.x * scaleX,
       y: position.y * scaleY,
@@ -335,63 +354,84 @@ export const PreviewSectionComponent = ({
   };
 
   const getHighlightStyle = (position: TextPosition, isHovered: boolean, isSelected: boolean) => {
-    // positionが存在しない場合は空のオブジェクトを返す
-    if (!position) {
-      console.log('位置情報がありません');
-      return {};
-    }
+  // positionが存在しない場合は空のオブジェクトを返す
+  if (!position) {
+    console.log('位置情報がありません');
+    return {};
+  }
 
-    // 画像サイズに合わせて位置を調整
-    const adjustedPosition = adjustPositionToImageSize(position);
+  // 位置情報が全て0の場合はデバッグ出力
+  const isZeroPosition = position.x === 0 && position.y === 0 && position.width === 0 && position.height === 0;
+  if (isZeroPosition) {
+    console.log('位置情報が全て0です:', position);
+  }
 
-    // 位置情報をログ出力（デバッグ用）
-    if (isSelected || isHovered) {
-      console.log('Original position:', position);
-      console.log('Adjusted position:', adjustedPosition);
-    }
+  // 画像サイズに合わせて位置を調整
+  const adjustedPosition = adjustPositionToImageSize(position);
 
-    // 基本スタイルの定義
-    const baseStyle: React.CSSProperties = {
-      position: 'absolute',
-      left: `${adjustedPosition.x}px`,
-      top: `${adjustedPosition.y}px`,
-      width: `${adjustedPosition.width}px`,
-      height: `${adjustedPosition.height}px`,
-      pointerEvents: 'auto', // クリックイベントを受け取れるように変更
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      zIndex: 30, // 高いz-indexを設定してクリック可能にする
-      // transformOriginを追加して、ズーム時の位置を正確に保持
-      transformOrigin: 'top left',
-    };
+  // 位置情報をログ出力（デバッグ用）
+  if (isSelected || isHovered || isZeroPosition) {
+    console.log('Original position:', position);
+    console.log('Adjusted position:', adjustedPosition);
+  }
 
-    // 選択されている場合
-    if (isSelected) {
-      return {
-        ...baseStyle,
-        border: '2px solid #3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        zIndex: 40, // 選択中は最も前面に
-      };
-    }
+  // 位置情報が無効な場合（全て0）でも最小サイズを設定して表示する
+  const minWidth = 50;
+  const minHeight = 20;
+  
+  // 基本スタイルの定義
+  const baseStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: `${adjustedPosition.x}px`,
+    top: `${adjustedPosition.y}px`,
+    // 幅と高さが0の場合は最小サイズを設定
+    width: `${adjustedPosition.width > 0 ? adjustedPosition.width : minWidth}px`,
+    height: `${adjustedPosition.height > 0 ? adjustedPosition.height : minHeight}px`,
+    pointerEvents: 'auto', // クリックイベントを受け取れるように変更
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    zIndex: 30, // 高いz-indexを設定してクリック可能にする
+    // transformOriginを追加して、ズーム時の位置を正確に保持
+    transformOrigin: 'top left',
+  };
 
-    // ホバー中の場合
-    if (isHovered) {
-      return {
-        ...baseStyle,
-        border: '2px solid #60a5fa',
-        backgroundColor: 'rgba(96, 165, 250, 0.1)',
-        zIndex: 35, // ホバー中は少し前面に
-      };
-    }
-
-    // 通常状態
+  // 位置情報が無効な場合は特別なスタイルを適用
+  if (isZeroPosition) {
     return {
       ...baseStyle,
-      border: '1px dashed rgba(156, 163, 175, 0.5)', // 薄い点線で領域を示す
-      backgroundColor: 'rgba(229, 231, 235, 0.1)', // 非常に薄い背景色
+      border: '2px solid #ef4444', // 赤い枠線
+      backgroundColor: 'rgba(239, 68, 68, 0.2)', // 薄い赤色の背景
+      zIndex: 45, // 最前面に表示
     };
+  }
+
+  // 選択されている場合
+  if (isSelected) {
+    return {
+      ...baseStyle,
+      border: '2px solid #3b82f6',
+      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+      zIndex: 40, // 選択中は最も前面に
+    };
+  }
+
+  // ホバー中の場合
+  if (isHovered) {
+    return {
+      ...baseStyle,
+      border: '2px solid #60a5fa',
+      backgroundColor: 'rgba(96, 165, 250, 0.1)',
+      zIndex: 35, // ホバー中は少し前面に
+    };
+  }
+
+  // 通常状態
+  return {
+    ...baseStyle,
+    border: '1px dashed rgba(156, 163, 175, 0.5)', // 薄い点線で領域を示す
+    backgroundColor: 'rgba(229, 231, 235, 0.1)', // 非常に薄い背景色
   };
+};
 
   // デバッグ用ログ出力
   useEffect(() => {
@@ -571,12 +611,32 @@ export const PreviewSectionComponent = ({
               )}
 
               {/* テキスト位置のハイライト表示 */}
-              <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-50 bg-transparent">
                 {textItems.map((text, index) => {
                   const isHovered = internalHoveredTextIndex === index;
                   const isSelected = internalSelectedTextIndex === index;
                   const style = getHighlightStyle(text.position, isHovered, isSelected);
-
+                  
+                  // テキスト内容を表示するツールチップスタイル
+                  const tooltipStyle: React.CSSProperties = {
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: '0',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                    opacity: isHovered || isSelected ? 1 : 0,
+                    transition: 'opacity 0.2s ease',
+                    zIndex: 100,
+                    pointerEvents: 'none',
+                    maxWidth: '200px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  };
+                  
                   return (
                     <div
                       key={`highlight-${index}`}
@@ -588,7 +648,14 @@ export const PreviewSectionComponent = ({
                       onMouseEnter={() => handleTextHover(index)}
                       onMouseLeave={() => handleTextHover(null)}
                       data-testid={`text-highlight-${index}`}
-                    />
+                    >
+                      {/* ホバーまたは選択時にテキスト内容を表示 */}
+                      {(isHovered || isSelected) && (
+                        <div style={tooltipStyle}>
+                          {text.text.length > 20 ? `${text.text.substring(0, 20)}...` : text.text}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -627,38 +694,123 @@ export const PreviewSectionComponent = ({
       {/* スライド内テキスト - ページ選択ボタンの下 */}
       {currentSlideData && textItems.length > 0 && (
         <div className="mt-4 border rounded-md overflow-hidden">
-          <div className="p-3 bg-gray-100 border-b">
+          <div className="p-3 bg-muted border-b-2">
             <h3 className="text-sm font-medium">スライド内のテキスト</h3>
-            <p className="text-xs text-gray-500">プレビューを確認しながらテキストを編集できます</p>
+            <p className="text-xs text-muted-foreground">プレビューを確認しながらテキストを編集できます</p>
           </div>
-          
-          <div className="overflow-y-auto max-h-[300px]">
+          <div className="overflow-y-auto max-h-[300px] bg-background">
             {textItems.map((text, index) => {
               const isSelected = internalSelectedTextIndex === index;
               const translation = currentSlideData.translations && 
                 currentSlideData.translations[index];
-              
               return (
                 <div 
                   key={`text-${index}`}
-                  className={`p-3 border-b hover:bg-gray-50 transition-colors ${
-                    isSelected ? 'bg-blue-50' : ''
+                  className={`p-3 border-b-2 hover:bg-muted transition-colors ${
+                    isSelected ? 'bg-primary/10' : ''
                   }`}
                   onClick={() => handleTextClick(index)}
                 >
                   <div className="flex flex-row">
                     {/* 原文 - 左側 */}
                     <div className="flex-1 mr-2">
-                      <p className="text-xs text-gray-500 mb-1">原文:</p>
+                      <p className="text-xs text-muted-foreground mb-1">原文:</p>
                       <p className="text-sm">{text.text}</p>
                     </div>
-                    
                     {/* 翻訳 - 右側 */}
                     <div className="flex-1 ml-2">
-                      <p className="text-xs text-gray-500 mb-1">翻訳:</p>
-                      <p className="text-sm">
-                        {translation ? translation.text : '翻訳がありません'}
+                      <p className="text-xs text-muted-foreground mb-1">
+                        翻訳:
+                        {editingTranslationIndex !== index && (
+                          <button
+                            className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // 編集モードを開始
+                              setEditingTranslationIndex(index);
+                              
+                              // 翻訳テキストを取得
+                              let translationText = '';
+                              if (editedTranslations[index]) {
+                                // 編集済みの場合はそれを使用
+                                translationText = editedTranslations[index];
+                              } else if (translation) {
+                                if (typeof translation === 'object' && translation.text) {
+                                  translationText = translation.text;
+                                } else if (typeof translation === 'string') {
+                                  translationText = translation;
+                                }
+                              }
+                              
+                              setEditTranslationValue(translationText);
+                            }}
+                          >
+                            編集
+                          </button>
+                        )}
                       </p>
+                      
+                      {editingTranslationIndex === index ? (
+                        // 編集モード
+                        <div className="flex flex-col">
+                          <textarea
+                            className="w-full p-2 border rounded text-sm min-h-[80px]"
+                            value={editTranslationValue}
+                            onChange={(e) => setEditTranslationValue(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex justify-end mt-2 space-x-2">
+                            <button
+                              className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTranslationIndex(null);
+                              }}
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // 編集内容を保存
+                                setEditedTranslations(prev => ({
+                                  ...prev,
+                                  [index]: editTranslationValue
+                                }));
+                                
+                                // 親コンポーネントに編集内容を伝える
+                                if (onTranslationEdit) {
+                                  onTranslationEdit(currentSlide, index, editTranslationValue);
+                                }
+                                
+                                setEditingTranslationIndex(null);
+                              }}
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // 表示モード
+                        <p className="text-sm">
+                          {editedTranslations[index] ? (
+                            // 編集済みの場合はそれを表示
+                            editedTranslations[index]
+                          ) : (
+                            translation ? 
+                              // translationがtextプロパティを持つオブジェクトの場合
+                              (typeof translation === 'object' && translation.text) ? 
+                                translation.text : 
+                              // translationが文字列の場合
+                              (typeof translation === 'string') ? 
+                                translation : 
+                              // それ以外の場合
+                              '翻訳データ形式エラー' 
+                            : '翻訳がありません'
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

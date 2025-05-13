@@ -293,32 +293,27 @@ file: [ファイルデータ]
 
 アップロードしたファイルのスライド情報を取得します。
 
-**エンドポイント**: `GET /api/slides/{fileId}`
+**エンドポイント**: `GET /api/slides/:fileId`
 
-**レスポンス**:
-
+**レスポンス例**:
 ```json
 {
-  "fileId": "file_id",
-  "fileName": "presentation.pptx",
   "slides": [
     {
       "index": 1,
-      "imageUrl": "https://example.com/slides/1.jpg",
+      "imageUrl": "/api/slides/xxx/slides/1.png",
       "texts": [
         {
-          "id": "text_id_1",
-          "text": "スライドのタイトル",
-          "position": { "x": 100, "y": 50 }
+          "text": "Welcome to our presentation.",
+          "position": { "x": 120, "y": 80, "width": 400, "height": 60 }
         },
         {
-          "id": "text_id_2",
-          "text": "スライドの内容",
-          "position": { "x": 100, "y": 100 }
+          "text": "This is the second text box.",
+          "position": { "x": 100, "y": 200, "width": 350, "height": 50 }
         }
       ]
     },
-    // 他のスライド...
+    ...
   ]
 }
 ```
