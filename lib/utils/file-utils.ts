@@ -1,4 +1,4 @@
-import { mkdir, readdir, unlink, stat, copyFile } from 'fs/promises';
+import { mkdir, readdir, unlink, stat, copyFile, rmdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { prisma } from '@/lib/db/prisma';
@@ -324,17 +324,35 @@ export async function cleanupOldFiles(userId: string) {
             // スライドディレクトリのクリーンアップ
             const slidesDir = join(fileIdPath, 'slides');
             if (existsSync(slidesDir)) {
-              const slideFiles = await readdir(slidesDir);
-              for (const slideFile of slideFiles) {
-                await unlink(join(slidesDir, slideFile));
+              try {
+                // Node.js v14.14.0以降の場合はrmを使用
+                await rm(slidesDir, { recursive: true, force: true });
+                console.log(`スライドディレクトリをクリーンアップしました: ${slidesDir}`);
+              } catch (rmError) {
+                // rmが利用できない場合はファイルを個別に削除してからディレクトリを削除
+                console.warn(`rmに失敗しました、個別削除を試みます:`, rmError);
+                const slideFiles = await readdir(slidesDir);
+                for (const slideFile of slideFiles) {
+                  await unlink(join(slidesDir, slideFile));
+                }
+                await rmdir(slidesDir);
+                console.log(`スライドディレクトリを個別削除でクリーンアップしました: ${slidesDir}`);
               }
-              console.log(`スライドディレクトリをクリーンアップしました: ${slidesDir}`);
             }
             
             // fileIdディレクトリ自体を削除
-            await unlink(fileIdPath);
-            await logFileOperation(userId, 'delete', fileId, true);
-            console.log(`古いファイルIDディレクトリを削除しました: ${fileIdPath}`);
+            try {
+              // Node.js v14.14.0以降の場合はrmを使用
+              await rm(fileIdPath, { recursive: true, force: true });
+              await logFileOperation(userId, 'delete', fileId, true);
+              console.log(`古いファイルIDディレクトリを削除しました: ${fileIdPath}`);
+            } catch (rmError) {
+              // rmが利用できない場合はrmdirを使用
+              console.warn(`rmに失敗しました、rmdirを試みます:`, rmError);
+              await rmdir(fileIdPath);
+              await logFileOperation(userId, 'delete', fileId, true);
+              console.log(`古いファイルIDディレクトリをrmdirで削除しました: ${fileIdPath}`);
+            }
           } catch (error) {
             if (error instanceof Error) {
               console.error(`Error cleaning up directory ${fileIdPath}:`, error);

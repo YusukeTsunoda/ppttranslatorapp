@@ -94,7 +94,7 @@ function SignUpContent() {
       <div className="w-full max-w-md space-y-8">
         <div>
           <div className="flex justify-center">
-            <CircleIcon className="h-12 w-12 text-orange-500" />
+            <CircleIcon className="h-12 w-12 text-blue-600" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">新規アカウント作成</h2>
           <p className="mt-2 text-center text-sm text-gray-600">必要な情報を入力してください</p>
@@ -162,7 +162,7 @@ function SignUpContent() {
             <div className="text-sm text-center">
               <p>
                 すでにアカウントをお持ちの方は{' '}
-                <Link href="/signin" className="font-medium text-orange-600 hover:text-orange-500">
+                <Link href="/signin" className="font-medium text-blue-600 hover:text-blue-500">
                   サインイン
                 </Link>
               </p>

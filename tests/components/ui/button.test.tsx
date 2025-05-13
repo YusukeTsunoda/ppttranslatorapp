@@ -69,10 +69,10 @@ describe('Button', () => {
       </>,
     );
 
-    expect(screen.getByTestId('default')).toHaveClass('h-9');
-    expect(screen.getByTestId('sm')).toHaveClass('h-8');
-    expect(screen.getByTestId('lg')).toHaveClass('h-10');
-    expect(screen.getByTestId('icon')).toHaveClass('h-9 w-9');
+    expect(screen.getByTestId('default')).toHaveClass('h-10');
+    expect(screen.getByTestId('sm')).toHaveClass('h-9');
+    expect(screen.getByTestId('lg')).toHaveClass('h-11');
+    expect(screen.getByTestId('icon')).toHaveClass('h-10 w-10');
   });
 
   it('無効状態をレンダリングする', () => {

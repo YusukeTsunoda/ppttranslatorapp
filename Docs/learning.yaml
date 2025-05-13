@@ -173,3 +173,52 @@ best_practices:
       cause: "router.push等の引数にstring | null型が渡る可能性を考慮していなかった。"
       solution: "router.push(newUrl || '') のように、必ずstring型を渡すよう修正。"
       prevention: "string型が必須のAPIには、型アサーションやデフォルト値で型を保証してから渡す。"
+
+- title: Next.js SSR/静的エクスポート不具合の原因と学び
+  date: "2025-05-08"
+  items:
+    - error: "Export encountered errors on following paths: ... などの静的エクスポートエラー"
+      cause: |
+        - Next.js App Router構成でSSR/サーバー専用処理（DBアクセス・認証）を含むページが静的エクスポート不可であることを見落としていた。
+        - サーバーコンポーネントからクライアントラッパーをimportするなど、App Routerの設計原則に反したimport構造が混在していた。
+        - Babel/SWCやoutput設定、Vercelのビルドコマンドなど複数の要因が絡み合い、根本原因の特定が難航した。
+      solution: |
+        - SSR運用（output: 'standalone'）に統一し、静的エクスポートは行わない。
+        - サーバーコンポーネントからクライアントラッパーをimportしない設計を徹底。
+        - Babel設定を見直し、Next.js標準のSWCビルドに戻す。
+        - ビルドコマンドや環境変数、Vercel設定を再点検。
+      prevention: |
+        - SSR/SSG/ISRの違いとNext.js App Routerの制約をチームで共有し、設計段階で静的エクスポート不可なページを明確化する。
+        - サーバー/クライアントコンポーネントのimportルールをドキュメント化し、レビュー時に必ずチェックする。
+        - Babelやoutput設定、CI/CDのビルドコマンドを一元管理し、変更時は影響範囲を明確にする。
+        - ビルドエラー発生時は、公式ドキュメントやエラーメッセージをもとに、SSR/SSG/静的エクスポートの観点から早期に切り分ける。
+    - time_consuming_factors:
+        - "App RouterのSSR/SSG/静的エクスポートの仕様理解不足により、原因の切り分けに時間を要した。"
+        - "サーバー/クライアントコンポーネントのimport構造が複雑化し、どこで何がimportされているか追跡に手間取った。"
+        - "Babelやoutput設定、Vercelのビルドコマンドなど複数の設定が絡み合い、どこが本質的な原因か特定しづらかった。"
+        - "エラー発生時のビルドログや設定ファイルの確認が後手に回り、調査が長期化した。"
+    - improvements:
+        - "SSR/SSG/静的エクスポートの設計方針をプロジェクト初期に明確化し、ドキュメント化する。"
+        - "サーバー/クライアントコンポーネントのimportルールをlintやレビューで自動チェックする仕組みを導入する。"
+        - "Babelやoutput、CI/CDのビルド設定をREADMEやdocsに明記し、変更時は必ずPRレビューを通す。"
+        - "ビルドエラー発生時は、まず公式ドキュメント・エラーメッセージ・設定ファイルを系統的に確認する運用を徹底する。"
+    - lessons_learned:
+        - "Next.js App RouterのSSR/SSG/静的エクスポートの仕様と制約を深く理解し、設計・実装に反映することの重要性。"
+        - "サーバー/クライアントコンポーネントのimport構造は厳格に分離し、設計原則を守ること。"
+        - "ビルドやデプロイの設定は一元管理し、複数の設定が絡む場合は影響範囲を明確にすること。"
+        - "エラー発生時は、設定・ログ・公式ドキュメントをもとに系統的に切り分けること。"
+    - best_practices:
+        - "SSR/SSG/静的エクスポートの設計方針をREADMEやdocsに明記し、チーム全体で共有する。"
+        - "サーバー/クライアントコンポーネントのimportルールをeslint-pluginやカスタムlintで自動化する。"
+        - "Babelやoutput、CI/CDのビルド設定は一元管理し、変更時は必ずPRレビュー・動作確認を行う。"
+        - "ビルドエラー発生時は、まず公式ドキュメント・エラーメッセージ・設定ファイルを確認し、安易に設定を変更しない。"
+
+- title: Babel利用禁止の方針
+  date: "2025-05-08"
+  items:
+    - rule: "今後はBabelを使わず、Next.js標準のSWCのみを利用する。"
+      reason: "Babel設定がSWCを無効化し、Next.jsのサーバー/クライアントコンポーネントの挙動やビルドに予期せぬ不具合を引き起こすため。"
+      enforcement: |
+        - Babel関連の設定ファイル（babel.config.js等）はリポジトリから削除する。
+        - jestやeslint等の設定からもBabel依存を排除する。
+        - 今後Babelを導入・追加する場合は、必ず技術的なレビューと影響範囲の検証を行う。

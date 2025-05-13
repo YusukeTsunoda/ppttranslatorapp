@@ -32,7 +32,7 @@ export interface ImageSize {
 
 export interface TextItem {
   text: string;
-  position: TextPosition;
+  position: TextPosition; // x, y, width, height を必ず含む
 }
 
 export interface TranslationItem {

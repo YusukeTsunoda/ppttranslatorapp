@@ -52,8 +52,12 @@ export async function GET(
 
     // レスポンスデータの構築
     const responseData = {
-      // 履歴自体の情報 (fileを除外して重複を避ける)
       ...(({ file, ...rest }) => rest)(historyItem),
+      tags: historyItem.tags,
+      metadata: historyItem.metadata,
+      thumbnailPath: historyItem.thumbnailPath,
+      processingTime: historyItem.processingTime,
+      fileSize: historyItem.fileSize,
       // 関連ファイル情報 (もしfileリレーションが存在すれば)
       fileDetails: historyItem.file ? {
         id: historyItem.file.id,
@@ -62,6 +66,7 @@ export async function GET(
         mimeType: historyItem.file.mimeType,
         status: historyItem.file.status,
         createdAt: historyItem.file.createdAt,
+        thumbnailPath: historyItem.thumbnailPath,
       } : null,
       // 関連スライド情報 (もしfileとSlideリレーションが存在すれば)
       slides: historyItem.file?.Slide.map(slide => ({

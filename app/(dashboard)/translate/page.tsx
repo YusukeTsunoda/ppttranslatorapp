@@ -72,6 +72,8 @@ export default function TranslatePage() {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  // 編集された翻訳を保持するオブジェクト
+  // キーは `slideIndex-textIndex` の形式
   const [editedTranslations, setEditedTranslations] = useState<Record<string, string>>({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [isTranslated, setIsTranslated] = useState(false);
@@ -83,6 +85,7 @@ export default function TranslatePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [userCredits, setUserCredits] = useState<number | null>(null);
 
   // URLからfileIdを抽出するヘルパー関数
   const extractFileIdFromUrl = (url?: string): string => {
@@ -194,11 +197,31 @@ export default function TranslatePage() {
       }
     };
 
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+
+    // クレジット残高を取得
+    const fetchCredits = async () => {
+      if (session?.user?.id) {
+        try {
+          const response = await fetch('/api/user/credits');
+          if (response.ok) {
+            const data = await response.json();
+            // クレジットが0以下の場合は0と表示
+            setUserCredits(data.credits > 0 ? data.credits : 0);
+          }
+        } catch (error) {
+          console.error('クレジット取得エラー:', error);
+        }
+      }
     };
-  }, [isDragging]);
+
+    fetchCredits();
+
+    // クリーンアップ関数
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [session]);
 
   // コンポーネントの初期化
   useEffect(() => {
@@ -274,6 +297,21 @@ export default function TranslatePage() {
 
   // 翻訳処理
   const handleTranslate = async () => {
+    if (!slides.length || isTranslating) return;
+
+    // クレジットが0の場合は翻訳不可
+    if (userCredits !== null && userCredits <= 0) {
+      toast({
+        title: 'クレジット不足',
+        description: '翻訳するにはクレジットが必要です。管理者にお問い合わせください。',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsTranslating(true);
+    setIsTranslated(false);
+
     // 現在のスライドのテキスト要素を確認
     console.log('翻訳開始前の確認:');
     console.log('現在のスライド:', currentSlide);
@@ -291,7 +329,6 @@ export default function TranslatePage() {
       return;
     }
 
-    setIsTranslating(true);
     try {
       // 現在のスライドのテキストを抽出
       const textsToTranslate = slides[currentSlide].texts.map((textItem) => ({
@@ -338,9 +375,21 @@ export default function TranslatePage() {
       setSlides(updatedSlides);
       setIsTranslated(true);
 
+      // クレジット残高を更新
+      try {
+        const creditsResponse = await fetch('/api/user/credits');
+        if (creditsResponse.ok) {
+          const creditsData = await creditsResponse.json();
+          // クレジットが0以下の場合は0と表示
+          setUserCredits(creditsData.credits > 0 ? creditsData.credits : 0);
+        }
+      } catch (error) {
+        console.error('クレジット取得エラー:', error);
+      }
+      
       toast({
         title: '翻訳完了',
-        description: 'スライドの翻訳が完了しました',
+        description: `${slides.length}枚のスライドを翻訳しました`,
       });
     } catch (error) {
       console.error('Translation error:', error);
@@ -387,13 +436,33 @@ export default function TranslatePage() {
       console.log('送信する翻訳データ:', slidesWithTranslations);
 
       // ダウンロードAPIの呼び出し
+      
+      // 正しいファイルIDを抽出
+      let extractedFileId = fileId;
+      
+      // fileIdがない場合はスライドのimageUrlから抽出
+      if (!extractedFileId && slides.length > 0 && slides[0].imageUrl) {
+        // URLパターン: /api/slides/{fileId}/slides/slide_1.png
+        const matches = slides[0].imageUrl.match(/\/api\/slides\/([^\/]+)\/slides\//); 
+        extractedFileId = matches ? matches[1] : null;
+      }
+      
+      console.log('ダウンロード用ファイルID:', {
+        extractedFileId,
+        originalUrl: slides.length > 0 ? slides[0].imageUrl : null
+      });
+      
+      if (!extractedFileId) {
+        throw new Error('ファイルIDを取得できませんでした');
+      }
+      
       const response = await fetch('/api/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fileId: slides[0].imageUrl.split('/').slice(-2)[0], // URLからfileIdを抽出
+          fileId: extractedFileId, // 正しく抽出したファイルIDを使用
           slides: slidesWithTranslations,
         }),
         credentials: 'include',
@@ -443,6 +512,20 @@ export default function TranslatePage() {
   const handleTextHover = (index: number | null) => {
     setHoveredTextIndex(index);
   };
+  
+  // 翻訳が編集された時の処理
+  const handleTranslationEdit = (slideIndex: number, textIndex: number, newTranslation: string) => {
+    // キーを生成
+    const key = `${slideIndex}-${textIndex}`;
+    
+    // 編集内容を保存
+    setEditedTranslations(prev => ({
+      ...prev,
+      [key]: newTranslation
+    }));
+    
+    console.log(`翻訳編集: スライド${slideIndex}, テキスト${textIndex}`, newTranslation);
+  };
 
   // プレビューセクションのレンダリング部分を修正
   const renderPreviewSection = () => {
@@ -459,6 +542,7 @@ export default function TranslatePage() {
         onTextSelect={handleTextSelect}
         hoveredTextIndex={hoveredTextIndex}
         onTextHover={handleTextHover}
+        onTranslationEdit={handleTranslationEdit}
       />
     );
   };
@@ -466,7 +550,15 @@ export default function TranslatePage() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col space-y-4">
-        <h1 className="text-2xl font-bold">プレゼンテーション翻訳</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">プレゼンテーション翻訳</h2>
+          <div className="flex items-center bg-primary/10 px-3 py-1 rounded-md">
+            <span className="text-sm font-medium mr-2">クレジット残高:</span>
+            <span className="text-sm font-bold text-primary">
+              {userCredits !== null ? userCredits : '読込中...'}
+            </span>
+          </div>
+        </div>
 
         {!file && (
           <Card className="p-6">
