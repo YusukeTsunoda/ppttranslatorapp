@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/db/prisma';
@@ -50,10 +49,6 @@ async function handler(req: NextRequest) {
     const activityLogs = await prisma.activityLog.findMany({
       where: {
         userId: token.sub,
-        metadata: {
-          path: ['apiKeyId'],
-          equals: keyId,
-        },
         createdAt: {
           gte: new Date(currentYear, currentMonth - 1, 1), // 今月の初日
           lt: new Date(currentYear, currentMonth, 1), // 来月の初日
@@ -65,9 +60,15 @@ async function handler(req: NextRequest) {
       take: 100, // 最新100件のみ取得
     });
 
+    // アクティビティをフィルタリング（APIキーIDに関連するものだけ）
+    const filteredLogs = activityLogs.filter(log => {
+      const metadata = log.metadata as Record<string, any> || {};
+      return metadata.apiKeyId === keyId;
+    });
+
     // 使用状況のサマリーを計算
     const summary = {
-      totalCalls: activityLogs.length,
+      totalCalls: filteredLogs.length,
       apiCallsByEndpoint: {} as Record<string, number>,
       lastUsed: apiKey.lastUsed,
       status: apiKey.isRevoked 
@@ -76,8 +77,10 @@ async function handler(req: NextRequest) {
     };
 
     // エンドポイント別の使用回数を集計
-    activityLogs.forEach(log => {
-      const endpoint = log.metadata?.endpoint as string || 'unknown';
+    filteredLogs.forEach(log => {
+      // metadataがJSONオブジェクトであることを確認し、適切に型キャストする
+      const metadata = log.metadata as Record<string, any> || {};
+      const endpoint = metadata.endpoint as string || 'unknown';
       if (!summary.apiCallsByEndpoint[endpoint]) {
         summary.apiCallsByEndpoint[endpoint] = 0;
       }
@@ -95,13 +98,16 @@ async function handler(req: NextRequest) {
           permissions: apiKey.permissions,
         },
         usage: summary,
-        recentActivity: activityLogs.map(log => ({
-          id: log.id,
-          timestamp: log.createdAt,
-          type: log.type,
-          endpoint: log.metadata?.endpoint || 'unknown',
-          status: log.metadata?.status || 'unknown',
-        })),
+        recentActivity: filteredLogs.map(log => {
+          const metadata = log.metadata as Record<string, any> || {};
+          return {
+            id: log.id,
+            timestamp: log.createdAt,
+            type: log.type,
+            endpoint: metadata.endpoint || 'unknown',
+            status: metadata.status || 'unknown',
+          };
+        }),
       },
     });
   } catch (error) {
@@ -115,24 +121,4 @@ async function handler(req: NextRequest) {
 
 // ログ機能を適用したハンドラをエクスポート
 export const GET = withAPILogging(handler, 'api-keys-usage'); 
-import { prisma } from '@/lib/db/prisma';
-
-export async function GET(req: Request) {
-  // TODO: 認証・権限チェック
-  // ここでは全APIキーの使用量をダミーで返す
-  const stats = await prisma.usageStatistics.findMany({
-    select: {
-      userId: true,
-      tokenCount: true,
-      apiCalls: true,
-      month: true,
-      year: true,
-    },
-    orderBy: [{ year: 'desc' }, { month: 'desc' }],
-    take: 20,
-  });
-  return new Response(JSON.stringify(stats), {
-    headers: { 'Content-Type': 'application/json' },
-  });
-} 
 
