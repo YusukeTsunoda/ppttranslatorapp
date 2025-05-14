@@ -10,6 +10,7 @@ import { Session } from 'next-auth';
 import { prisma } from '@/lib/db/prisma';
 import { v4 as uuidv4 } from 'uuid';
 import { Language, TranslationStatus } from '@prisma/client';
+import { withAPILogging } from '@/lib/utils/api-logging';
 
 interface CustomSession extends Session {
   user: {
@@ -22,7 +23,7 @@ interface CustomSession extends Session {
 }
 
 // 翻訳APIエンドポイント
-export async function POST(request: Request) {
+async function handler(req: NextRequest) {
   try {
     // APIキーの確認
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const data = await request.json();
+    const data = await req.json();
 
     // リクエストBodyからパラメータ取得
     const { texts, sourceLang, targetLang, model, fileName = 'スライド', slides, fileId } = data;
@@ -368,6 +369,9 @@ export async function POST(request: Request) {
     });
   }
 }
+
+// ログ機能を適用したハンドラをエクスポート
+export const POST = withAPILogging(handler, 'translate');
 
 export async function GET(req: Request) {
   try {

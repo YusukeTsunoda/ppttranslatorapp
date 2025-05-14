@@ -73,7 +73,11 @@ export default function HistoryPage() {
     return `/api/history?${params.toString()}`;
   }, [filter]);
 
-  const { data: apiResponse, error, isLoading } = useSWR<ApiResponse>(apiUrl, fetcher);
+  const { data: apiResponse, error, isLoading } = useSWR<ApiResponse>(
+    apiUrl,
+    fetcher,
+    { revalidateOnFocus: true, dedupingInterval: 60000 }
+  );
   const { data: creditsData, error: creditsError, isLoading: creditsLoading } = useSWR<{credits: number}>('/api/user/credits', fetcher);
 
   const pagination: PaginationInfo | null = useMemo(() => {
@@ -196,7 +200,7 @@ export default function HistoryPage() {
                         >
                           <TableCell>
                             {item.thumbnailPath ? (
-                              <img src={item.thumbnailPath} alt="サムネイル" className="w-16 h-12 object-cover rounded" />
+                              <img src={item.thumbnailPath} alt="サムネイル" className="w-16 h-12 object-cover rounded" loading="lazy" />
                             ) : (
                               <span className="text-xs text-gray-400">なし</span>
                             )}
