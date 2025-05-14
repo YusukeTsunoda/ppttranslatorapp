@@ -52,6 +52,17 @@ const config = {
         includeFailureMsg: true,
       },
     ],
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'reports',
+        outputName: 'junit.xml',
+        classNameTemplate: '{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true
+      }
+    ]
   ],
   globals: {
     'ts-jest': {
