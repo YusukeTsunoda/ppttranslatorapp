@@ -3,6 +3,8 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import TextList from '@/app/(dashboard)/translate/components/TextList';
+import { SlideText } from '@/lib/pptx/types';
 
 // テスト用の型定義
 interface Translation {
@@ -33,144 +35,210 @@ interface TextListProps {
 }
 
 // モックデータ
-const mockTexts: TextItem[] = [
-  {
-    id: 'text1',
-    text: 'サンプルテキスト1',
-    position: { x: 100, y: 100, width: 200, height: 50 },
-    translations: [
-      { language: 'en', text: 'Sample Text 1' },
-      { language: 'fr', text: 'Exemple de texte 1' },
-    ],
-  },
-  {
-    id: 'text2',
-    text: 'サンプルテキスト2',
-    position: { x: 100, y: 200, width: 200, height: 50 },
-    translations: [{ language: 'en', text: 'Sample Text 2' }],
-  },
-  {
-    id: 'text3',
-    text: 'サンプルテキスト3',
-    position: { x: 100, y: 300, width: 200, height: 50 },
-    translations: [],
-  },
+const mockTexts: SlideText[] = [
+  { id: '1', text: 'Hello world', position: { x: 0, y: 0, width: 100, height: 50 } },
+  { id: '2', text: 'Welcome to testing', position: { x: 0, y: 100, width: 100, height: 50 } },
+  { id: '3', text: 'Testing is important', position: { x: 0, y: 200, width: 100, height: 50 } },
 ];
 
-// TextListコンポーネントを定義
-const TextList = ({
-  texts,
-  onTextSelect,
-  selectedTextIndex,
-  onTextHover,
-  searchTerm,
-  hideTranslated,
-  selectedLanguage,
-}: TextListProps) => (
-  <div data-testid="text-list">
-    {texts
-      .filter((text) => !searchTerm || text.text.includes(searchTerm))
-      .filter((text) => {
-        if (!hideTranslated || !selectedLanguage) return true;
-        const hasTranslation = text.translations.some((t) => t.language === selectedLanguage);
-        return !hasTranslation;
-      })
-      .map((text, i) => (
-        <div
-          key={text.id}
-          data-testid={`text-item-${i}`}
-          className={selectedTextIndex === i ? 'selected' : ''}
-          onClick={() => onTextSelect && onTextSelect(i)}
-          onMouseEnter={() => onTextHover && onTextHover(i)}
-          onMouseLeave={() => onTextHover && onTextHover(null)}
-        >
-          {text.text}
-          <div data-testid={`text-translations-${i}`}>
-            {text.translations.map((t, j) => (
-              <div key={j} data-testid={`translation-${i}-${t.language}`}>
-                {t.language}: {t.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-  </div>
-);
+const mockTranslations = {
+  '1': 'こんにちは世界',
+  '2': 'テストへようこそ',
+};
 
 describe('TextList', () => {
   it('テキストリストを表示する', () => {
-    render(<TextList texts={mockTexts} />);
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
 
-    // 3つのテキストアイテムが表示されていることを確認
-    expect(screen.getAllByTestId(/text-item-/)).toHaveLength(3);
-    expect(screen.getByText('サンプルテキスト1')).toBeInTheDocument();
-    expect(screen.getByText('サンプルテキスト2')).toBeInTheDocument();
-    expect(screen.getByText('サンプルテキスト3')).toBeInTheDocument();
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to testing')).toBeInTheDocument();
+    expect(screen.getByText('Testing is important')).toBeInTheDocument();
   });
 
   it('テキスト選択コールバックが機能する', () => {
-    const mockOnTextSelect = jest.fn();
+    const handleSelectText = jest.fn();
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={handleSelectText}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
 
-    render(<TextList texts={mockTexts} onTextSelect={mockOnTextSelect} />);
-
-    // テキストアイテムをクリック
-    const textItem = screen.getByTestId('text-item-0');
-    fireEvent.click(textItem);
-    expect(mockOnTextSelect).toHaveBeenCalledWith(0);
+    fireEvent.click(screen.getByText('Hello world'));
+    expect(handleSelectText).toHaveBeenCalledWith('1');
   });
 
   it('選択されたテキストにselectedクラスが付与される', () => {
-    render(<TextList texts={mockTexts} selectedTextIndex={1} />);
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId="2"
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
 
-    // 選択されたテキストアイテムにselectedクラスが付与されていることを確認
-    const textItem = screen.getByTestId('text-item-1');
-    expect(textItem).toHaveClass('selected');
+    const selectedItem = screen.getByText('Welcome to testing').closest('li');
+    expect(selectedItem).toHaveClass('selected');
   });
 
   it('テキストホバーコールバックが機能する', () => {
-    const mockOnTextHover = jest.fn();
+    const handleHoverText = jest.fn();
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={handleHoverText}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
 
-    render(<TextList texts={mockTexts} onTextHover={mockOnTextHover} />);
+    fireEvent.mouseEnter(screen.getByText('Hello world'));
+    expect(handleHoverText).toHaveBeenCalledWith('1');
 
-    // テキストアイテムにマウスオーバー
-    const textItem = screen.getByTestId('text-item-0');
-    fireEvent.mouseEnter(textItem);
-    expect(mockOnTextHover).toHaveBeenCalledWith(0);
-
-    // テキストアイテムからマウスアウト
-    fireEvent.mouseLeave(textItem);
-    expect(mockOnTextHover).toHaveBeenCalledWith(null);
+    fireEvent.mouseLeave(screen.getByText('Hello world'));
+    expect(handleHoverText).toHaveBeenCalledWith(null);
   });
 
   it('検索語に基づいてテキストをフィルタリングする', () => {
-    render(<TextList texts={mockTexts} searchTerm="テキスト1" />);
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText="world"
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
 
-    // 検索語に一致するテキストのみが表示されていることを確認
-    expect(screen.getAllByTestId(/text-item-/)).toHaveLength(1);
-    expect(screen.getByText('サンプルテキスト1')).toBeInTheDocument();
-    expect(screen.queryByText('サンプルテキスト2')).not.toBeInTheDocument();
-    expect(screen.queryByText('サンプルテキスト3')).not.toBeInTheDocument();
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Testing is important')).not.toBeInTheDocument();
   });
 
   it('翻訳済みのテキストを非表示にする', () => {
-    render(<TextList texts={mockTexts} hideTranslated={true} selectedLanguage="en" />);
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={true}
+        translations={mockTranslations}
+      />
+    );
 
-    // 英語の翻訳がないテキストのみが表示されていることを確認
-    expect(screen.getAllByTestId(/text-item-/)).toHaveLength(1);
-    expect(screen.queryByText('サンプルテキスト1')).not.toBeInTheDocument();
-    expect(screen.queryByText('サンプルテキスト2')).not.toBeInTheDocument();
-    expect(screen.getByText('サンプルテキスト3')).toBeInTheDocument();
+    expect(screen.queryByText('Hello world')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+    expect(screen.getByText('Testing is important')).toBeInTheDocument();
   });
 
   it('翻訳情報を表示する', () => {
-    render(<TextList texts={mockTexts} />);
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={mockTranslations}
+      />
+    );
 
-    // 各テキストアイテムの翻訳情報が表示されていることを確認
-    expect(screen.getByTestId('translation-0-en')).toHaveTextContent('en: Sample Text 1');
-    expect(screen.getByTestId('translation-0-fr')).toHaveTextContent('fr: Exemple de texte 1');
-    expect(screen.getByTestId('translation-1-en')).toHaveTextContent('en: Sample Text 2');
+    expect(screen.getByText('こんにちは世界')).toBeInTheDocument();
+    expect(screen.getByText('テストへようこそ')).toBeInTheDocument();
+  });
 
-    // 翻訳がないテキストには翻訳情報が表示されていないことを確認
-    expect(screen.queryByTestId('translation-2-en')).not.toBeInTheDocument();
+  it('空のテキストリストを適切に処理する', () => {
+    render(
+      <TextList
+        texts={[]}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
+
+    expect(screen.getByText('テキストが見つかりません')).toBeInTheDocument();
+  });
+
+  it('大文字小文字を区別せずに検索する', () => {
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText="WORLD"
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
+
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+  });
+
+  it('検索結果が空の場合に適切なメッセージを表示する', () => {
+    render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText="xyz123"
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
+
+    expect(screen.getByText('検索結果がありません')).toBeInTheDocument();
+  });
+
+  it('正しい順序でテキストを表示する', () => {
+    const { container } = render(
+      <TextList
+        texts={mockTexts}
+        onSelectText={() => {}}
+        onHoverText={() => {}}
+        selectedTextId={null}
+        searchText=""
+        hideTranslated={false}
+        translations={{}}
+      />
+    );
+
+    const listItems = container.querySelectorAll('li');
+    expect(listItems[0].textContent).toContain('Hello world');
+    expect(listItems[1].textContent).toContain('Welcome to testing');
+    expect(listItems[2].textContent).toContain('Testing is important');
   });
 });
