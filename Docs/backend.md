@@ -304,3 +304,12 @@ middleware.ts                 # グローバルミドルウェア
 - **バージョン管理**: デプロイメントバージョン
 - **即時ロールバック**: 問題発生時
 - **ブルー/グリーンデプロイ**: ゼロダウンタイム
+
+### バッチアップロードAPI/ワーカー/進捗API 実装メモ
+
+- バッチアップロードAPIはNode.js API Route（pages/api/batch-upload.ts）で実装
+- multipart/form-dataはformidable等でパース予定
+- バッチワーカー（scripts/batch_worker.ts）はts-node/tsxで起動（.tsのまま実行可能）
+- Next.js app routerのEdge RuntimeではPrismaClientが動作しないため、Node.jsランタイムで実装
+- 進捗API（GET /api/batch-upload?jobId=xxx）はjobIdで進捗・エラー取得
+- DB登録時はuserId, status, files（相対パスのみ）, progress, totalを格納
