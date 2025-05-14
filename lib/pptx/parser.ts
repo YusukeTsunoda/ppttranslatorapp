@@ -5,17 +5,34 @@ import { v4 as uuidv4 } from 'uuid';
 import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createHash } from 'crypto';
+import os from 'os';
 
 const execAsync = promisify(exec);
+const fsPromises = fs.promises;
+
+// パーサーキャッシュ
+interface ParseCache {
+  result: PPTXParseResult;
+  timestamp: number;
+  fileHash: string;
+}
 
 export class PPTXParser {
   private static instance: PPTXParser;
   private pythonScriptPath: string;
   private pythonPath: string;
+  private parserCache: Map<string, ParseCache> = new Map();
+  // キャッシュの有効期限（1時間）
+  private cacheExpirationTime = 60 * 60 * 1000;
+  // 同時処理数の制限
+  private maxConcurrentProcesses: number;
 
   private constructor() {
     this.pythonScriptPath = path.join(process.cwd(), 'lib', 'python', 'pptx_parser.py');
     this.pythonPath = process.env.PYTHON_PATH || 'python3';
+    // CPUコア数に基づいて同時処理数を設定（最大値を制限）
+    this.maxConcurrentProcesses = Math.max(1, Math.min(os.cpus().length - 1, 4));
   }
 
   public static getInstance(): PPTXParser {
@@ -25,239 +42,222 @@ export class PPTXParser {
     return PPTXParser.instance;
   }
 
+  // ファイルのハッシュを計算
+  private async calculateFileHash(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      try {
+        const hash = createHash('md5');
+        const stream = fs.createReadStream(filePath);
+        
+        stream.on('data', (data) => {
+          hash.update(data);
+        });
+        
+        stream.on('end', () => {
+          resolve(hash.digest('hex'));
+        });
+        
+        stream.on('error', (error) => {
+          reject(error);
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // キャッシュが有効かチェック
+  private isCacheValid(cache: ParseCache, fileHash: string): boolean {
+    const now = Date.now();
+    // キャッシュが期限内で、ファイルハッシュが一致している場合は有効
+    return (
+      now - cache.timestamp < this.cacheExpirationTime &&
+      cache.fileHash === fileHash
+    );
+  }
+
   private async ensurePythonScript(): Promise<void> {
     if (!fs.existsSync(this.pythonScriptPath)) {
-      throw new Error('Python script not found');
-    }
-
-    try {
-      await execAsync('python3 --version');
-    } catch (error) {
-      throw new Error('Python execution error');
+      throw new Error(`Python script not found at ${this.pythonScriptPath}`);
     }
   }
 
   private async checkDependencies(): Promise<void> {
-    const checkScriptPath = path.join(process.cwd(), 'tmp', 'check_deps.py');
-    const checkScriptContent = `
-import sys
-try:
-    import pptx
-    print("pptx OK")
-except ImportError:
-    print("pptx NOT FOUND")
-    sys.exit(1)
-
-try:
-    import pdf2image
-    print("pdf2image OK")
-except ImportError:
-    print("pdf2image NOT FOUND")
-    sys.exit(1)
-
-try:
-    import PIL
-    print("PIL OK")
-except ImportError:
-    print("PIL NOT FOUND")
-    sys.exit(1)
-
-print("All dependencies are installed")
-`;
-
     try {
-      if (!fs.existsSync(path.join(process.cwd(), 'tmp'))) {
-        fs.mkdirSync(path.join(process.cwd(), 'tmp'), { recursive: true });
-      }
-
-      fs.writeFileSync(checkScriptPath, checkScriptContent, 'utf8');
-
-      const result = await new Promise<boolean>((resolve, reject) => {
-        const pyshell = new PythonShell(checkScriptPath, {
-          mode: 'text',
-          pythonPath: this.pythonPath,
-        });
-
-        let hasError = false;
-
-        pyshell.on('message', (message) => {
-          if (message.includes('NOT FOUND')) {
-            hasError = true;
-          }
-        });
-
-        pyshell.on('stderr', (stderr) => {
-          hasError = true;
-        });
-
-        pyshell.end((err) => {
-          try {
-            if (fs.existsSync(checkScriptPath)) {
-              fs.unlinkSync(checkScriptPath);
-            }
-          } catch (e) {
-            // 一時ファイル削除エラーは無視
-          }
-
-          if (err) {
-            reject(new Error('Python execution error'));
-          } else if (hasError) {
-            reject(new Error('Python dependencies missing'));
-          } else {
-            resolve(true);
-          }
-        });
-      });
-
-      return;
+      // Python環境の確認
+      await execAsync(`${this.pythonPath} --version`);
+      
+      // 依存パッケージのチェック（最小限の確認のみ実施）
+      await execAsync(`${this.pythonPath} -c "import python_pptx; import PIL"`);
     } catch (error) {
-      throw error instanceof Error ? error : new Error('Python execution error');
+      console.error('Python dependency check failed:', error);
+      throw new Error('Python dependencies are not installed. Please install required packages.');
     }
   }
 
-  public async parsePPTX(inputPath: string, outputDir: string): Promise<PPTXParseResult> {
+  // スライド処理を並列実行するための補助関数
+  private async processSlidesBatch(slides: any[], outputDir: string): Promise<SlideContent[]> {
+    // CPUコア数に基づいて適切なバッチサイズを設定
+    const batchSize = Math.max(1, Math.ceil(slides.length / this.maxConcurrentProcesses));
+    const batches = [];
+    
+    // スライドをバッチに分割
+    for (let i = 0; i < slides.length; i += batchSize) {
+      batches.push(slides.slice(i, i + batchSize));
+    }
+    
+    // 各バッチを並列処理
+    const results = await Promise.all(
+      batches.map(async (batch) => {
+        return batch.map((slide: any, index: number) => {
+          const slideIndex = slide.index;
+          const imageUrl = `/api/slides/${path.basename(outputDir)}/slides/${slideIndex + 1}.png`;
+          
+          return {
+            index: slideIndex,
+            imageUrl,
+            textElements: slide.texts.map((textObj: any) => ({
+              id: `text-${slideIndex}-${uuidv4().substring(0, 8)}`,
+              text: textObj.text,
+              position: textObj.position,
+              type: textObj.type || 'text',
+              fontInfo: textObj.paragraphs?.[0]?.font || {}
+            }))
+          };
+        });
+      })
+    );
+    
+    // 結果を平坦化して返す
+    return results.flat();
+  }
+
+  private async executePythonScript(inputPath: string, outputDir: string): Promise<any> {
     try {
+      // まず出力ディレクトリを確保
+      await fsPromises.mkdir(outputDir, { recursive: true });
+
+      // PythonShellのオプション
+      const options = {
+        mode: 'json' as const,
+        pythonPath: this.pythonPath,
+        pythonOptions: ['-u'], // 出力バッファリングを無効化
+        scriptPath: path.dirname(this.pythonScriptPath),
+        args: [inputPath, outputDir]
+      };
+
+      const results = await PythonShell.run(path.basename(this.pythonScriptPath), options);
+      if (!results || results.length === 0) {
+        throw new Error('No results returned from Python script');
+      }
+
+      return results[0];
+    } catch (error) {
+      console.error('Python script execution failed:', error);
+      throw new Error(`Failed to execute Python script: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
+    if (!result || !result.slides || !Array.isArray(result.slides)) {
+      throw new Error('Invalid result format from Python script');
+    }
+
+    return {
+      filename: path.basename(inputPath),
+      totalSlides: result.slides.length,
+      metadata: result.metadata || {},
+      slides: result.slides.map((slide: any, index: number) => ({
+        index,
+        imageUrl: slide.imageUrl,
+        textElements: (slide.texts || []).map((textObj: any) => ({
+          id: `text-${index}-${uuidv4().substring(0, 8)}`,
+          text: textObj.text,
+          position: textObj.position,
+          type: textObj.type || 'text',
+          fontInfo: textObj.paragraphs?.[0]?.font || {}
+        }))
+      }))
+    };
+  }
+
+  public async parsePPTX(inputPath: string, outputDir: string, forceReparse: boolean = false): Promise<PPTXParseResult> {
+    try {
+      // ファイルハッシュを計算
+      const fileHash = await this.calculateFileHash(inputPath);
+      const cacheKey = `${path.basename(inputPath)}_${fileHash}`;
+      
+      // キャッシュをチェック（強制再解析フラグがオフの場合のみ）
+      if (!forceReparse && this.parserCache.has(cacheKey)) {
+        const cache = this.parserCache.get(cacheKey)!;
+        if (this.isCacheValid(cache, fileHash)) {
+          // 有効なキャッシュが存在する場合はそれを使用
+          console.log(`Using cached parse result for ${path.basename(inputPath)}`);
+          return cache.result;
+        }
+      }
+      
+      // Python環境の確認
       await this.ensurePythonScript();
       await this.checkDependencies();
+      
+      // メモリ使用量最適化のため、GCを実行
+      if (global.gc) {
+        global.gc();
+      }
+      
+      // Python処理の実行（メイン処理）
       const result = await this.executePythonScript(inputPath, outputDir);
-      return this.validateAndProcessResult(result, inputPath);
+      
+      // スライドを並列処理
+      if (result && result.slides && Array.isArray(result.slides)) {
+        console.log(`Processing ${result.slides.length} slides in parallel batches`);
+        const processedSlides = await this.processSlidesBatch(result.slides, outputDir);
+        result.slides = processedSlides;
+      }
+      
+      // 結果を検証して処理
+      const parseResult = this.validateAndProcessResult(result, inputPath);
+      
+      // キャッシュに保存
+      this.parserCache.set(cacheKey, {
+        result: parseResult,
+        timestamp: Date.now(),
+        fileHash
+      });
+      
+      // 古いキャッシュのクリーンアップ
+      this.cleanupCache();
+      
+      return parseResult;
     } catch (error) {
+      console.error('PPTX parsing error:', error);
       if (error instanceof Error) {
         throw error;
       }
       throw new Error('Unknown error occurred during PPTX parsing');
+    } finally {
+      // 明示的にメモリ解放を促す
+      if (global.gc) {
+        global.gc();
+      }
     }
   }
 
-  private async executePythonScript(inputPath: string, outputDir: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-      try {
-        // 出力ディレクトリが存在しない場合は作成
-        if (!fs.existsSync(outputDir)) {
-          fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        const options = {
-          mode: 'text' as const,
-          pythonPath: this.pythonPath,
-          args: [
-            inputPath,
-            outputDir
-          ],
-        };
-
-        let result: any = null;
-        let errorOutput = '';
-        let stdoutOutput = '';
-        let hasError = false;
-
-        const pyshell = new PythonShell(this.pythonScriptPath, options);
-
-        pyshell.on('message', (message) => {
-          stdoutOutput += message + '\n';
-          
-          try {
-            // JSONデータを検出して解析
-            if (message.trim().startsWith('{') && message.trim().endsWith('}')) {
-              result = JSON.parse(message);
-            }
-          } catch (e) {
-            errorOutput += `JSON解析エラー: ${e}\n`;
-          }
-        });
-
-        pyshell.on('stderr', (stderr) => {
-          errorOutput += stderr + '\n';
-          
-          // 重要なエラーメッセージを検出
-          if (
-            stderr.includes('Error') || 
-            stderr.includes('Exception') || 
-            stderr.includes('Traceback') ||
-            stderr.includes('failed') ||
-            stderr.includes('not found')
-          ) {
-            hasError = true;
-          }
-        });
-
-        pyshell.end((err) => {
-          if (err) {
-            reject(new Error(`Python実行エラー: ${err.message}\n${errorOutput}`));
-          } else if (hasError) {
-            reject(new Error(`Pythonスクリプトエラー: ${errorOutput}`));
-          } else if (!result) {
-            reject(new Error(`Pythonスクリプトから有効な結果が得られませんでした。`));
-          } else {
-            resolve(result);
-          }
-        });
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+  // 古いキャッシュエントリをクリーンアップ
+  private cleanupCache(): void {
+    const now = Date.now();
+    for (const [key, cache] of this.parserCache.entries()) {
+      if (now - cache.timestamp > this.cacheExpirationTime) {
+        this.parserCache.delete(key);
       }
-    });
+    }
   }
 
-  private validateAndProcessResult(results: any, inputPath: string): PPTXParseResult {
-    if (!results || typeof results !== 'object') {
-      throw new Error('無効な結果形式: オブジェクトが必要です');
-    }
-
-    if (!Array.isArray(results.slides)) {
-      throw new Error('無効な結果形式: slides プロパティは配列である必要があります');
-    }
-
-    const slides = results.slides.map((slide: any, index: number) => {
-      if (!slide || typeof slide !== 'object') {
-        throw new Error(`スライド ${index} のデータが無効です`);
-      }
-
-      if (!Array.isArray(slide.texts)) {
-        throw new Error(`スライド ${index} のテキストデータが無効です`);
-      }
-
-      const textElements: TextElement[] = Array.isArray(slide.texts) 
-        ? slide.texts.map((text: any, i: number) => {
-            let textContent = '';
-            let position: Position = { x: 0, y: 0, width: 0, height: 0 };
-            
-            if (typeof text === 'string') {
-              textContent = text;
-            } else if (text && typeof text === 'object') {
-              textContent = text.text || text.content || '';
-              position = text.position || position;
-            }
-            
-            return {
-              id: uuidv4(),
-              text: textContent,
-              position: {
-                x: position.x || 0,
-                y: position.y || 0,
-                width: position.width || 0,
-                height: position.height || 0,
-              },
-            };
-          })
-        : [];
-
-      return {
-        index,
-        imagePath: slide.image_path || `slide_${index + 1}.png`,
-        textElements,
-      };
-    });
-
-    const parseResult: PPTXParseResult = {
-      slides,
-      metadata: {
-        totalSlides: slides.length,
-        title: path.basename(inputPath, '.pptx'),
-        lastModified: new Date().toISOString(),
-      },
-    };
-
-    return parseResult;
+  // キャッシュを完全にクリア
+  public clearCache(): void {
+    this.parserCache.clear();
+    console.log('Parser cache cleared');
   }
 
   public extractTexts(parseResult: PPTXParseResult): string[] {
