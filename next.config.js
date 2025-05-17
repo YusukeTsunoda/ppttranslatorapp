@@ -40,6 +40,9 @@ const nextConfig = {
       'esbuild',
       'babel-plugin-transform-runtime',
       '@babel/runtime',
+      // Prismaのエンジンバイナリはライブラリモードで使用するため除外
+      'prisma',
+      '@prisma/engines',
     ],
     // バンドルから除外するファイルパスパターン
     ignoredModuleFiles: [
