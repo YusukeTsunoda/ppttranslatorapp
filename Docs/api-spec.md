@@ -179,6 +179,54 @@ PowerPointファイルの翻訳を実行します。
 }
 ```
 
+## クエリパラメータによるフィルタリング
+
+API v2.0から、主要なエンドポイントでクエリパラメータによるサーバーサイドフィルタリング機能を導入しました。この機能により、クライアントは必要なデータのみを効率的に取得できます。
+
+### 共通フィルタリングパラメータ
+
+以下のパラメータはすべてのフィルタリング対応APIで使用できます：
+
+| パラメータ | 説明 | 例 |
+|------------|------|-----|
+| page | ページ番号（1から開始） | `?page=2` |
+| limit | 1ページあたりの最大件数（最大100） | `?limit=20` |
+| sort | ソートするフィールド | `?sort=createdAt` |
+| order | ソート順（asc/desc） | `?order=desc` |
+| search | 検索キーワード | `?search=presentation` |
+| startDate | 開始日（YYYY-MM-DD形式） | `?startDate=2023-01-01` |
+| endDate | 終了日（YYYY-MM-DD形式） | `?endDate=2023-12-31` |
+
+### サポートしているエンドポイント
+
+以下のエンドポイントはクエリパラメータによるフィルタリングをサポートしています：
+
+1. **GET /api/history** - 翻訳履歴一覧
+   - 追加フィルタ: status, sourceLang, targetLang, minPageCount, maxPageCount など
+
+2. **GET /api/upload** - ファイル一覧
+   - 追加フィルタ: status, mimeType, minFileSize, maxFileSize
+
+3. **GET /api/activity** - アクティビティログ
+   - 追加フィルタ: type, userId (管理者のみ)
+
+4. **GET /api/admin/users** - ユーザー管理 (管理者のみ)
+   - 追加フィルタ: role, emailVerified, minCredits, maxCredits
+
+### 使用例
+
+翻訳履歴の取得（ステータスが完了、日付順に並べ替え）：
+```
+GET /api/history?status=COMPLETED&sort=createdAt&order=desc
+```
+
+特定のサイズ範囲のファイル検索：
+```
+GET /api/upload?minFileSize=1000000&maxFileSize=5000000
+```
+
+詳細な仕様は [APIリファレンス](/Docs/api-reference.md) を参照してください。
+
 ## エラーコード
 
 | コード | 説明 |
