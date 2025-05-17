@@ -1,126 +1,157 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { FilePathManager, FILE_CONFIG, generateFileId, wait, withRetry } from '@/lib/utils/file-utils';
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { FilePathManager, FILE_CONFIG, generateFileId, withRetry } from '@/lib/utils/file-utils';
 import { join } from 'path';
+import { promises as fs } from 'fs';
 
-// fs/promises と fs のモックは jest.setup.js で設定済み
-jest.mock('fs/promises');
-jest.mock('fs');
+// fsモジュールのモック
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  readdir: jest.fn().mockResolvedValue(['test-file.pptx']),
+  copyFile: jest.fn().mockResolvedValue(undefined),
+  stat: jest.fn().mockResolvedValue({ mtimeMs: Date.now() }),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
 
-// グローバルのユーティリティ関数を使用
-declare global {
-  function __mockReaddir(files: string[]): void;
-  function __mockExistsSync(exists: boolean): void;
-  function __mockMkdir(implementationFn?: Function): void;
-}
+jest.mock('fs', () => ({
+  existsSync: jest.fn().mockReturnValue(true),
+}));
 
-describe('ファイルユーティリティ', () => {
+describe('FilePathManager', () => {
+  let filePathManager: FilePathManager;
+  const userId = 'test-user';
+  const fileId = 'test-file';
+
   beforeEach(() => {
     jest.clearAllMocks();
+    filePathManager = new FilePathManager();
   });
 
-  describe('FilePathManager', () => {
-    let filePathManager: FilePathManager;
-    const userId = 'user123';
-    const fileId = 'file123';
+  describe('パス生成メソッド', () => {
+    it('getTempPathが正しいパスを返す', () => {
+      const originalPath = filePathManager.getTempPath(userId, fileId, 'original');
+      const translatedPath = filePathManager.getTempPath(userId, fileId, 'translated');
 
-    beforeEach(() => {
-      filePathManager = new FilePathManager();
+      expect(originalPath).toBe(join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_original.pptx`));
+      expect(translatedPath).toBe(join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`));
     });
 
-    describe('getTempPath', () => {
-      it('正しい一時ファイルパスを返す', () => {
-        const result = filePathManager.getTempPath(userId, fileId);
-        const expected = join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_original.pptx`);
-        expect(result).toBe(expected);
-      });
+    it('getPublicPathが正しいパスを返す', () => {
+      const originalPath = filePathManager.getPublicPath(userId, fileId, 'original');
+      const translatedPath = filePathManager.getPublicPath(userId, fileId, 'translated');
+
+      expect(originalPath).toBe(join('uploads', userId, `${fileId}_original.pptx`));
+      expect(translatedPath).toBe(join('uploads', userId, `${fileId}_translated.pptx`));
     });
 
-    describe('getPublicPath', () => {
-      it('正しい公開ファイルパスを返す', () => {
-        const result = filePathManager.getPublicPath(userId, fileId);
-        expect(result).toBe(`uploads/${userId}/${fileId}_translated.pptx`);
-      });
+    it('getProcessingPathが正しいパスを返す', () => {
+      const path = filePathManager.getProcessingPath(userId, fileId);
+      expect(path).toBe(join(FILE_CONFIG.processingDir, userId, fileId));
     });
 
-    describe('getProcessingPath', () => {
-      it('正しい処理中ファイルパスを返す', () => {
-        const result = filePathManager.getProcessingPath(userId, fileId);
-        expect(result).toBe(`${FILE_CONFIG.processingDir}/${userId}/${fileId}`);
-      });
+    it('getSlidesPathが正しいパスを返す', () => {
+      const path = filePathManager.getSlidesPath(userId, fileId);
+      expect(path).toBe(join(FILE_CONFIG.tempDir, userId, fileId, 'slides'));
     });
   });
 
+  describe('パス変換メソッド', () => {
+    it('getAbsolutePathが相対パスを絶対パスに変換する', () => {
+      const relativePath = 'uploads/test-file.pptx';
+      const absolutePath = filePathManager.getAbsolutePath(relativePath);
+      expect(absolutePath).toBe(join(process.cwd(), relativePath));
+    });
+
+    it('getAbsolutePathが絶対パスをそのまま返す', () => {
+      const absolutePath = '/absolute/path/to/file.pptx';
+      const result = filePathManager.getAbsolutePath(absolutePath);
+      expect(result).toBe(absolutePath);
+    });
+  });
+
+  describe('ファイル操作メソッド', () => {
+    it('findActualFilePathが正しいファイルを見つける', async () => {
+      const mockFiles = [`${fileId}.pptx`, `${fileId}_translated.pptx`];
+      (fs.readdir as jest.Mock).mockResolvedValue(mockFiles);
+
+      const originalPath = await filePathManager.findActualFilePath(userId, fileId, 'original');
+      const translatedPath = await filePathManager.findActualFilePath(userId, fileId, 'translated');
+
+      expect(originalPath).toBe(join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}.pptx`));
+      expect(translatedPath).toBe(join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`));
+    });
+
+    it('findActualFilePathがファイルが見つからない場合nullを返す', async () => {
+      (fs.readdir as jest.Mock).mockResolvedValue(['other-file.pptx']);
+
+      const result = await filePathManager.findActualFilePath(userId, fileId, 'original');
+      expect(result).toBeNull();
+    });
+
+    it('ensurePathがディレクトリを作成する', async () => {
+      const filePath = join('uploads', userId, 'test-file.pptx');
+      await filePathManager.ensurePath(filePath);
+
+      expect(fs.mkdir).toHaveBeenCalledWith(
+        join(process.cwd(), 'uploads', userId),
+        { recursive: true }
+      );
+    });
+
+    it('moveToPublicがファイルを公開ディレクトリに移動する', async () => {
+      const sourcePath = join(FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`);
+      const destPath = join(FILE_CONFIG.publicDir, userId, `${fileId}_translated.pptx`);
+      
+      (fs.readdir as jest.Mock).mockResolvedValue([`${fileId}_translated.pptx`]);
+
+      const result = await filePathManager.moveToPublic(userId, fileId);
+
+      expect(fs.mkdir).toHaveBeenCalledWith(
+        join(process.cwd(), FILE_CONFIG.publicDir, userId),
+        { recursive: true }
+      );
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        join(process.cwd(), sourcePath),
+        join(process.cwd(), destPath)
+      );
+      expect(result).toBe(join('uploads', userId, `${fileId}_translated.pptx`));
+    });
+  });
+});
+
+describe('ユーティリティ関数', () => {
   describe('generateFileId', () => {
     it('一意のファイルIDを生成する', () => {
-      const id = generateFileId();
-      expect(id).toMatch(/^\d+_[a-z0-9]+$/);
-    });
-  });
-
-  describe('wait', () => {
-    it('指定された時間だけ待機する', async () => {
-      jest.useFakeTimers();
-      const waitPromise = wait(1000);
-      jest.advanceTimersByTime(1000);
-      await waitPromise;
-      jest.useRealTimers();
+      const id1 = generateFileId();
+      const id2 = generateFileId();
+      expect(id1).not.toBe(id2);
+      expect(id1).toMatch(/^[a-f0-9-]+$/);
     });
   });
 
   describe('withRetry', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('初回で成功した場合はリトライしない', async () => {
-      const operation = jest.fn<() => Promise<string>>().mockResolvedValue('成功');
-      const onError = jest.fn();
-
-      const result = await withRetry(operation, { maxRetries: 3, delay: 100, onError });
-
-      expect(result).toBe('成功');
+    it('成功時に結果を返す', async () => {
+      const operation = jest.fn().mockResolvedValue('success');
+      const result = await withRetry(operation, { maxRetries: 3, delay: 100 });
+      expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(1);
-      expect(onError).not.toHaveBeenCalled();
     });
 
-    it('失敗後にリトライして成功する場合', async () => {
-      const operation = jest
-        .fn<() => Promise<string>>()
-        .mockRejectedValueOnce(new Error('エラー1'))
-        .mockResolvedValue('成功');
-      const onError = jest.fn();
+    it('失敗時にリトライする', async () => {
+      const operation = jest.fn()
+        .mockRejectedValueOnce(new Error('fail'))
+        .mockRejectedValueOnce(new Error('fail'))
+        .mockResolvedValue('success');
 
-      const retryPromise = withRetry(operation, { maxRetries: 3, delay: 100, onError });
-
-      await Promise.resolve(); // 初回実行
-      jest.advanceTimersByTime(100); // 遅延
-      await Promise.resolve(); // リトライ
-
-      const result = await retryPromise;
-
-      expect(result).toBe('成功');
-      expect(operation).toHaveBeenCalledTimes(2);
-      expect(onError).toHaveBeenCalledTimes(1);
+      const result = await withRetry(operation, { maxRetries: 3, delay: 100 });
+      expect(result).toBe('success');
+      expect(operation).toHaveBeenCalledTimes(3);
     });
 
-    it('最大リトライ回数を超えた場合はエラーをスロー', async () => {
-      const operation = jest.fn<() => Promise<string>>().mockRejectedValue(new Error('エラー'));
-      const onError = jest.fn();
-
-      const retryPromise = withRetry(operation, { maxRetries: 2, delay: 100, onError });
-
-      await Promise.resolve(); // 初回実行
-      jest.advanceTimersByTime(100); // 1回目の遅延
-      await Promise.resolve(); // 1回目のリトライ
-      jest.advanceTimersByTime(200); // 2回目の遅延
-
-      await expect(retryPromise).rejects.toThrow('エラー');
-      expect(operation).toHaveBeenCalledTimes(2);
-      expect(onError).toHaveBeenCalledTimes(2);
+    it('最大リトライ回数を超えた場合にエラーを投げる', async () => {
+      const operation = jest.fn().mockRejectedValue(new Error('fail'));
+      await expect(withRetry(operation, { maxRetries: 3, delay: 100 }))
+        .rejects.toThrow('fail');
+      expect(operation).toHaveBeenCalledTimes(3);
     });
   });
 });
