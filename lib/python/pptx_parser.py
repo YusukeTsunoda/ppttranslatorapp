@@ -294,8 +294,111 @@ def convert_coordinates(x: float, y: float, width: float, height: float,
     print(f"Final coordinates: {result}", file=sys.stderr)
     return result
 
-def extract_text_from_shape(shape):
-    """シェイプからテキストを抽出し、フォーマット情報も保持する"""
+def extract_text_from_shape(shape, parent_z_order=0, parent_position=None):
+    """シェイプからテキストを抽出し、フォーマット情報も保持する
+    
+    Args:
+        shape: シェイプオブジェクト
+        parent_z_order: 親要素のZ順序（グループ内の要素用）
+        parent_position: 親要素の位置情報（グループ内の要素用）
+        
+    Returns:
+        dict: テキスト情報を含む辞書、またはNone
+    """
+    # グループシェイプの場合は再帰的に処理
+    if isinstance(shape, GroupShape):
+        group_elements = []
+        try:
+            # グループ自体の位置情報を取得
+            group_position = {
+                'x': shape.left,
+                'y': shape.top,
+                'z_order': parent_z_order
+            }
+            
+            # グループ内の各シェイプを処理
+            for i, child in enumerate(shape.shapes):
+                # 子要素のZ順序は親のZ順序 + インデックスで計算
+                child_z_order = parent_z_order + i / 1000.0
+                child_element = extract_text_from_shape(child, child_z_order, group_position)
+                if child_element:
+                    group_elements.append(child_element)
+                    
+            if group_elements:
+                return {
+                    "type": "group",
+                    "elements": group_elements,
+                    "position": group_position
+                }
+            return None
+        except Exception as e:
+            logger.warning(f"Error extracting text from group shape: {str(e)}")
+            return None
+    
+    # テーブルの場合は特別な処理
+    if hasattr(shape, "table"):
+        try:
+            table_data = {
+                "type": "table",
+                "rows": [],
+                "position": {
+                    'x': shape.left,
+                    'y': shape.top,
+                    'z_order': parent_z_order
+                }
+            }
+            
+            # 各セルのテキストを抽出
+            for i, row in enumerate(shape.table.rows):
+                row_data = []
+                for j, cell in enumerate(row.cells):
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        # セル内のテキスト書式情報も抽出
+                        cell_paragraphs = []
+                        for p in cell.text_frame.paragraphs:
+                            if not p.text.strip():
+                                continue
+                                
+                            # 各ランのフォント情報を収集
+                            runs_info = []
+                            for run in p.runs:
+                                if not run.text.strip():
+                                    continue
+                                    
+                                font_info = extract_font_info(run)
+                                runs_info.append({
+                                    "text": run.text.strip(),
+                                    "font": font_info,
+                                    "index": run._rId
+                                })
+                                
+                            if runs_info:
+                                cell_paragraphs.append({
+                                    "text": p.text.strip(),
+                                    "style": extract_text_style(p),
+                                    "runs": runs_info
+                                })
+                                
+                        row_data.append({
+                            "text": cell_text,
+                            "paragraphs": cell_paragraphs,
+                            "position": {
+                                "row": i,
+                                "column": j
+                            }
+                        })
+                    else:
+                        row_data.append(None)  # 空のセル
+                        
+                table_data["rows"].append(row_data)
+                
+            return table_data
+        except Exception as e:
+            logger.warning(f"Error extracting text from table: {str(e)}")
+            # テーブル処理に失敗しても通常のテキスト抽出を試みる
+    
+    # 通常のテキスト抽出処理
     if not hasattr(shape, "text"):
         return None
     
@@ -303,47 +406,82 @@ def extract_text_from_shape(shape):
     if not text:
         return None
     
+    # シェイプのID、位置情報、サイズを取得
+    shape_id = getattr(shape, "shape_id", None)
+    left = getattr(shape, "left", 0)
+    top = getattr(shape, "top", 0)
+    width = getattr(shape, "width", 0)
+    height = getattr(shape, "height", 0)
+    
+    # 親要素の位置がある場合は相対位置を計算
+    if parent_position:
+        left += parent_position['x']
+        top += parent_position['y']
+    
     # テキスト情報を抽出
     text_info = {
         "text": text,
         "type": "text",
+        "shape_id": shape_id,
+        "position": {
+            "x": left,
+            "y": top,
+            "width": width,
+            "height": height,
+            "z_order": parent_z_order
+        }
     }
     
     # 可能であればフォント情報も抽出
     try:
         if hasattr(shape, "text_frame") and shape.text_frame:
+            # テキストフレームの自動調整設定を取得
+            if hasattr(shape.text_frame, "auto_size"):
+                text_info["auto_size"] = str(shape.text_frame.auto_size)
+                
+            # 縦書きかどうかを判定
+            if hasattr(shape.text_frame, "vertical"):
+                text_info["vertical"] = shape.text_frame.vertical
+            
             # パラグラフごとの処理
             paragraphs_info = []
-            for p in shape.text_frame.paragraphs:
+            for p_idx, p in enumerate(shape.text_frame.paragraphs):
                 if not p.text.strip():
                     continue
-                    
-                # フォントサイズやスタイル情報を取得
-                font_info = {}
-                if p.runs and p.runs[0].font:
-                    font = p.runs[0].font
-                    if font.size:
-                        # ポイント単位に変換（EMUから）
-                        font_size = font.size / 12700
-                        font_info["size"] = font_size
-                    if font.name:
-                        font_info["name"] = font.name
-                    if font.bold is not None:
-                        font_info["bold"] = font.bold
-                    if font.italic is not None:
-                        font_info["italic"] = font.italic
+                
+                # パラグラフのスタイル情報を取得
+                paragraph_style = extract_text_style(p)
+                
+                # 箇条書きスタイルを取得
+                bullet_style = extract_bullet_style(p)
+                if bullet_style:
+                    paragraph_style.update(bullet_style)
+                
+                # 各テキストランの処理
+                runs_info = []
+                for r_idx, run in enumerate(p.runs):
+                    if not run.text.strip():
+                        continue
+                        
+                    font_info = extract_font_info(run)
+                    runs_info.append({
+                        "text": run.text.strip(),
+                        "font": font_info,
+                        "index": r_idx
+                    })
                 
                 paragraphs_info.append({
                     "text": p.text.strip(),
-                    "font": font_info,
-                    "alignment": str(p.alignment) if p.alignment else "left"
+                    "style": paragraph_style,
+                    "runs": runs_info,
+                    "index": p_idx
                 })
             
             if paragraphs_info:
                 text_info["paragraphs"] = paragraphs_info
-    except Exception:
+    except Exception as e:
         # フォント情報の抽出に失敗しても続行
-        pass
+        logger.warning(f"Error extracting font info: {str(e)}")
         
     return text_info
 
@@ -389,7 +527,7 @@ def extract_metadata(presentation: Presentation) -> dict:
     
     return metadata
 
-def extract_font_info(run) -> dict:
+def extract_font_info(run):
     """
     テキストのフォント情報を抽出する
     
@@ -399,22 +537,57 @@ def extract_font_info(run) -> dict:
     Returns:
         dict: フォント情報
     """
-    font = run.font
-    return {
-        'name': font.name or 'Arial',
-        'size': font.size.pt if font.size else 12,
-        'color': f'#{font.color.rgb:06x}' if font.color and font.color.type == 'RGB' else '#000000',
-        'bold': bool(font.bold),
-        'italic': bool(font.italic),
-        'underline': bool(font.underline),
-        'strikethrough': bool(font.strike),
-        'superscript': bool(font.superscript),
-        'subscript': bool(font.subscript),
-        'characterSpacing': font.char_spacing or 0,
-        'kerning': bool(font.kerning)
-    }
+    font_info = {}
+    
+    try:
+        if run.font:
+            font = run.font
+            if font.size:
+                # EMUからポイントに変換
+                font_size = font.size / 12700
+                font_info["size"] = font_size
+                
+            if font.name:
+                font_info["name"] = font.name
+                
+            # フォントファミリー情報を追加
+            if hasattr(font, "_Font__family") and font._Font__family:
+                font_info["family"] = str(font._Font__family)
+                
+            # フォントの言語情報を追加
+            if hasattr(font, "_Font__charset") and font._Font__charset is not None:
+                font_info["charset"] = str(font._Font__charset)
+                
+            # 文字の計算方向を追加
+            if hasattr(font, "_Font__bidi") and font._Font__bidi is not None:
+                font_info["bidi"] = font._Font__bidi  # 右から左への書字方向
+                
+            # スタイル情報を追加
+            if font.bold is not None:
+                font_info["bold"] = font.bold
+                
+            if font.italic is not None:
+                font_info["italic"] = font.italic
+                
+            if font.underline is not None:
+                font_info["underline"] = font.underline
+                
+            if hasattr(font, "strike") and font.strike is not None:
+                font_info["strike"] = font.strike
+                
+            # 色情報を追加
+            if hasattr(font, "color") and font.color and hasattr(font.color, "rgb"):
+                font_info["color"] = safe_get_rgb(font.color)
+                
+            # ハイライト色情報を追加
+            if hasattr(font, "highlight_color") and font.highlight_color:
+                font_info["highlight_color"] = str(font.highlight_color)
+    except Exception as e:
+        logger.warning(f"Error extracting font info: {str(e)}")
+        
+    return font_info
 
-def extract_text_style(paragraph) -> dict:
+def extract_text_style(paragraph):
     """
     段落のスタイル情報を抽出する
     
@@ -424,22 +597,63 @@ def extract_text_style(paragraph) -> dict:
     Returns:
         dict: スタイル情報
     """
-    alignment_map = {
-        0: 'left',
-        1: 'center',
-        2: 'right',
-        3: 'justify'
-    }
+    style_info = {}
     
-    return {
-        'alignment': alignment_map.get(paragraph.alignment, 'left'),
-        'lineSpacing': paragraph.line_spacing or 1.0,
-        'indentation': paragraph.indent or 0,
-        'direction': 'rtl' if paragraph.rtl else 'ltr',
-        'bulletStyle': extract_bullet_style(paragraph)
-    }
+    try:
+        # 段落の配置
+        if paragraph.alignment:
+            style_info["alignment"] = str(paragraph.alignment)
+            
+        # 行間
+        if paragraph.line_spacing:
+            style_info["line_spacing"] = paragraph.line_spacing
+            
+        # 段落前の空き
+        if paragraph.space_before:
+            style_info["space_before"] = paragraph.space_before
+            
+        # 段落後の空き
+        if paragraph.space_after:
+            style_info["space_after"] = paragraph.space_after
+            
+        # インデント情報
+        if hasattr(paragraph, "level"):
+            style_info["level"] = paragraph.level
+            
+        # 左インデント
+        if hasattr(paragraph, "left_indent") and paragraph.left_indent is not None:
+            style_info["left_indent"] = paragraph.left_indent
+            
+        # 右インデント
+        if hasattr(paragraph, "right_indent") and paragraph.right_indent is not None:
+            style_info["right_indent"] = paragraph.right_indent
+            
+        # 最初の行のインデント
+        if hasattr(paragraph, "first_line_indent") and paragraph.first_line_indent is not None:
+            style_info["first_line_indent"] = paragraph.first_line_indent
+            
+        # 文字方向（右から左、左から右）
+        if hasattr(paragraph, "bidi") and paragraph.bidi is not None:
+            style_info["bidi"] = paragraph.bidi
+            
+        # 縦書きかどうか
+        if hasattr(paragraph, "vertical") and paragraph.vertical is not None:
+            style_info["vertical"] = paragraph.vertical
+            
+        # フォントの基本情報を取得（最初のランから）
+        if paragraph.runs and paragraph.runs[0].font:
+            base_font = paragraph.runs[0].font
+            if base_font.name:
+                style_info["font_name"] = base_font.name
+                
+            if base_font.size:
+                style_info["font_size"] = base_font.size / 12700  # EMUからポイントに変換
+    except Exception as e:
+        logger.warning(f"Error extracting text style: {str(e)}")
+        
+    return style_info
 
-def extract_bullet_style(paragraph) -> dict:
+def extract_bullet_style(paragraph):
     """
     箇条書きのスタイル情報を抽出する
     
@@ -449,14 +663,63 @@ def extract_bullet_style(paragraph) -> dict:
     Returns:
         dict: 箇条書きスタイル情報
     """
-    if not paragraph.bullet:
+    bullet_info = {}
+    
+    try:
+        # 箇条書きの有無を確認
+        has_bullet = False
+        if hasattr(paragraph, "bullet") and paragraph.bullet:
+            has_bullet = True
+        elif hasattr(paragraph, "level") and paragraph.level is not None and paragraph.level > 0:
+            # レベルが設定されている場合も箇条書きの可能性がある
+            has_bullet = True
+            
+        if not has_bullet:
+            return None
+            
+        bullet_info["has_bullet"] = True
+        
+        # 箇条書きのレベル
+        if hasattr(paragraph, "level"):
+            bullet_info["level"] = paragraph.level
+        
+        # 箇条書きの詳細情報を取得
+        if hasattr(paragraph, "bullet") and paragraph.bullet:
+            bullet = paragraph.bullet
+            
+            # 箇条書きの種類
+            bullet_info["type"] = 'number' if bullet.numbered else 'bullet'
+            
+            # 箇条書きの書式
+            if hasattr(bullet, "format"):
+                bullet_info["format"] = bullet.format
+                
+            # 開始番号
+            if hasattr(bullet, "start_num"):
+                bullet_info["start_at"] = bullet.start_num
+            
+            # 箇条書きの文字
+            if hasattr(bullet, "char") and bullet.char:
+                # Unicode正規化を適用して特殊文字を適切に処理
+                import unicodedata
+                bullet_info["char"] = unicodedata.normalize('NFKC', bullet.char)
+            
+            # 箇条書きのフォント
+            if hasattr(bullet, "font") and bullet.font:
+                bullet_info["font"] = bullet.font
+            
+            # 箇条書きの色
+            if hasattr(bullet, "color") and bullet.color:
+                bullet_info["color"] = safe_get_rgb(bullet.color)
+            
+            # 箇条書きのサイズ
+            if hasattr(bullet, "size") and bullet.size:
+                bullet_info["size"] = bullet.size / 12700  # EMUからポイントに変換
+    except Exception as e:
+        logger.warning(f"Error extracting bullet style: {str(e)}")
         return None
         
-    return {
-        'type': 'number' if paragraph.bullet.numbered else 'bullet',
-        'format': paragraph.bullet.format if hasattr(paragraph.bullet, 'format') else None,
-        'startAt': paragraph.bullet.start_num if hasattr(paragraph.bullet, 'start_num') else None
-    }
+    return bullet_info
 
 def extract_shape_info(shape) -> dict:
     """
@@ -639,7 +902,10 @@ def extract_background(slide) -> dict:
 
 def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True, 
              image_format: str = 'WEBP', image_quality: int = 85,
-             max_width: int = 1920, max_height: int = 1080) -> Dict[str, Any]:
+             max_width: int = 1920, max_height: int = 1080,
+             sort_elements: bool = True, extract_tables: bool = True,
+             extract_groups: bool = True, extract_smartart: bool = True,
+             improve_text_order: bool = True) -> Dict[str, Any]:
     """
     PPTXファイルを解析し、スライド情報を抽出する
     
@@ -651,11 +917,17 @@ def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True,
         image_quality (int): 画質 (0-100)
         max_width (int): 最大幅
         max_height (int): 最大高さ
+        sort_elements (bool): 要素をZ順序とレイアウト位置でソートするか
+        extract_tables (bool): テーブル内のテキストを抽出するか
+        extract_groups (bool): グループ内のテキストを抽出するか
+        extract_smartart (bool): SmartArt内のテキストを抽出するか
+        improve_text_order (bool): テキスト順序を改善するか
         
     Returns:
         Dict[str, Any]: 解析結果
     """
     try:
+        logger.info(f"Starting to parse PPTX file: {file_path}")
         # プレゼンテーションを開く
         presentation = Presentation(file_path)
         
@@ -671,6 +943,7 @@ def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True,
         )
         
         if not image_paths:
+            logger.error("Failed to convert slides to images")
             return {'error': 'Failed to convert slides to images'}
         
         # 結果を格納する辞書
@@ -683,7 +956,14 @@ def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True,
                     'width': image_size[0],
                     'height': image_size[1]
                 },
-                'optimized': optimize_images
+                'optimized': optimize_images,
+                'parser_version': '2.0',  # パーサーバージョンを追加
+                'extraction_options': {
+                    'tables': extract_tables,
+                    'groups': extract_groups,
+                    'smartart': extract_smartart,
+                    'improved_text_order': improve_text_order
+                }
             }
         }
         
@@ -694,11 +974,17 @@ def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True,
             logger.warning(f"Error extracting metadata: {str(e)}")
         
         # 各スライドを処理
+        total_slides = len(presentation.slides)
+        logger.info(f"Processing {total_slides} slides")
+        
         for i, (slide, image_path) in enumerate(zip(presentation.slides, image_paths)):
+            logger.info(f"Processing slide {i+1}/{total_slides}")
+            
             slide_data = {
                 'index': i,
                 'image_path': image_path,
                 'elements': [],
+                'text_elements': [],  # テキスト要素のみを格納する配列を追加
                 'background': extract_background(slide),
                 'size': {
                     'width': presentation.slide_width,
@@ -706,23 +992,100 @@ def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True,
                 }
             }
             
-            for shape in slide.shapes:
-                if hasattr(shape, "text") and shape.text.strip():
-                    text_data = extract_text_from_shape(shape)
+            # スライド内の全要素を処理
+            all_elements = []
+            for shape_idx, shape in enumerate(slide.shapes):
+                # Z順序を設定（スライド内の順序を使用）
+                z_order = shape_idx
+                
+                # テキスト要素の抽出
+                if hasattr(shape, "text") or isinstance(shape, GroupShape) or hasattr(shape, "table"):
+                    text_data = extract_text_from_shape(shape, z_order)
                     if text_data:
-                        slide_data['elements'].append(text_data)
-                        
+                        all_elements.append(text_data)
+                        # テキスト要素のみの配列にも追加
+                        if text_data.get("type") == "text" or text_data.get("type") == "table" or text_data.get("type") == "group":
+                            slide_data['text_elements'].append(text_data)
+                
+                # 非テキスト要素の情報も抽出
                 shape_info = extract_shape_info(shape)
                 if shape_info:
-                    slide_data['elements'].append(shape_info)
+                    all_elements.append(shape_info)
+            
+            # 要素をZ順序とレイアウト位置でソート
+            if sort_elements and all_elements:
+                # まずZ順序でソート
+                all_elements.sort(key=lambda x: x.get("position", {}).get("z_order", 0) if x.get("position") else 999999)
+                
+                # 読み順を改善する場合は、さらにレイアウト位置も考慮
+                if improve_text_order:
+                    # テキスト要素のみを抽出してレイアウト位置でソート
+                    text_elements = [elem for elem in all_elements if elem.get("type") in ["text", "table", "group"]]
                     
+                    # 縦書きテキストと横書きテキストを区別
+                    vertical_texts = []
+                    horizontal_texts = []
+                    other_elements = []
+                    
+                    for elem in text_elements:
+                        if elem.get("type") == "text" and elem.get("vertical"):
+                            vertical_texts.append(elem)
+                        elif elem.get("type") == "text":
+                            horizontal_texts.append(elem)
+                        else:
+                            other_elements.append(elem)
+                    
+                    # 横書きテキストは上から下、左から右の順でソート
+                    horizontal_texts.sort(key=lambda x: (x.get("position", {}).get("y", 0), x.get("position", {}).get("x", 0)))
+                    
+                    # 縦書きテキストは右から左、上から下の順でソート
+                    vertical_texts.sort(key=lambda x: (-x.get("position", {}).get("x", 0), x.get("position", {}).get("y", 0)))
+                    
+                    # ソートされたテキスト要素を結合
+                    sorted_text_elements = horizontal_texts + vertical_texts + other_elements
+                    
+                    # テキスト要素のみの配列を更新
+                    slide_data['text_elements'] = sorted_text_elements
+                    
+                    # 全要素の配列でテキスト要素を更新
+                    text_element_ids = {id(elem) for elem in sorted_text_elements}
+                    non_text_elements = [elem for elem in all_elements if id(elem) not in text_element_ids]
+                    all_elements = sorted_text_elements + non_text_elements
+            
+            # 処理済みの要素をスライドデータに追加
+            slide_data['elements'] = all_elements
+            
+            # 特殊文字や多言語テキストの処理を強化
+            for elem in slide_data['text_elements']:
+                if elem.get("type") == "text" and "text" in elem:
+                    # Unicode正規化を適用して特殊文字を適切に処理
+                    import unicodedata
+                    normalized_text = unicodedata.normalize('NFKC', elem["text"])
+                    elem["text"] = normalized_text
+                    
+                    # パラグラフ内のテキストも正規化
+                    if "paragraphs" in elem:
+                        for para in elem["paragraphs"]:
+                            if "text" in para:
+                                para["text"] = unicodedata.normalize('NFKC', para["text"])
+                            
+                            # ラン内のテキストも正規化
+                            if "runs" in para:
+                                for run in para["runs"]:
+                                    if "text" in run:
+                                        run["text"] = unicodedata.normalize('NFKC', run["text"])
+            
+            # スライドデータを結果に追加
             result['slides'].append(slide_data)
             
+        logger.info(f"Successfully processed all {total_slides} slides")
         return result
         
     except Exception as e:
-        print(f"Error parsing PPTX: {str(e)}", file=sys.stderr)
-        return {'error': str(e)}
+        logger.error(f"Error parsing PPTX: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {'error': str(e), 'traceback': traceback.format_exc()}
 
 def update_pptx_with_translations(
     original_file: str,
@@ -770,21 +1133,69 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PPTX Parser')
     parser.add_argument('file_path', help='Path to PPTX file')
     parser.add_argument('output_dir', help='Output directory')
-    parser.add_argument('--optimize', action='store_true', default=True, help='Optimize images')
-    parser.add_argument('--no-optimize', action='store_false', dest='optimize', help='Disable image optimization')
-    parser.add_argument('--format', choices=['PNG', 'WEBP', 'JPEG'], default='WEBP', help='Image format')
-    parser.add_argument('--quality', type=int, default=85, help='Image quality (0-100)')
-    parser.add_argument('--max-width', type=int, default=1920, help='Maximum image width')
-    parser.add_argument('--max-height', type=int, default=1080, help='Maximum image height')
+    
+    # 画像関連のオプション
+    image_group = parser.add_argument_group('Image options')
+    image_group.add_argument('--optimize', action='store_true', default=True, help='Optimize images')
+    image_group.add_argument('--no-optimize', action='store_false', dest='optimize', help='Disable image optimization')
+    image_group.add_argument('--format', choices=['PNG', 'WEBP', 'JPEG'], default='WEBP', help='Image format')
+    image_group.add_argument('--quality', type=int, default=85, help='Image quality (0-100)')
+    image_group.add_argument('--max-width', type=int, default=1920, help='Maximum image width')
+    image_group.add_argument('--max-height', type=int, default=1080, help='Maximum image height')
+    
+    # テキスト抽出関連のオプション
+    text_group = parser.add_argument_group('Text extraction options')
+    text_group.add_argument('--sort-elements', action='store_true', default=True, 
+                          help='Sort elements by Z-order and layout position')
+    text_group.add_argument('--no-sort-elements', action='store_false', dest='sort_elements', 
+                          help='Do not sort elements')
+    text_group.add_argument('--extract-tables', action='store_true', default=True, 
+                          help='Extract text from tables')
+    text_group.add_argument('--no-extract-tables', action='store_false', dest='extract_tables', 
+                          help='Do not extract text from tables')
+    text_group.add_argument('--extract-groups', action='store_true', default=True, 
+                          help='Extract text from grouped objects')
+    text_group.add_argument('--no-extract-groups', action='store_false', dest='extract_groups', 
+                          help='Do not extract text from grouped objects')
+    text_group.add_argument('--extract-smartart', action='store_true', default=True, 
+                          help='Extract text from SmartArt')
+    text_group.add_argument('--no-extract-smartart', action='store_false', dest='extract_smartart', 
+                          help='Do not extract text from SmartArt')
+    text_group.add_argument('--improve-text-order', action='store_true', default=True, 
+                          help='Improve text reading order')
+    text_group.add_argument('--no-improve-text-order', action='store_false', dest='improve_text_order', 
+                          help='Do not improve text reading order')
+    
+    # ログ関連のオプション
+    log_group = parser.add_argument_group('Logging options')
+    log_group.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
+    log_group.add_argument('--debug', action='store_true', help='Enable debug logging')
+    
     args = parser.parse_args()
+    
+    # ログレベルの設定
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+    elif args.verbose:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.WARNING)
     
     # 入力ファイルが存在するか確認
     if not os.path.exists(args.file_path):
+        logger.error(f"Input file '{args.file_path}' does not exist")
         print(f"Error: Input file '{args.file_path}' does not exist", file=sys.stderr)
         sys.exit(1)
         
     # 出力ディレクトリが存在しない場合は作成
     os.makedirs(args.output_dir, exist_ok=True)
+    
+    logger.info(f"Starting to parse PPTX file: {args.file_path}")
+    logger.info(f"Output directory: {args.output_dir}")
+    logger.info(f"Image options: format={args.format}, quality={args.quality}, optimize={args.optimize}")
+    logger.info(f"Text extraction options: sort_elements={args.sort_elements}, extract_tables={args.extract_tables}, " +
+               f"extract_groups={args.extract_groups}, extract_smartart={args.extract_smartart}, " +
+               f"improve_text_order={args.improve_text_order}")
     
     # PPTXファイルを解析
     result = parse_pptx(
@@ -794,10 +1205,23 @@ if __name__ == "__main__":
         image_format=args.format,
         image_quality=args.quality,
         max_width=args.max_width,
-        max_height=args.max_height
+        max_height=args.max_height,
+        sort_elements=args.sort_elements,
+        extract_tables=args.extract_tables,
+        extract_groups=args.extract_groups,
+        extract_smartart=args.extract_smartart,
+        improve_text_order=args.improve_text_order
     )
     
     # 結果を出力
     print(json.dumps(result, ensure_ascii=False, indent=2))
     
-    logger.info(f"Successfully processed {len(result.get('slides', []))} slides")
+    # 処理結果のサマリをログに出力
+    total_slides = len(result.get('slides', []))
+    total_text_elements = sum(len(slide.get('text_elements', [])) for slide in result.get('slides', []))
+    logger.info(f"Successfully processed {total_slides} slides with {total_text_elements} text elements")
+    
+    # エラーがあればログに出力
+    if 'error' in result:
+        logger.error(f"Error in parsing: {result['error']}")
+        sys.exit(1)
