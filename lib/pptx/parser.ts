@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { PythonShell } from 'python-shell';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position } from './types';
+import { PPTXParseResult, ParseAPIResponse, SlideContent, TextElement, Position, Metadata, Font, Background } from './types';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { createHash } from 'crypto';
@@ -114,13 +114,12 @@ export class PPTXParser {
     };
   }
 
-  private processMetadata(metadata: any): Record<string, any> {
-    // メタデータの検証と整形
-    const processedMetadata = {
+  private processMetadata(metadata: any): Metadata {
+    return {
       title: metadata.title || '',
       author: metadata.author || '',
-      created: metadata.created || '',
-      modified: metadata.modified || '',
+      created: metadata.created ? new Date(metadata.created).toISOString() : new Date().toISOString(),
+      modified: metadata.modified ? new Date(metadata.modified).toISOString() : new Date().toISOString(),
       company: metadata.company || '',
       version: metadata.version || '',
       lastModifiedBy: metadata.lastModifiedBy || '',
@@ -133,27 +132,6 @@ export class PPTXParser {
       presentationFormat: metadata.presentationFormat || 'widescreen',
       createdApplication: metadata.createdApplication || ''
     };
-
-    // 日付形式の検証と変換
-    if (processedMetadata.created) {
-      try {
-        const date = new Date(processedMetadata.created);
-        processedMetadata.created = date.toISOString();
-      } catch (error) {
-        console.warn('Invalid created date format:', error);
-      }
-    }
-
-    if (processedMetadata.modified) {
-      try {
-        const date = new Date(processedMetadata.modified);
-        processedMetadata.modified = date.toISOString();
-      } catch (error) {
-        console.warn('Invalid modified date format:', error);
-      }
-    }
-
-    return processedMetadata;
   }
 
   private processTextElements(texts: any[], slideIndex: number): TextElement[] {
@@ -211,7 +189,7 @@ export class PPTXParser {
     };
   }
 
-  private processFont(font: any): Record<string, any> {
+  private processFont(font: any): Font {
     return {
       name: font.name || 'Arial',
       size: font.size || 12,
@@ -244,7 +222,7 @@ export class PPTXParser {
     }));
   }
 
-  private processBackground(background: any): Record<string, any> {
+  private processBackground(background: any): Background {
     return {
       color: background?.color || '#FFFFFF',
       image: background?.image || null,
@@ -297,21 +275,22 @@ export class PPTXParser {
 
           return {
             index: slideIndex,
-<<<<<<< HEAD
-            imageUrl,
-            textElements: this.processTextElements(slide.texts || [], slideIndex),
-            shapes: this.processShapes(slide.shapes || []),
-            background: this.processBackground(slide.background)
-=======
-            imagePath: imageUrl,
+            imageUrl: imageUrl,
             textElements: slide.texts.map((textObj: any) => ({
               id: `text-${slideIndex}-${uuidv4().substring(0, 8)}`,
               text: textObj.text,
               position: textObj.position,
               type: textObj.type || 'text',
               fontInfo: textObj.paragraphs?.[0]?.font || {}
-            }))
->>>>>>> c58ec68 (実装途中)
+            })),
+            shapes: [],
+            background: {
+              color: '#FFFFFF',
+              image: null,
+              pattern: null,
+              gradient: null,
+              transparency: 0
+            }
           };
         });
       })
@@ -351,35 +330,6 @@ export class PPTXParser {
     }
   }
 
-<<<<<<< HEAD
-=======
-  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
-    if (!result || !result.slides || !Array.isArray(result.slides)) {
-      throw new Error('Invalid result format from Python script');
-    }
-
-    return {
-      metadata: {
-        ...result.metadata || {},
-        totalSlides: result.slides.length,
-        title: result.title || path.basename(inputPath),
-        lastModified: result.lastModified || new Date().toISOString()
-      },
-      slides: result.slides.map((slide: any, index: number) => ({
-        index,
-        imagePath: slide.imageUrl || slide.imagePath,
-        textElements: (slide.texts || []).map((textObj: any) => ({
-          id: `text-${index}-${uuidv4().substring(0, 8)}`,
-          text: textObj.text,
-          position: textObj.position,
-          type: textObj.type || 'text',
-          fontInfo: textObj.paragraphs?.[0]?.font || {}
-        }))
-      }))
-    };
-  }
-
->>>>>>> c58ec68 (実装途中)
   public async parsePPTX(inputPath: string, outputDir: string, forceReparse: boolean = false): Promise<PPTXParseResult> {
     try {
       // ファイルハッシュを計算

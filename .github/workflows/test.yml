@@ -1,28 +1,19 @@
-<<<<<<< HEAD
-name: Test Coverage
-
-on:
-  push:
-    branches: [ main, develop, feature/* ]
-=======
 name: Test
 
 on:
   push:
     branches: [ main, develop ]
->>>>>>> c58ec68 (実装途中)
   pull_request:
     branches: [ main, develop ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    
-    strategy:
-      matrix:
-        node-version: [18.x]
-=======
+    # Node.jsのバージョンはここで一元管理 (例: 18.x)
+    # もし複数のバージョンでテストしたい場合は、strategy.matrix を使用
+    # strategy:
+    #   matrix:
+    #     node-version: [16.x, 18.x]
 
     services:
       postgres:
@@ -32,96 +23,98 @@ jobs:
           POSTGRES_PASSWORD: testpass
           POSTGRES_DB: ppt_translator_test
         ports:
-          - 5433:5432
+          - 5433:5432 # ホストの5433番ポートをコンテナの5432番ポートにマッピング
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
->>>>>>> c58ec68 (実装途中)
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-<<<<<<< HEAD
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
-    - name: Get npm cache directory
-      id: npm-cache-dir
-      shell: bash
-      run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache-dir.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run tests with coverage
-      run: npm test -- --coverage
-      env:
-        CI: true
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        directory: ./coverage
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: true
-        verbose: true
-
-    - name: Save test execution time
-      run: |
-        echo "Test execution time: ${{ steps.test.outputs.time }}" >> $GITHUB_STEP_SUMMARY
-        echo "Coverage: ${{ steps.test.outputs.coverage }}" >> $GITHUB_STEP_SUMMARY
-
-    - name: Cache test results
-      uses: actions/cache@v3
-      with:
-        path: .jest-cache
-        key: ${{ runner.os }}-jest-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-jest- 
-=======
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
-        cache: 'npm'
+        node-version: '18.x' # 使用するNode.jsバージョンを指定 (matrixを使う場合は ${{ matrix.node-version }})
+        cache: 'npm' # npmのキャッシュを有効化
 
     - name: Install dependencies
       run: npm ci
 
-    - name: Setup environment variables
+    # --- ユニットテスト ---
+    - name: Run unit tests with coverage
+      id: unit-tests # ステップIDを付与 (必要に応じて)
+      run: npm test -- --coverage # package.jsonの 'test' スクリプトでカバレッジを生成すると仮定
+      env:
+        CI: true
+
+    - name: Upload unit test coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: ./coverage # 'npm test -- --coverage' の出力先
+        flags: unittests
+        name: codecov-umbrella # 必要であれば matrix.node-version などで区別
+        fail_ci_if_error: true
+        verbose: true
+
+    - name: Cache Jest test results
+      uses: actions/cache@v3
+      with:
+        path: .jest-cache
+        key: ${{ runner.os }}-jest-${{ hashFiles('**/package-lock.json') }} # 依存関係の変更でキーが変わるように
+        restore-keys: |
+          ${{ runner.os }}-jest-
+
+    # --- インテグレーション/E2Eテスト (データベースを使用するテスト) ---
+    - name: Setup environment variables for integration tests
       run: |
         echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5433/ppt_translator_test" >> .env.test
         echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> .env.test
         echo "NEXTAUTH_URL=http://localhost:3000" >> .env.test
         echo "NEXTAUTH_SECRET=test-secret" >> .env.test
+      # 環境変数はテストスクリプト内で直接参照するか、.env.test をテストランナーが読み込む想定
 
     - name: Run database migrations
       run: npx prisma migrate deploy
 
-    - name: Run tests
-      run: npm run test
+    - name: Run integration/E2E tests
+      id: integration-tests # ステップIDを付与 (必要に応じて)
+      run: npm run test # この 'test' スクリプトがデータベースを使用するテストを実行すると仮定
+                       # (例: npm run test:e2e など、専用のスクリプトがある場合はそれに変更)
+      env:
+        CI: true
+        # 必要に応じて、ここで .env.test を読み込む設定や、
+        # テストスクリプト内で環境変数を直接利用する
 
-    - name: Upload test results
-      if: always()
+    # --- テスト結果の集約とアップロード ---
+    - name: Summarize test information
+      if: always() # 常に実行
+      run: |
+        echo "### Test Summary" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.unit-tests.outcome }}" == "success" ]; then
+          echo "- ✅ Unit tests passed." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Unit tests failed." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- Unit test coverage uploaded to Codecov." >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ steps.integration-tests.outcome }}" == "success" ]; then
+          echo "- ✅ Integration/E2E tests passed." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Integration/E2E tests failed." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "Check artifacts for detailed reports (if generated)." >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload test artifacts
+      if: always() # テストの成否に関わらず常に実行
       uses: actions/upload-artifact@v3
       with:
-        name: test-results
+        name: test-results-node-18 # Nodeバージョンを名前に含めると分かりやすい
         path: |
-          coverage/
-          junit.xml 
->>>>>>> c58ec68 (実装途中)
+          coverage/   # ユニットテストのカバレッジレポート
+          junit.xml   # インテグレーション/E2EテストのJUnitレポート (生成されている場合)
+          # 他にもアップロードしたいテスト関連ファイルがあればここに追加
+        retention-days: 7 # (オプション) アーティファクトの保持日数

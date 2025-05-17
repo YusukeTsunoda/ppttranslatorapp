@@ -1,6 +1,5 @@
 import os from 'os';
 import { prisma } from '../prisma';
-import { PerformanceMetrics } from '@/lib/translation/performance';
 
 export interface SystemMetrics {
   cpuUsage: number;
@@ -14,28 +13,19 @@ export interface SystemMetrics {
 
 export class MetricsCollector {
   private static instance: MetricsCollector;
+  private metrics: SystemMetrics;
+  private listeners: ((metrics: SystemMetrics) => void)[] = [];
 
-  private constructor() {}
+  private constructor() {
+    this.metrics = this.initializeMetrics();
+    this.startCollecting();
+  }
 
   public static getInstance(): MetricsCollector {
     if (!MetricsCollector.instance) {
       MetricsCollector.instance = new MetricsCollector();
     }
     return MetricsCollector.instance;
-  }
-
-  public async collectSystemMetrics(): Promise<SystemMetrics> {
-    const cpuUsage = await this.getCPUUsage();
-    const memoryUsage = this.getMemoryUsage();
-    const diskUsage = await this.getDiskUsage();
-    const networkTraffic = await this.getNetworkTraffic();
-
-    return {
-      cpuUsage,
-      memoryUsage,
-      diskUsage,
-      networkTraffic,
-    };
   }
 
   private async getCPUUsage(): Promise<number> {
@@ -69,24 +59,6 @@ export class MetricsCollector {
       bytesOut: 0,
     };
   }
-}
-
-class MetricsCollector {
-  private static instance: MetricsCollector;
-  private metrics: SystemMetrics;
-  private listeners: ((metrics: SystemMetrics) => void)[] = [];
-
-  private constructor() {
-    this.metrics = this.initializeMetrics();
-    this.startCollecting();
-  }
-
-  static getInstance(): MetricsCollector {
-    if (!MetricsCollector.instance) {
-      MetricsCollector.instance = new MetricsCollector();
-    }
-    return MetricsCollector.instance;
-  }
 
   private initializeMetrics(): SystemMetrics {
     return {
@@ -101,16 +73,25 @@ class MetricsCollector {
   }
 
   private startCollecting(): void {
-    setInterval(() => {
-      this.collectSystemMetrics();
+    setInterval(async () => {
+      const metrics = await this.collectMetrics();
+      this.metrics = metrics;
       this.notifyListeners();
-    }, 5000); // 5秒ごとに収集
+    }, 5000);
   }
 
-  private collectSystemMetrics(): void {
-    this.collectSystemMetrics().then(metrics => {
-      this.metrics = metrics;
-    });
+  private async collectMetrics(): Promise<SystemMetrics> {
+    const cpuUsage = await this.getCPUUsage();
+    const memoryUsage = this.getMemoryUsage();
+    const diskUsage = await this.getDiskUsage();
+    const networkTraffic = await this.getNetworkTraffic();
+
+    return {
+      cpuUsage,
+      memoryUsage,
+      diskUsage,
+      networkTraffic,
+    };
   }
 
   recordRequest(success: boolean, latency: number): void {
