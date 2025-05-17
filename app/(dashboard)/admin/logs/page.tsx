@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/CardClientWrapper';
 import Link from 'next/link';
 
+// 動的レンダリングを明示的に指定
+export const dynamic = 'force-dynamic';
+
 console.log("=== [admin/logs/page.tsx] SSR実行 ===");
 console.log("imported Card:", Card);
 console.log("imported prisma:", prisma);
