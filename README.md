@@ -1,316 +1,399 @@
-# Next.js SaaS Starter
+# PowerPoint Translator App
 
-This is a starter template for building a SaaS application using **Next.js** with support for authentication, Stripe integration for payments, and a dashboard for logged-in users.
+PowerPoint Translator Appは、PowerPointプレゼンテーションの翻訳を自動化するウェブアプリケーションです。このアプリケーションを使用すると、PowerPointファイルをアップロードし、AIを活用した高品質な翻訳を適用して、翻訳されたバージョンをダウンロードすることができます。
 
-**Demo: [https://next-saas-start.vercel.app/](https://next-saas-start.vercel.app/)**
+## 主な機能
 
-## Features
+- PowerPointファイルのアップロードとパース
+- スライド内のテキスト抽出と翻訳
+- 翻訳されたPowerPointファイルの生成
+- 翻訳履歴の管理
+- ユーザー認証と権限管理
+- 多言語サポート
 
-- Marketing landing page (`/`) with animated Terminal element
-- Pricing page (`/pricing`) which connects to Stripe Checkout
-- Dashboard pages with CRUD operations on users/teams
-- Basic RBAC with Owner and Member roles
-- Subscription management with Stripe Customer Portal
-- Email/password authentication with JWTs stored to cookies
-- Global middleware to protect logged-in routes
-- Local middleware to protect Server Actions or validate Zod schemas
-- Activity logging system for any user events
+## 技術スタック
 
-## Tech Stack
+### フロントエンド
+- Next.js 14
+- React 18
+- Tailwind CSS
+- shadcn/ui
+- SWR
 
-- **Framework**: [Next.js](https://nextjs.org/)
-- **Database**: [Postgres](https://www.postgresql.org/)
-- **ORM**: [Drizzle](https://orm.drizzle.team/)
-- **Payments**: [Stripe](https://stripe.com/)
-- **UI Library**: [shadcn/ui](https://ui.shadcn.com/)
+### バックエンド
+- Next.js API Routes
+- Prisma ORM
+- PostgreSQL
+- NextAuth.js
 
-## Getting Started
+### インフラストラクチャ
+- Vercel (本番環境)
+- Supabase (データベース)
+- AWS S3 (ファイルストレージ)
 
+## 開発環境のセットアップ
+
+### 前提条件
+- Node.js 20.x以上
+- npm 9.x以上
+- PostgreSQL 15.x以上
+
+### インストール手順
+
+1. リポジトリをクローンする
 ```bash
-git clone https://github.com/nextjs/saas-starter
-cd saas-starter
-pnpm install
+git clone https://github.com/yourusername/ppttranslatorapp.git
+cd ppttranslatorapp
 ```
 
-## Running Locally
-
-Use the included setup script to create your `.env` file:
-
+2. 依存関係をインストールする
 ```bash
-pnpm db:setup
+npm install
 ```
 
-Then, run the database migrations and seed the database with a default user and team:
-
+3. 環境変数を設定する
 ```bash
-pnpm db:migrate
-pnpm db:seed
+cp .env.example .env.local
+```
+`.env.local`ファイルを編集して、必要な環境変数を設定してください。
+
+4. データベースをセットアップする
+```bash
+npx prisma migrate dev
 ```
 
-This will create the following user and team:
-
-- User: `test@test.com`
-- Password: `admin123`
-
-You can, of course, create new users as well through `/sign-up`.
-
-Finally, run the Next.js development server:
-
+5. 開発サーバーを起動する
 ```bash
-pnpm dev
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the app in action.
+アプリケーションは`http://localhost:3000`で実行されます。
 
-Optionally, you can listen for Stripe webhooks locally through their CLI to handle subscription change events:
+## 環境変数
 
-```bash
-stripe listen --forward-to localhost:3000/api/stripe/webhook
+アプリケーションを実行するには、以下の環境変数を設定する必要があります：
+
+### 認証関連
+- `NEXTAUTH_URL`: NextAuth.jsのURL（開発環境では`http://localhost:3000`）
+- `NEXTAUTH_SECRET`: NextAuth.jsのシークレットキー
+- `GOOGLE_CLIENT_ID`: GoogleログインのクライアントID
+- `GOOGLE_CLIENT_SECRET`: Googleログインのクライアントシークレット
+
+### データベース関連
+- `DATABASE_URL`: PostgreSQLデータベースの接続URL
+
+### ファイルストレージ関連
+- `AWS_ACCESS_KEY_ID`: AWS S3アクセスキーID
+- `AWS_SECRET_ACCESS_KEY`: AWS S3シークレットアクセスキー
+- `AWS_REGION`: AWS S3リージョン
+- `AWS_BUCKET_NAME`: AWS S3バケット名
+
+### 翻訳API関連
+- `TRANSLATION_API_KEY`: 翻訳APIのキー
+- `TRANSLATION_API_ENDPOINT`: 翻訳APIのエンドポイント
+
+## プロジェクト構造
+
+```
+ppttranslatorapp/
+├── app/
+│   ├── (marketing)/
+│   │   ├── layout.tsx      # マーケティングページ用のレイアウト
+│   │   ├── page.tsx        # トップページ
+│   │   └── pricing/
+│   │       └── page.tsx    # プライシングページ
+│   ├── (auth)/
+│   │   ├── signin/         # サインインページ
+│   │   │   └── page.tsx
+│   │   ├── signup/         # サインアップページ
+│   │   │   └── page.tsx
+│   │   └── reset-password/ # パスワードリセット
+│   │       ├── page.tsx
+│   │       └── confirm/
+│   │           └── page.tsx
+│   ├── (dashboard)/
+│   │   ├── translate/      # 翻訳機能ページ
+│   │   │   ├── page.tsx
+│   │   │   └── components/ # 翻訳ページ固有コンポーネント
+│   │   ├── activity/       # アクティビティページ
+│   │   ├── history/        # 履歴ページ
+│   │   ├── profile/        # プロフィールページ
+│   │   ├── settings/       # 設定ページ
+│   │   │   └── subscription/ # サブスクリプション設定
+│   │   ├── checkout/       # 決済ページ
+│   │   ├── integrations/   # 連携設定ページ
+│   │   └── admin/          # 管理者ページ
+│   │       ├── logs/       # ログ管理
+│   │       ├── statistics/ # 統計情報
+│   │       └── users/      # ユーザー管理
+│   ├── api/                # APIエンドポイント
+│   │   ├── auth/           # 認証関連API
+│   │   │   ├── [...nextauth]/  # NextAuth.js設定
+│   │   │   ├── login/      # ログインAPI
+│   │   │   ├── signup/     # サインアップAPI
+│   │   │   ├── session/    # セッション管理API
+│   │   │   └── reset-password/ # パスワードリセットAPI
+│   │   ├── pptx/           # PowerPoint関連API
+│   │   │   ├── parse/      # PPTXパース処理
+│   │   │   └── generate/   # PPTX生成処理
+│   │   ├── translate/      # 翻訳処理API
+│   │   ├── translations/   # 翻訳データ管理API
+│   │   │   └── save/       # 翻訳保存API
+│   │   ├── stripe/         # 決済関連API
+│   │   │   ├── checkout/   # 決済処理API
+│   │   │   └── webhook/    # Stripeウェブフック
+│   │   ├── upload/         # ファイルアップロードAPI
+│   │   ├── download/       # ファイルダウンロードAPI
+│   │   ├── history/        # 履歴管理API
+│   │   ├── activity/       # アクティビティ管理API
+│   │   ├── user/           # ユーザー管理API
+│   │   └── admin/          # 管理者用API
+│   ├── layout.tsx          # アプリ全体のレイアウト
+│   └── page.tsx            # ルートページ
+├── components/             # 共通コンポーネント
+│   ├── ui/                 # UIコンポーネント
+│   ├── auth/               # 認証関連コンポーネント
+│   ├── dashboard/          # ダッシュボード関連コンポーネント
+│   ├── forms/              # フォームコンポーネント
+│   ├── modals/             # モーダルコンポーネント
+│   └── layout/             # レイアウトコンポーネント
+├── lib/                    # ユーティリティ関数とヘルパー
+│   ├── db/                 # データベース関連
+│   │   └── prisma.ts       # Prismaクライアント
+│   ├── auth/               # 認証関連
+│   ├── api/                # API関連
+│   ├── utils/              # ユーティリティ関数
+│   ├── pptx/               # PowerPoint処理関連
+│   └── translation/        # 翻訳処理関連
+├── public/                 # 静的ファイル
+│   ├── images/             # 画像ファイル
+│   ├── fonts/              # フォントファイル
+│   └── favicon.ico         # ファビコン
+├── styles/                 # スタイル関連
+│   └── globals.css         # グローバルスタイル
+├── prisma/                 # Prisma関連
+│   ├── schema.prisma       # データベーススキーマ
+│   └── migrations/         # マイグレーションファイル
+├── middleware.ts           # Next.jsミドルウェア
+├── next.config.js          # Next.js設定
+├── tailwind.config.js      # Tailwind CSS設定
+├── tsconfig.json           # TypeScript設定
+├── package.json            # パッケージ設定
+└── README.md               # プロジェクト説明
 ```
 
-## Testing Payments
+## API仕様
 
-To test Stripe payments, use the following test card details:
+### 認証API
 
-- Card Number: `4242 4242 4242 4242`
-- Expiration: Any future date
-- CVC: Any 3-digit number
+#### POST /api/auth/login
+ユーザーログイン
 
-## Testing and CI/CD
+リクエスト:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
 
-This project includes comprehensive testing and CI/CD setup using GitHub Actions.
+レスポンス:
+```json
+{
+  "user": {
+    "id": "user_id",
+    "name": "User Name",
+    "email": "user@example.com"
+  },
+  "token": "jwt_token"
+}
+```
 
-### Running Tests Locally
+#### POST /api/auth/signup
+ユーザー登録
 
+リクエスト:
+```json
+{
+  "name": "User Name",
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+レスポンス:
+```json
+{
+  "user": {
+    "id": "user_id",
+    "name": "User Name",
+    "email": "user@example.com"
+  },
+  "token": "jwt_token"
+}
+```
+
+### 翻訳API
+
+#### POST /api/pptx/parse
+PowerPointファイルのパース
+
+リクエスト: `multipart/form-data`
+- `file`: PowerPointファイル
+
+レスポンス:
+```json
+{
+  "id": "file_id",
+  "slides": [
+    {
+      "id": "slide_id",
+      "index": 0,
+      "texts": [
+        {
+          "id": "text_id",
+          "content": "テキスト内容",
+          "position": { "x": 100, "y": 200 }
+        }
+      ],
+      "image": "slide_image_url"
+    }
+  ]
+}
+```
+
+#### POST /api/translate
+テキスト翻訳
+
+リクエスト:
+```json
+{
+  "texts": [
+    {
+      "id": "text_id",
+      "content": "翻訳するテキスト"
+    }
+  ],
+  "sourceLanguage": "ja",
+  "targetLanguage": "en"
+}
+```
+
+レスポンス:
+```json
+{
+  "translations": [
+    {
+      "id": "text_id",
+      "original": "翻訳するテキスト",
+      "translated": "Text to be translated"
+    }
+  ]
+}
+```
+
+#### POST /api/pptx/generate
+翻訳済みPowerPointファイルの生成
+
+リクエスト:
+```json
+{
+  "fileId": "file_id",
+  "translations": [
+    {
+      "textId": "text_id",
+      "translation": "翻訳されたテキスト"
+    }
+  ]
+}
+```
+
+レスポンス:
+```json
+{
+  "downloadUrl": "download_url"
+}
+```
+
+## テスト
+
+### ユニットテスト
 ```bash
-# Run Jest unit tests
 npm run test
-
-# Run Jest tests with coverage report
-npm run test:coverage
-
-# Run Jest tests with HTML report generation
-npm run test:report
-
-# Run Cypress E2E tests
-npm run cypress:run
-
-# Run Cypress tests with HTML report generation
-npm run cypress:report
-
-# Run all tests (lint, unit tests with coverage, and E2E tests)
-npm run test:all
-
-# Clean up all report directories
-npm run reports:clean
-
-# Create report directories
-npm run reports:create-dirs
 ```
 
-### Test Reports
-
-When running tests, HTML reports are automatically generated in the following locations:
-
-- **Jest Test Report**: `reports/jest-report.html`
-- **Coverage Report**: `coverage/lcov-report/index.html`
-- **Cypress Test Report**: `cypress/reports/report.html`
-
-These reports provide detailed information about test results, failures, and code coverage.
-
-### CI/CD Pipeline
-
-The project uses GitHub Actions for continuous integration and deployment:
-
-1. **Lint and Test**: Runs ESLint and Jest tests with coverage reports
-2. **E2E Tests**: Runs Cypress tests with screenshots and video recording
-3. **Build and Deploy**: Builds the Next.js application and deploys to Vercel (on main branch only)
-
-The CI/CD pipeline automatically:
-- Generates test coverage reports
-- Creates HTML test reports for both Jest and Cypress tests
-- Captures and analyzes screenshots on test failures
-- Optimizes test execution with caching and parallel runs
-
-To manually trigger the CI/CD workflow, go to the Actions tab in your GitHub repository and select the workflow to run.
-
-## Going to Production
-
-When you're ready to deploy your SaaS application to production, follow these steps:
-
-### Set up a production Stripe webhook
-
-1. Go to the Stripe Dashboard and create a new webhook for your production environment.
-2. Set the endpoint URL to your production API route (e.g., `https://yourdomain.com/api/stripe/webhook`).
-3. Select the events you want to listen for (e.g., `checkout.session.completed`, `customer.subscription.updated`).
-
-### Deploy to Vercel
-
-1. Push your code to a GitHub repository.
-2. Connect your repository to [Vercel](https://vercel.com/) and deploy it.
-3. Follow the Vercel deployment process, which will guide you through setting up your project.
-
-### Add environment variables
-
-In your Vercel project settings (or during deployment), add all the necessary environment variables. Make sure to update the values for the production environment, including:
-
-1. `BASE_URL`: Set this to your production domain.
-2. `STRIPE_SECRET_KEY`: Use your Stripe secret key for the production environment.
-3. `STRIPE_WEBHOOK_SECRET`: Use the webhook secret from the production webhook you created in step 1.
-4. `POSTGRES_URL`: Set this to your production database URL.
-5. `AUTH_SECRET`: Set this to a random string. `openssl rand -base64 32` will generate one.
-
-## Other Templates
-
-While this template is intentionally minimal and to be used as a learning resource, there are other paid versions in the community which are more full-featured:
-
-- https://achromatic.dev
-- https://shipfa.st
-- https://makerkit.dev
-
-stripe link is under construction.
-
-# CI/CD構築について
-
-## 概要
-
-GitHub Actionsを使用した自動CI/CDパイプラインを実装しました。このパイプラインは以下の機能を提供します：
-
-- **コード品質チェック**: ESLint、TypeScript型チェック、Prettierによるコードフォーマットチェック
-- **自動テスト実行**: ユニットテストとE2Eテストの自動実行
-- **テストレポート生成**: 詳細なテスト結果レポートとカバレッジレポートの自動生成
-- **ビルド＆デプロイ自動化**: 本番環境へのVercelデプロイの自動化
-- **通知機能**: Slackへのデプロイ結果通知
-
-## ワークフローの詳細
-
-### 1. コード品質チェックワークフロー
-
-```yaml
-jobs:
-  code-quality:
-    name: Code Quality Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run ESLint
-        id: eslint
-        run: npm run lint
-      - name: TypeScript type check
-        id: tsc
-        run: npx tsc --noEmit
-      - name: Prettier Check
-        id: prettier
-        run: npx prettier --check "**/*.{js,jsx,ts,tsx}"
+### E2Eテスト
+```bash
+npm run test:e2e
 ```
 
-### 2. テスト自動実行ワークフロー
+## CI/CD
 
-```yaml
-jobs:
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: code-quality
-    steps:
-      - name: Run unit tests with coverage
-        id: unit_tests
-        run: npm run test:ci
-        
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - name: Run Cypress tests
-        id: cypress
-        uses: cypress-io/github-action@v6
-```
+CI/CDを正常に動作させるためには、以下の環境変数をGitHubシークレットに設定する必要があります：
 
-### 3. ビルド＆デプロイ自動化
-
-```yaml
-jobs:
-  build-and-deploy:
-    name: Build and Deploy
-    runs-on: ubuntu-latest
-    needs: [unit-tests, e2e-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    steps:
-      - name: Build Next.js
-        run: npm run build
-      - name: Deploy to Vercel
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-```
-
-## スケジュール実行
-
-- **CI/CDパイプライン**: 毎週日曜日の午前0時に自動実行
-- **E2Eテスト**: 毎週月曜日と木曜日の午前0時に自動実行
-
-## テストレポート
-
-自動生成される主なレポート：
-
-1. **コード品質レポート**: ESLint、TypeScript、Prettierのチェック結果
-2. **ユニットテストレポート**: テスト結果とカバレッジ情報
-3. **E2Eテストレポート**: テスト結果、スクリーンショット、ビデオ
-4. **失敗分析レポート**: テスト失敗時の詳細分析
-5. **実行時間分析**: テスト実行パフォーマンス分析
-
-## 使用方法
-
-### 手動でワークフローを実行
-
-1. GitHubリポジトリの「Actions」タブに移動
-2. 実行したいワークフロー（「CI/CD Pipeline」または「E2E Tests」）を選択
-3. 「Run workflow」ボタンをクリック
-4. 必要に応じてブランチを選択して「Run workflow」をクリック
-
-### テストレポートの確認
-
-1. ワークフロー実行後、「Artifacts」セクションにレポートが表示されます
-2. 以下のレポートがダウンロード可能です：
-   - `code-quality-report`
-   - `test-reports`
-   - `cypress-results-{run_id}`
-   - `e2e-failures-{run_id}`（テスト失敗時のみ）
-   - `test-timing-{run_id}`
-   - `test-summary-{run_id}`
-   - `deployment-summary`（デプロイ時のみ）
-
-## 環境変数の設定
-
-CI/CDを正常に動作させるためには、以下の環境変数をGitHubリポジトリの「Settings」→「Secrets and variables」→「Actions」に設定する必要があります：
-
-- `DATABASE_URL`: データベース接続URL
-- `NEXTAUTH_URL`: Next.js認証用URL
-- `NEXTAUTH_SECRET`: Next.js認証用シークレット
-- `BASE_URL`: アプリケーションのベースURL
-- `STRIPE_SECRET_KEY`: Stripe APIキー
 - `VERCEL_TOKEN`: Vercelデプロイトークン
-- `SLACK_WEBHOOK`: Slack通知用Webhook URL（オプション）
+- `VERCEL_ORG_ID`: VercelのOrganization ID
+- `VERCEL_PROJECT_ID`: VercelのProject ID
+- `DATABASE_URL`: テスト用データベースのURL
 - `TEST_USER_EMAIL`: E2Eテスト用のユーザーメールアドレス
 - `TEST_USER_PASSWORD`: E2Eテスト用のユーザーパスワード
 
-# テスト自動化の実装
+# バッチ翻訳機能の実装
 
 ## 実装内容
-- ユニットテストの作成（実装済み）
-- 統合テストの作成
-- エッジケースのテスト
-- CI/CDパイプラインへの統合
-- 様々なサイズのPPTXファイルでのテスト実装
-- パフォーマンステストの自動化
+- 複数ファイルの一括アップロード
+- バックグラウンド処理の実装
+- 進捗状況の表示
 
 ## フェーズ
-1. テスト計画の策定
-   - テスト対象機能と範囲の明確化
-   - 優先度の高いテストケースの特定
-2. テスト実装
-   - 統合テストの作成
-   - エッジケースのテスト実装
-   - 様々なサイズのPPTXファイルを使用したテスト
-   - パフォーマンステストの自動化スクリプト作成
-3. CI/CD統合
-   - テストの自動実行パイプラインへの組み込み
-   - テスト結果レポート自動生成の設定
+1. 設計フェーズ
+   - バッチ処理アーキテクチャの設計
+   - ジョブキュー管理システムの選定
+   - フロントエンドUIの設計
+2. 実装フェーズ
+   - 複数ファイルアップロード機能の実装
+   - バックグラウンド処理システムの実装
+   - 進捗状況の管理と表示機能の実装
+   - ジョブステータス監視システムの構築
+3. テストフェーズ
+   - 大量ファイルでの負荷テスト
+   - 長時間実行のエラー耐性テスト
+   - ユーザーインターフェース使用感テスト
+
+# テキスト抽出の改善
+
+## 実装内容
+- 複雑なテキストレイアウトの処理改善
+- 特殊文字や多言語テキストのサポート強化
+- テキスト順序の正確な保持
+
+## フェーズ
+1. 現状の問題分析
+   - 複雑なレイアウトでの抽出精度の評価
+   - 多言語テキスト対応状況の確認
+   - テキスト順序の正確性検証
+2. 改善実装
+   - テキスト抽出アルゴリズムの改良
+   - 特殊文字処理の強化
+   - テキスト順序保持のためのロジック改善
+   - 多言語テキストサポートの拡充
+
+# クエリパラメータによるサーバーサイドフィルタリング
+
+## 実装内容
+- フィルタリングパラメータの設計
+- クエリパーサーの設計
+- データベースクエリビルダーの実装
+
+## フェーズ
+1. 設計フェーズ
+   - フィルタリングパラメータの設計
+   - クエリパーサーの設計
+2. 実装フェーズ
+   - クエリパラメータ解析機能の実装
+   - データベースクエリビルダーの実装
+   - レスポンスフォーマットの最適化
+3. セキュリティ強化
+   - インジェクション対策の実装
+   - パラメータバリデーションの強化
+   - アクセス制御の実装
