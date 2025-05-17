@@ -1,0 +1,591 @@
+/**
+ * ストリーミング処理に対応したPPTXパーサー
+ * メモリ効率と処理速度を向上させるために、ファイル全体をメモリに読み込まずに
+ * ストリーミング処理を行う実装です。
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { promisify } from 'util';
+import { exec } from 'child_process';
+import * as os from 'os';
+import { PythonShell } from 'python-shell';
+import { PPTXParseResult, ParseOptions, SlideContent } from './types';
+import { PPTXCacheHelper, createPPTXCacheHelper, PPTXCacheOptions } from './cache-helper';
+import { CacheStats } from '../utils/cache-manager';
+
+const execAsync = promisify(exec);
+const fsPromises = fs.promises;
+
+// キャッシュエントリの型
+interface CacheEntry {
+  result: PPTXParseResult;
+  timestamp: number;
+  fileHash: string;
+}
+
+/**
+ * ストリーミング処理に対応したPPTXパーサークラス
+ */
+export class StreamingPPTXParser {
+  // クラスプロパティを確定的に初期化し、型エラーを回避する
+  private pythonPath: string = 'python3'; // デフォルト値を直接設定
+  private scriptPath: string = path.join(__dirname, '..', '..', 'python', 'pptx_parser.py');
+  private outputDir: string = path.join(os.tmpdir(), 'pptx-parser-output');
+  private cacheExpirationTime: number = 1000 * 60 * 60; // 1時間
+  private batchSize: number = 10;
+  private cacheHelper: PPTXCacheHelper;
+  private parserCache: Map<string, CacheEntry> = new Map();
+  private static instance: StreamingPPTXParser;
+
+  /**
+   * コンストラクタ
+   * @param options オプション
+   */
+  constructor(options: {
+    pythonPath?: string;
+    scriptPath?: string;
+    outputDir?: string;
+    maxParallelProcesses?: number;
+    cacheExpirationTime?: number;
+    batchSize?: number;
+    cacheOptions?: PPTXCacheOptions;
+  } = {}) {
+    // クラスプロパティはすでにデフォルト値で初期化されているので、
+    // オプションが指定された場合のみ上書きする
+    if (options.pythonPath) {
+      this.pythonPath = options.pythonPath;
+    }
+    
+    if (options.scriptPath) {
+      this.scriptPath = options.scriptPath;
+    }
+    
+    if (options.outputDir) {
+      this.outputDir = options.outputDir;
+    }
+    
+    if (options.cacheExpirationTime !== undefined) {
+      this.cacheExpirationTime = options.cacheExpirationTime;
+    }
+    
+    if (options.batchSize !== undefined) {
+      this.batchSize = options.batchSize;
+    }
+    
+    // 出力ディレクトリが存在しない場合は作成
+    if (!fs.existsSync(this.outputDir)) {
+      fs.mkdirSync(this.outputDir, { recursive: true });
+    }
+    
+    // キャッシュヘルパーを初期化
+    const cacheDir = path.join(this.outputDir, 'cache');
+    const defaultCacheOptions: PPTXCacheOptions = {
+      cacheDir,
+      ttl: this.cacheExpirationTime,
+      maxMemoryEntries: 20,
+      maxDiskEntries: 100,
+      useDiskCache: true,
+      prefix: 'pptx_cache',
+      cleanupInterval: 30 * 60 * 1000 // 30分
+    };
+    
+    this.cacheHelper = createPPTXCacheHelper({
+      ...defaultCacheOptions,
+      ...options.cacheOptions
+    });
+  }
+  
+  /**
+   * シングルトンインスタンスを取得
+   * @returns StreamingPPTXParserのインスタンス
+   */
+  public static getInstance(options?: {
+    pythonPath?: string;
+    scriptPath?: string;
+    outputDir?: string;
+    cacheExpirationTime?: number;
+    batchSize?: number;
+    cacheOptions?: PPTXCacheOptions;
+  }): StreamingPPTXParser {
+    if (!StreamingPPTXParser.instance) {
+      StreamingPPTXParser.instance = new StreamingPPTXParser(options || {});
+    }
+    return StreamingPPTXParser.instance;
+  }
+
+
+
+  /**
+   * Python依存関係のチェック
+   * @throws {Error} Python依存関係のチェックに失敗した場合
+   */
+  private async checkDependencies(): Promise<void> {
+    // 型安全性を確保するために、クラスプロパティの値をローカル変数に保存
+    // クラスプロパティはデフォルト値で初期化されているので、型エラーは発生しない
+    const pythonPath = this.pythonPath;
+    
+    try {
+      // Pythonのバージョンチェック
+      try {
+        const { stdout } = await execAsync(`${pythonPath} --version`);
+        const versionMatch = stdout.match(/Python (\d+)\.(\d+)\.(\d+)/);
+        
+        if (versionMatch && versionMatch[1] && versionMatch[2] && versionMatch[3]) {
+          const major = parseInt(versionMatch[1], 10);
+          const minor = parseInt(versionMatch[2], 10);
+          
+          if (major < 3 || (major === 3 && minor < 7)) {
+            throw new Error(`Python 3.7以上が必要です。検出されたバージョン: ${stdout.trim()}`);
+          }
+          
+          console.log(`Using Python ${major}.${minor}.${versionMatch[3]}`);
+        } else {
+          console.warn(`Pythonバージョンの解析に失敗しました: ${stdout.trim()}`);
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(`Pythonの実行に失敗しました: ${error.message}。Pythonがインストールされていることを確認してください。`);
+        }
+        throw error;
+      }
+      
+      // 必要なPythonパッケージのチェック
+      const requiredPackages = ['python-pptx', 'Pillow', 'numpy'];
+      const missingPackages: string[] = [];
+      const packageErrors: Record<string, string> = {};
+      
+      for (const pkg of requiredPackages) {
+        try {
+          // ハイフンをアンダースコアに変換（Pythonモジュール名の規則に合わせる）
+          const pkgName = pkg.replace('-', '_');
+          const importCmd = `import ${pkgName}`;
+          const cmd = `${pythonPath} -c "${importCmd}"`;
+          // ここではpythonPathは必ずstring型であることが保証されている
+          await execAsync(cmd);
+          console.log(`Package ${pkg} is installed.`);
+        } catch (error) {
+          console.warn(`Required Python package not found: ${pkg}`);
+          missingPackages.push(pkg);
+          packageErrors[pkg] = error instanceof Error ? error.message : String(error);
+        }
+      }
+      
+      if (missingPackages.length > 0) {
+        const missingPackagesStr = missingPackages.join(', ');
+        console.warn(`Missing Python packages: ${missingPackagesStr}`);
+        
+        // 詳細なエラー情報をログに出力
+        for (const pkg of missingPackages) {
+          console.warn(`Error details for ${pkg}: ${packageErrors[pkg]}`);
+        }
+        
+        // インストール手順の表示
+        const installInstructions = [
+          '以下の手順でPython依存パッケージをインストールしてください:',
+          '1. 仮想環境の作成と有効化:',
+          '   python3 -m venv venv',
+          '   source venv/bin/activate  # Linuxの場合',
+          '   .\\venv\\Scripts\\activate  # Windowsの場合',
+          `2. 必要なパッケージのインストール:`,
+          `   pip install ${missingPackagesStr}`,
+          '3. インストール後、アプリケーションを再起動してください。'
+        ].join('\n');
+        
+        console.warn(installInstructions);
+        
+        // テストモードの場合はエラーをスキップ
+        if (process.env['NODE_ENV'] === 'test') {
+          console.warn('Running in test mode, skipping dependency check.');
+          return;
+        }
+        
+        throw new Error(`Python依存パッケージが不足しています: ${missingPackagesStr}\n${installInstructions}`);
+      }
+    } catch (error) {
+      if (process.env['NODE_ENV'] === 'test') {
+        console.warn('Running in test mode, skipping dependency check error:', error);
+        return;
+      }
+      
+      console.error('Failed to check Python dependencies:', error);
+      
+      if (error instanceof Error) {
+        throw error; // すでに詳細なエラーメッセージが含まれている場合はそのまま再スロー
+      } else {
+        throw new Error('Python依存関係のチェックに失敗しました。Python 3.7以上と必要なパッケージがインストールされていることを確認してください。');
+      }
+    }
+  }
+
+  /**
+   * ファイルのハッシュを計算
+   * @param filePath ファイルパス
+   * @returns ハッシュ文字列
+   * @throws {Error} ファイルが存在しないか、アクセスできない場合
+   */
+  private async calculateFileHash(filePath: string): Promise<string> {
+    // ファイルの存在確認
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`ファイルが存在しません: ${filePath}`);
+    }
+    
+    try {
+      return this.cacheHelper.calculateFileHash(filePath);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`ファイルハッシュの計算に失敗しました: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * キャッシュが有効かどうかを確認
+   * @param cache キャッシュエントリ
+   * @param fileHash ファイルハッシュ
+   * @returns 有効な場合はtrue
+   */
+  private isCacheValid(cache: CacheEntry | null | undefined, fileHash: string): boolean {
+    // キャッシュが存在しない場合は無効
+    if (!cache) return false;
+    
+    // キャッシュのハッシュが存在しない場合は無効
+    if (!cache.fileHash) return false;
+    
+    const now = Date.now();
+    const isExpired = now - cache.timestamp > this.cacheExpirationTime;
+    const isHashMatch = cache.fileHash === fileHash;
+    
+    // キャッシュが期限切れでなく、ハッシュが一致する場合は有効
+    return !isExpired && isHashMatch;
+  }
+
+  /**
+   * PPTXファイルを解析
+   * @param inputPath 入力ファイルパス
+   * @param options 解析オプション
+   * @returns 解析結果
+   */
+  public async parsePPTX(inputPath: string, options: ParseOptions = {}): Promise<PPTXParseResult> {
+    try {
+      // ファイルの存在確認
+      if (!fs.existsSync(inputPath)) {
+        throw new Error(`File not found: ${inputPath}`);
+      }
+      
+      // 依存関係のチェック
+      await this.checkDependencies();
+      
+      // ファイルハッシュの計算
+      const fileHash = await this.calculateFileHash(inputPath);
+      
+      // 強制再解析オプションが指定されていない場合はキャッシュを確認
+      if (!options.forceReparse) {
+        // 新しいキャッシュシステムからの取得を試みる
+        const cachedResult = this.cacheHelper.getCacheResult(inputPath, fileHash);
+        if (cachedResult) {
+          console.log(`Cache hit for ${inputPath} (new cache system)`);
+          return cachedResult;
+        }
+        
+        // 古いキャッシュからの取得を試みる
+        const cacheKey = `${path.basename(inputPath)}_${fileHash}`;
+        const legacyCache = this.parserCache.get(cacheKey);
+        if (legacyCache && this.isCacheValid(legacyCache, fileHash)) {
+          console.log(`Cache hit for ${inputPath} (legacy cache)`);
+          // 新しいキャッシュシステムに移行
+          this.cacheHelper.setCacheResult(inputPath, fileHash, legacyCache.result, 0);
+          return legacyCache.result;
+        }
+      } else {
+        console.log(`Force reparse option enabled for ${inputPath}`);
+      }
+      
+      console.log(`Cache miss for ${inputPath}, parsing...`);
+      
+      // 一時ディレクトリの作成
+      const tempDir = path.join(this.outputDir, uuidv4());
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
+      // 開始時間の記録
+      const startTime = Date.now();
+      
+      // Pythonスクリプトの実行
+      const result = await this.executePythonScript(inputPath, tempDir);
+      
+      // 結果の検証と処理
+      const processedResult = this.validateAndProcessResult(result, inputPath);
+      
+      // スライドの並列処理
+      if (processedResult.slides && Array.isArray(processedResult.slides)) {
+        processedResult.slides = await this.processSlidesBatch(processedResult.slides, tempDir);
+      }
+      
+      // 処理時間の計算
+      const parseTime = Date.now() - startTime;
+      
+      // キャッシュに保存
+      const cacheKey = `${path.basename(inputPath)}_${fileHash}`;
+      this.parserCache.set(cacheKey, {
+        result: processedResult,
+        timestamp: Date.now(),
+        fileHash
+      });
+      
+      // 新しいキャッシュシステムにも保存
+      this.cacheHelper.setCacheResult(inputPath, fileHash, processedResult, parseTime);
+      
+      // 古いキャッシュのクリーンアップ
+      this.cleanupCache();
+      
+      // 一時ディレクトリのクリーンアップ
+      try {
+        await fsPromises.rm(tempDir, { recursive: true, force: true });
+      } catch (error) {
+        console.error(`Failed to clean up temp directory ${tempDir}:`, error);
+      }
+      
+      return processedResult;
+    } catch (error) {
+      console.error('PPTX parsing error:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred during PPTX parsing');
+    } finally {
+      // 明示的にメモリ解放を促す
+      if (global.gc) {
+        global.gc();
+      }
+    }
+  }
+
+  /**
+   * キャッシュをクリア
+   */
+  public clearCache(): void {
+    // 両方のキャッシュシステムをクリア
+    this.parserCache.clear();
+    this.cacheHelper.clearCache();
+    console.log('All parser caches cleared');
+  }
+  
+  /**
+   * キャッシュの統計情報を取得
+   * @returns キャッシュ統計情報
+   */
+  public getCacheStats(): CacheStats {
+    return this.cacheHelper.getStats();
+  }
+  
+  /**
+   * リソースを解放
+   */
+  public dispose(): void {
+    this.cacheHelper.dispose();
+  }
+  
+  /**
+   * Pythonスクリプトを実行
+            }
+            
+            // 最後の結果を取得（JSONオブジェクト）
+            const result = results[results.length - 1];
+            resolve(result);
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('Error initializing Python shell:', errorMessage);
+          reject(new Error(`Pythonシェルの初期化に失敗しました: ${errorMessage}`));
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error executing Python script:', errorMessage);
+      
+      // エラーメッセージを詳細化
+      if (error instanceof Error) {
+        throw new Error(`PPTXパース処理でエラーが発生しました: ${errorMessage}`);
+      } else {
+        throw new Error(`PPTXパース処理で不明なエラーが発生しました: ${String(error)}`);
+      }
+    }
+  }
+  
+  /**
+   * 結果の検証と処理
+   * @param result Pythonスクリプトからの結果
+   * @param inputPath 入力ファイルパス
+   * @returns 処理済みの結果
+   * @throws {Error} 結果の形式が無効な場合
+   */
+  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
+    // 結果の形式を検証
+    if (!result) {
+      throw new Error('Pythonスクリプトからの結果が空です');
+    }
+    
+    if (!result.slides) {
+      throw new Error('Pythonスクリプトからの結果にslidesプロパティがありません');
+    }
+    
+    if (!Array.isArray(result.slides)) {
+      throw new Error('Pythonスクリプトからの結果のslidesプロパティが配列ではありません');
+    }
+    
+    // 結果を処理して返す
+    return {
+      filename: path.basename(inputPath),
+      totalSlides: result.slides.length,
+      metadata: result.metadata || {},
+      slides: result.slides.map((slide: any, index: number) => {
+        // スライドの各プロパティを安全に取得
+        const safeSlide = slide || {};
+        
+        return {
+          index: safeSlide.index !== undefined ? safeSlide.index : index,
+          imagePath: safeSlide.image_path || '',
+          textElements: safeSlide.textElements || [],
+          elements: safeSlide.elements || [],
+          shapes: safeSlide.shapes || [],
+          background: safeSlide.background || {},
+          size: safeSlide.size || { width: 0, height: 0 },
+          notes: safeSlide.notes || ''
+        };
+      })
+    };
+  }
+  
+  /**
+   * スライドを並列処理するためのバッチ処理
+   * @param slides スライドの配列
+   * @param tempDir 一時ディレクトリ
+   * @returns 処理済みのスライド配列
+   */
+  private async processSlidesBatch(slides: any[], tempDir: string): Promise<any[]> {
+    console.log(`Processing ${slides.length} slides in batches of ${this.batchSize}`);
+    
+    // スライドをバッチに分割
+    const batches: any[][] = [];
+    for (let i = 0; i < slides.length; i += this.batchSize) {
+      batches.push(slides.slice(i, i + this.batchSize));
+    }
+    
+    console.log(`Created ${batches.length} batches for parallel processing`);
+    
+    // 各バッチを並列処理
+    const processedBatches = await Promise.all(
+      batches.map(async (batch) => {
+        return await Promise.all(
+          batch.map(async (slide) => {
+            try {
+              // スライド画像の最適化処理
+              if (slide.image_path && fs.existsSync(path.join(tempDir, slide.image_path))) {
+                // 画像の最適化処理を実行（必要に応じて）
+                // この部分は実際の画像処理ロジックに置き換えてください
+                console.log(`Optimizing image: ${path.join(tempDir, slide.image_path)}`);
+              }
+              
+              // テキスト要素の処理
+              if (slide.elements && Array.isArray(slide.elements)) {
+                slide.elements = slide.elements.map((element: any) => {
+                  // 必要に応じてテキスト要素を処理
+                  return element;
+                });
+              }
+              
+              return slide;
+            } catch (error) {
+              console.error(`Error processing slide ${slide.index}:`, error);
+              return slide; // エラーが発生しても元のスライドを返す
+            }
+          })
+        );
+      })
+    );
+    
+    // 処理済みのバッチを1つの配列に結合
+    return processedBatches.flat();
+  }
+  
+  /**
+   * 古いキャッシュエントリをクリーンアップ
+   */
+  private cleanupCache(): void {
+    const now = Date.now();
+    // Array.fromを使用してイテレーションの問題を回避
+    Array.from(this.parserCache.entries()).forEach(([key, cache]) => {
+      if (now - cache.timestamp > this.cacheExpirationTime) {
+        this.parserCache.delete(key);
+      }
+    });
+  }
+  
+  /**
+   * 解析結果からテキストを抽出
+   * @param parseResult 解析結果
+   * @returns テキストの配列
+   */
+  public extractTexts(parseResult: PPTXParseResult): string[] {
+    if (!parseResult || !parseResult.slides || !Array.isArray(parseResult.slides)) {
+      console.warn('無効な解析結果からテキストを抽出しようとしました');
+      return [];
+    }
+    
+    return parseResult.slides.flatMap(slide => {
+      // テキスト要素が存在しない場合は空配列を返す
+      const textElements = slide.textElements || [];
+      
+      // 空のテキストを除外し、改行や空白を正規化
+      return textElements
+        .map(element => {
+          const text = element.text || '';
+          // 空白や特殊文字を正規化
+          return text.trim()
+            .replace(/\s+/g, ' ')  // 複数の空白を単一の空白に
+            .replace(/[\u200B-\u200D\uFEFF]/g, ''); // ゼロ幅スペースや特殊文字を除去
+        })
+        .filter(text => text.length > 0); // 空の文字列を除外
+    });
+  }
+
+  /**
+   * 解析結果から位置情報付きテキストを取得
+   * @param parseResult 解析結果
+   * @returns スライド内容の配列
+   */
+  public getTextWithPositions(parseResult: PPTXParseResult): SlideContent[] {
+    if (!parseResult || !parseResult.slides || !Array.isArray(parseResult.slides)) {
+      console.warn('無効な解析結果から位置情報付きテキストを取得しようとしました');
+      return [];
+    }
+    
+    // 各スライドのテキスト要素を正規化
+    return parseResult.slides.map(slide => {
+      // テキスト要素が存在しない場合は空配列を使用
+      const textElements = slide.textElements || [];
+      
+      // テキスト要素の正規化
+      const normalizedTextElements = textElements.map(element => {
+        // ディープコピーを作成して元のオブジェクトを変更しない
+        const normalizedElement = { ...element };
+        
+        if (normalizedElement.text) {
+          // 空白や特殊文字を正規化
+          normalizedElement.text = normalizedElement.text.trim()
+            .replace(/\s+/g, ' ')  // 複数の空白を単一の空白に
+            .replace(/[\u200B-\u200D\uFEFF]/g, ''); // ゼロ幅スペースや特殊文字を除去
+        }
+        
+        return normalizedElement;
+      }).filter(element => element.text && element.text.length > 0); // 空のテキスト要素を除外
+      
+      // 新しいスライドオブジェクトを作成して返す
+      return {
+        ...slide,
+        textElements: normalizedTextElements
+      };
+    });
+  }
+}

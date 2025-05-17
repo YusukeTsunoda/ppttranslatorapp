@@ -3,11 +3,12 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PPTXParser } from '@/lib/pptx/parser';
+import { StreamingPPTXParser } from '@/lib/pptx/streaming-parser';
 import { auth } from '@/lib/auth/auth';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
 
 // アップロードされるファイルの最大サイズ（20MB）
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -15,11 +16,23 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 // 許可するファイルタイプ
 const ALLOWED_FILE_TYPES = ['application/vnd.openxmlformats-officedocument.presentationml.presentation'];
 
+// バッファをストリームに変換する関数
+function bufferToStream(buffer: Buffer): Readable {
+  const readable = new Readable();
+  readable._read = () => {}; // _read メソッドを実装する必要がある
+  readable.push(buffer);
+  readable.push(null);
+  return readable;
+}
+
 export async function POST(req: NextRequest) {
   let tempDir: string | undefined;
-  let tempFilePath: string | undefined;
 
   try {
+    // 処理開始時間を記録
+    const startTime = Date.now();
+    console.log(`[${new Date().toISOString()}] PPTXパース処理開始`);
+    
     // 認証チェック
     const session = await auth();
     if (!session) {
@@ -45,23 +58,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'ファイルサイズは20MB以下にしてください' }, { status: 400 });
     }
 
+    console.log(`[${new Date().toISOString()}] ファイルサイズ: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+
     // 一時ディレクトリの作成
     tempDir = path.join(process.cwd(), 'tmp', uuidv4());
     await fs.mkdir(tempDir, { recursive: true });
 
-    // 一時ファイルの作成
+    // ファイルをバッファに変換
     const buffer = Buffer.from(await file.arrayBuffer());
-    tempFilePath = path.join(tempDir, 'input.pptx');
-    await fs.writeFile(tempFilePath, buffer);
+    
+    // バッファをストリームに変換
+    const fileStream = bufferToStream(buffer);
 
-    // PPTXパーサーのインスタンスを取得
-    const parser = PPTXParser.getInstance();
+    // ストリーミングPPTXパーサーのインスタンスを取得
+    const parser = StreamingPPTXParser.getInstance();
 
-    // ファイルを解析
-    const result = await parser.parsePPTX(tempFilePath, tempDir);
+    // ストリームからファイルを解析
+    console.log(`[${new Date().toISOString()}] ストリーミングパーサーによる解析開始`);
+    const result = await parser.parsePPTXStream(fileStream, tempDir);
+    console.log(`[${new Date().toISOString()}] ストリーミングパーサーによる解析完了`);
+
+    // 処理時間を計算
+    const processingTime = Date.now() - startTime;
+    console.log(`[${new Date().toISOString()}] PPTXパース処理完了: ${processingTime}ms (${(processingTime / 1000).toFixed(2)}秒)`);
 
     // 結果を返す
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      processingTime,
+      processingTimeSeconds: processingTime / 1000
+    });
   } catch (error) {
     console.error('PPTXファイルの処理中にエラーが発生しました:', error);
     return NextResponse.json(
@@ -72,20 +98,18 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   } finally {
-    // 一時ファイルとディレクトリの削除
-    if (tempFilePath) {
-      try {
-        await fs.unlink(tempFilePath);
-      } catch (error) {
-        console.error('一時ファイルの削除に失敗しました:', error);
-      }
-    }
+    // 一時ディレクトリの削除
     if (tempDir) {
       try {
         await fs.rm(tempDir, { recursive: true });
       } catch (error) {
         console.error('一時ディレクトリの削除に失敗しました:', error);
       }
+    }
+    
+    // 明示的にガベージコレクションを促す
+    if (global.gc) {
+      global.gc();
     }
   }
 }

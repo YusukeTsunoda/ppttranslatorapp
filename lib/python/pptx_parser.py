@@ -1,26 +1,47 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
 import sys
 import json
-import os
-from pptx import Presentation
-from typing import List, Dict, Any
-import subprocess
+import argparse
 from pdf2image import convert_from_path
+import subprocess
+import logging
+from typing import List, Dict, Any, Tuple, Optional, Union
+from pptx import Presentation
+from pptx.shapes.autoshape import Shape
+from pptx.shapes.group import GroupShape
+from pptx.shapes.picture import Picture
+from pptx.shapes.placeholder import PlaceholderGraphicFrame
+# 同じディレクトリにあるimage_optimizerモジュールをインポート
+from lib.python.image_optimizer import optimize_image, batch_optimize, get_optimal_format
 
-def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[int, int]]:
+# ロギング設定
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('pptx_parser')
+
+def convert_to_png(pptx_path: str, output_dir: str, optimize: bool = True, 
+                  format: str = 'WEBP', quality: int = 85, 
+                  max_width: int = 1920, max_height: int = 1080) -> tuple[List[str], tuple[int, int]]:
     """
-    PPTXの各スライドをPNG画像に変換する
+    PPTXの各スライドをPNG画像に変換し、必要に応じて最適化する
     
     Args:
         pptx_path (str): PPTXファイルのパス
         output_dir (str): 出力ディレクトリ
+        optimize (bool): 画像最適化を行うかどうか
+        format (str): 出力画像形式 ('PNG', 'WEBP', 'JPEG')
+        quality (int): 画質 (0-100)
+        max_width (int): 最大幅
+        max_height (int): 最大高さ
     
     Returns:
         tuple[List[str], tuple[int, int]]: 画像パスのリストと画像サイズ
     """
     try:
         # デバッグ出力を追加
-        print(f"Starting convert_to_png: pptx_path={pptx_path}, output_dir={output_dir}", file=sys.stderr)
+        logger.info(f"Starting convert_to_png: pptx_path={pptx_path}, output_dir={output_dir}")
         
         # 出力ディレクトリが存在しない場合は作成
         os.makedirs(output_dir, exist_ok=True)
@@ -29,12 +50,12 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
         pptx_name = os.path.splitext(os.path.basename(pptx_path))[0]
         pdf_path = os.path.join(output_dir, f"{pptx_name}.pdf")
         
-        print(f"Converting PPTX to PDF: output={pdf_path}", file=sys.stderr)
+        logger.info(f"Converting PPTX to PDF: output={pdf_path}")
         
         if sys.platform == "darwin":  # macOS
             # LibreOfficeのパスを確認
             libreoffice_path = subprocess.run(["which", "soffice"], capture_output=True, text=True).stdout.strip()
-            print(f"LibreOffice path: {libreoffice_path}", file=sys.stderr)
+            logger.info(f"LibreOffice path: {libreoffice_path}")
             
             result = subprocess.run(
                 [libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", output_dir, pptx_path],
@@ -42,12 +63,12 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
                 text=True
             )
             
-            print(f"LibreOffice conversion result: returncode={result.returncode}", file=sys.stderr)
-            print(f"LibreOffice stdout: {result.stdout}", file=sys.stderr)
-            print(f"LibreOffice stderr: {result.stderr}", file=sys.stderr)
+            logger.info(f"LibreOffice conversion result: returncode={result.returncode}")
+            logger.debug(f"LibreOffice stdout: {result.stdout}")
+            logger.debug(f"LibreOffice stderr: {result.stderr}")
             
             if result.returncode != 0:
-                print(f"LibreOffice conversion failed with code {result.returncode}", file=sys.stderr)
+                logger.error(f"LibreOffice conversion failed with code {result.returncode}")
                 return [], (0, 0)
         else:  # Linux
             result = subprocess.run(
@@ -56,20 +77,17 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
                 text=True
             )
             if result.returncode != 0:
+                logger.error(f"LibreOffice conversion failed with code {result.returncode}")
                 return [], (0, 0)
 
         if not os.path.exists(pdf_path):
-            print(f"PDF file not found at {pdf_path}", file=sys.stderr)
+            logger.error(f"PDF file not found at {pdf_path}")
             return [], (0, 0)
             
-        print(f"PDF file created successfully: {pdf_path}", file=sys.stderr)
+        logger.info(f"PDF file created successfully: {pdf_path}")
             
-        # PDFを画像に変換（16:9のアスペクト比を保持）
+        # PDFを画像に変換（アスペクト比を保持）
         try:
-            # 高解像度で変換（1920x1080のサイズ）
-            target_width = 1920
-            target_height = int(target_width * 9 / 16)  # 1080px
-            
             # popplerのパスを確認
             poppler_path = None
             if sys.platform == "darwin":  # macOS
@@ -79,80 +97,125 @@ def convert_to_png(pptx_path: str, output_dir: str) -> tuple[List[str], tuple[in
                     poppler_path = "/usr/local/bin"
                 
                 # パスの存在確認
-                print(f"Checking poppler path: {poppler_path}", file=sys.stderr)
+                logger.debug(f"Checking poppler path: {poppler_path}")
                 if os.path.exists(os.path.join(poppler_path, "pdftoppm")):
-                    print(f"pdftoppm found at {os.path.join(poppler_path, 'pdftoppm')}", file=sys.stderr)
+                    logger.debug(f"pdftoppm found at {os.path.join(poppler_path, 'pdftoppm')}")
                 else:
-                    print(f"pdftoppm NOT found at {os.path.join(poppler_path, 'pdftoppm')}", file=sys.stderr)
+                    logger.warning(f"pdftoppm NOT found at {os.path.join(poppler_path, 'pdftoppm')}")
                     # 環境変数PATHからpoppler関連コマンドを探す
                     for path_dir in os.environ.get('PATH', '').split(':'):
                         if os.path.exists(os.path.join(path_dir, 'pdftoppm')):
                             poppler_path = path_dir
-                            print(f"Found pdftoppm in PATH: {os.path.join(path_dir, 'pdftoppm')}", file=sys.stderr)
+                            logger.info(f"Found pdftoppm in PATH: {os.path.join(path_dir, 'pdftoppm')}")
                             break
             
-            print(f"Using poppler_path: {poppler_path}", file=sys.stderr)
-            print(f"Converting PDF to images with size: {target_width}x{target_height}", file=sys.stderr)
+            logger.info(f"Using poppler_path: {poppler_path}")
+            logger.info(f"Converting PDF to images with target size: {max_width}x{max_height}")
             
             # 高品質設定でPDFを画像に変換
             images = convert_from_path(
                 pdf_path, 
-                size=(target_width, target_height),
+                size=(max_width, max_height),
                 poppler_path=poppler_path,
                 dpi=300,  # 高解像度
-                fmt="png",  # PNG形式で出力
+                fmt="png",  # PNG形式で出力（後で最適化）
                 transparent=False,  # 透明度なし
                 use_cropbox=True,  # クロップボックスを使用
                 strict=False  # 厳密なエラーチェックを無効化
             )
             
-            print(f"Converted {len(images)} images from PDF", file=sys.stderr)
+            logger.info(f"Converted {len(images)} images from PDF")
             
             if not images:
-                print("No images were converted from PDF", file=sys.stderr)
+                logger.error("No images were converted from PDF")
                 return [], (0, 0)
                 
             # 実際の画像サイズを取得
             actual_width = images[0].width
             actual_height = images[0].height
-            print(f"Actual image size: {actual_width}x{actual_height}", file=sys.stderr)
+            logger.info(f"Actual image size: {actual_width}x{actual_height}")
             
         except Exception as e:
-            print(f"Error converting PDF to images: {str(e)}", file=sys.stderr)
+            logger.error(f"Error converting PDF to images: {str(e)}")
             return [], (0, 0)
         
-        image_paths = []
+        # 一時的な画像パスを生成（最適化前）
+        temp_image_paths = []
         for i, image in enumerate(images):
-            image_path = os.path.join(output_dir, f"slide_{i+1}.png")
-            # 高品質で保存
+            temp_image_path = os.path.join(output_dir, f"temp_slide_{i+1}.png")
             try:
                 # 保存前にディレクトリが存在することを確認
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                os.makedirs(os.path.dirname(temp_image_path), exist_ok=True)
                 
-                # 高品質で保存
-                image.save(image_path, "PNG", quality=95, optimize=True)
+                # 一時的に高品質PNGで保存
+                image.save(temp_image_path, "PNG", optimize=True)
                 
-                # 保存後にファイルが存在することを確認
-                if os.path.exists(image_path):
-                    print(f"Successfully saved image: {image_path}", file=sys.stderr)
+                if os.path.exists(temp_image_path):
+                    logger.debug(f"Saved temporary image: {temp_image_path}")
+                    temp_image_paths.append(temp_image_path)
                 else:
-                    print(f"Warning: Image file not found after save: {image_path}", file=sys.stderr)
-                
-                rel_path = f"slide_{i+1}.png"
-                image_paths.append(rel_path)
+                    logger.warning(f"Warning: Temporary image file not found: {temp_image_path}")
             except Exception as e:
-                print(f"Error saving image {i+1}: {str(e)}", file=sys.stderr)
+                logger.error(f"Error saving temporary image {i+1}: {str(e)}")
         
+        # 画像の最適化処理
+        image_paths = []
+        if optimize and temp_image_paths:
+            logger.info(f"Optimizing {len(temp_image_paths)} images to format: {format}, quality: {quality}")
+            
+            # 最適化結果を格納するディレクトリ
+            optimized_dir = os.path.join(output_dir, "optimized")
+            os.makedirs(optimized_dir, exist_ok=True)
+            
+            # 画像を最適化
+            optimization_results = batch_optimize(
+                input_paths=temp_image_paths,
+                output_dir=optimized_dir,
+                format=format,
+                quality=quality,
+                max_width=max_width,
+                max_height=max_height
+            )
+            
+            # 最適化された画像パスを収集
+            for i, result in enumerate(optimization_results):
+                if 'error' not in result:
+                    # 相対パスを生成
+                    rel_path = os.path.relpath(result['path'], output_dir)
+                    image_paths.append(rel_path)
+                    logger.info(f"Optimized image {i+1}: {result['path']}")
+                    logger.info(f"  Size reduction: {result['original']['size']} -> {result['optimized']['size']} bytes")
+                    logger.info(f"  Compression ratio: {result['optimized']['compression_ratio']:.2f}%")
+                else:
+                    logger.error(f"Error optimizing image {i+1}: {result.get('error', 'Unknown error')}")
+            
+            # 一時ファイルを削除
+            for temp_path in temp_image_paths:
+                try:
+                    os.remove(temp_path)
+                    logger.debug(f"Removed temporary file: {temp_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove temporary file {temp_path}: {str(e)}")
+        else:
+            # 最適化しない場合は一時ファイルをそのまま使用
+            for i, temp_path in enumerate(temp_image_paths):
+                # 相対パスを生成
+                rel_path = os.path.relpath(temp_path, output_dir)
+                image_paths.append(rel_path)
+                logger.info(f"Using non-optimized image: {temp_path}")
+        
+        # PDFファイルを削除
         try:
             os.remove(pdf_path)
-        except Exception:
-            pass
+            logger.debug(f"Removed temporary PDF file: {pdf_path}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temporary PDF file: {str(e)}")
         
-        print(f"Returning {len(image_paths)} image paths", file=sys.stderr)
+        logger.info(f"Returning {len(image_paths)} image paths")
         return image_paths, (actual_width, actual_height)
         
     except Exception as e:
-        print(f"Exception in convert_to_png: {str(e)}", file=sys.stderr)
+        logger.error(f"Exception in convert_to_png: {str(e)}")
         return [], (0, 0)
 
 def convert_coordinates(x: float, y: float, width: float, height: float, 
@@ -296,22 +359,32 @@ def extract_metadata(presentation: Presentation) -> dict:
     """
     core_props = presentation.core_properties
     
+    # 安全に属性にアクセスするヘルパー関数
+    def safe_get_attr(obj, attr_name, default=None):
+        try:
+            value = getattr(obj, attr_name)
+            if attr_name in ['created', 'modified'] and value:
+                return value.isoformat()
+            return value or default
+        except (AttributeError, TypeError):
+            return default
+    
     metadata = {
-        'title': core_props.title or '',
-        'author': core_props.author or '',
-        'created': core_props.created.isoformat() if core_props.created else '',
-        'modified': core_props.modified.isoformat() if core_props.modified else '',
-        'company': core_props.company or '',
-        'version': core_props.version or '',
-        'lastModifiedBy': core_props.last_modified_by or '',
-        'revision': core_props.revision or 0,
-        'subject': core_props.subject or '',
-        'keywords': core_props.keywords.split(',') if core_props.keywords else [],
-        'category': core_props.category or '',
-        'description': core_props.description or '',
-        'language': core_props.language or 'ja-JP',
+        'title': safe_get_attr(core_props, 'title', ''),
+        'author': safe_get_attr(core_props, 'author', ''),
+        'created': safe_get_attr(core_props, 'created', ''),
+        'modified': safe_get_attr(core_props, 'modified', ''),
+        'company': safe_get_attr(core_props, 'company', ''),
+        'version': safe_get_attr(core_props, 'version', ''),
+        'lastModifiedBy': safe_get_attr(core_props, 'last_modified_by', ''),
+        'revision': safe_get_attr(core_props, 'revision', 0),
+        'subject': safe_get_attr(core_props, 'subject', ''),
+        'keywords': safe_get_attr(core_props, 'keywords', '').split(',') if safe_get_attr(core_props, 'keywords') else [],
+        'category': safe_get_attr(core_props, 'category', ''),
+        'description': safe_get_attr(core_props, 'description', ''),
+        'language': safe_get_attr(core_props, 'language', 'ja-JP'),
         'presentationFormat': 'widescreen' if presentation.slide_width > 9144000 else 'standard',
-        'createdApplication': core_props.application or ''
+        'createdApplication': safe_get_attr(core_props, 'application', '')
     }
     
     return metadata
@@ -407,7 +480,7 @@ def extract_shape_info(shape) -> dict:
         'fillColor': extract_fill_color(shape),
         'strokeColor': extract_line_color(shape),
         'strokeWidth': shape.line.width if shape.line else 1,
-        'opacity': shape.fill.transparency if shape.fill else 1
+        'opacity': 1  # python-pptxの最新バージョンではtransparency属性が存在しないため、固定値を使用
     }
     
     # 円の場合は半径を追加
@@ -420,6 +493,30 @@ def extract_shape_info(shape) -> dict:
         
     return base_info
 
+def safe_get_rgb(color) -> str:
+    """
+    色情報からRGB値を安全に取得する
+    
+    Args:
+        color: 色オブジェクト
+        
+    Returns:
+        str: 16進数のRGB値
+    """
+    if not color:
+        return '#000000'
+        
+    try:
+        if hasattr(color, 'rgb') and color.rgb:
+            return f'#{color.rgb:06x}'
+        elif hasattr(color, 'theme_color') and color.theme_color:
+            # テーマカラーの場合
+            return '#000000'  # デフォルト値
+    except (AttributeError, TypeError):
+        pass
+        
+    return '#000000'
+
 def extract_fill_color(shape) -> str:
     """
     シェイプの塗りつぶし色を抽出する
@@ -430,11 +527,11 @@ def extract_fill_color(shape) -> str:
     Returns:
         str: 色情報（16進数）
     """
-    if not shape.fill or shape.fill.type == 'NONE':
+    if not hasattr(shape, 'fill') or not shape.fill or shape.fill.type == 'NONE':
         return 'transparent'
         
     if shape.fill.type == 'SOLID':
-        return f'#{shape.fill.fore_color.rgb:06x}' if shape.fill.fore_color else '#000000'
+        return safe_get_rgb(shape.fill.fore_color)
         
     return 'transparent'
 
@@ -448,10 +545,19 @@ def extract_line_color(shape) -> str:
     Returns:
         str: 色情報（16進数）
     """
-    if not shape.line or shape.line.fill.type == 'NONE':
-        return 'transparent'
+    try:
+        if not hasattr(shape, 'line') or not shape.line:
+            return 'transparent'
+            
+        if not hasattr(shape.line, 'fill') or not shape.line.fill or shape.line.fill.type == 'NONE':
+            return 'transparent'
+            
+        if hasattr(shape.line, 'color') and shape.line.color:
+            return safe_get_rgb(shape.line.color)
+    except (AttributeError, TypeError):
+        pass
         
-    return f'#{shape.line.color.rgb:06x}' if shape.line.color else '#000000'
+    return 'transparent'
 
 def extract_background(slide) -> dict:
     """
@@ -475,89 +581,144 @@ def extract_background(slide) -> dict:
         }
         
     fill = background.fill
+    
+    # python-pptxの最新バージョンではtransparency属性が存在しないため、固定値を使用
+    transparency = 0
+    
     result = {
         'color': '#FFFFFF',
         'image': None,
         'pattern': None,
         'gradient': None,
-        'transparency': fill.transparency if fill else 0
+        'transparency': transparency
     }
     
     if fill:
-        if fill.type == 'SOLID':
-            result['color'] = f'#{fill.fore_color.rgb:06x}' if fill.fore_color else '#FFFFFF'
-        elif fill.type == 'PICTURE':
-            result['image'] = {
-                'rId': fill.image.rId,
-                'filename': fill.image.filename
-            }
-        elif fill.type == 'PATTERN':
-            result['pattern'] = {
-                'type': str(fill.pattern),
-                'foreColor': f'#{fill.fore_color.rgb:06x}' if fill.fore_color else '#000000',
-                'backColor': f'#{fill.back_color.rgb:06x}' if fill.back_color else '#FFFFFF'
-            }
-        elif fill.type == 'GRADIENT':
-            result['gradient'] = {
-                'type': 'linear' if fill.gradient_stops else 'radial',
-                'stops': [
-                    {
-                        'position': stop.position,
-                        'color': f'#{stop.color.rgb:06x}'
+        try:
+            if fill.type == 'SOLID':
+                result['color'] = safe_get_rgb(fill.fore_color) if hasattr(fill, 'fore_color') else '#FFFFFF'
+            elif fill.type == 'PICTURE' and hasattr(fill, 'image'):
+                try:
+                    result['image'] = {
+                        'rId': fill.image.rId if hasattr(fill.image, 'rId') else '',
+                        'filename': fill.image.filename if hasattr(fill.image, 'filename') else ''
                     }
-                    for stop in fill.gradient_stops
-                ],
-                'angle': fill.gradient_angle if hasattr(fill, 'gradient_angle') else 0
-            }
+                except (AttributeError, TypeError):
+                    result['image'] = {'rId': '', 'filename': ''}
+            elif fill.type == 'PATTERN' and hasattr(fill, 'pattern'):
+                result['pattern'] = {
+                    'type': str(fill.pattern),
+                    'foreColor': safe_get_rgb(fill.fore_color) if hasattr(fill, 'fore_color') else '#000000',
+                    'backColor': safe_get_rgb(fill.back_color) if hasattr(fill, 'back_color') else '#FFFFFF'
+                }
+        except (AttributeError, TypeError) as e:
+            print(f"Error processing fill: {str(e)}", file=sys.stderr)
+            
+        # グラデーションの処理
+        try:
+            if fill.type == 'GRADIENT' and hasattr(fill, 'gradient_stops'):
+                stops = []
+                for stop in fill.gradient_stops:
+                    try:
+                        stops.append({
+                            'position': stop.position if hasattr(stop, 'position') else 0,
+                            'color': safe_get_rgb(stop.color) if hasattr(stop, 'color') else '#000000'
+                        })
+                    except (AttributeError, TypeError) as e:
+                        print(f"Error processing gradient stop: {str(e)}", file=sys.stderr)
+                
+                result['gradient'] = {
+                    'type': 'linear' if fill.gradient_stops else 'radial',
+                    'stops': stops,
+                    'angle': fill.gradient_angle if hasattr(fill, 'gradient_angle') else 0
+                }
+        except (AttributeError, TypeError) as e:
+            print(f"Error processing gradient: {str(e)}", file=sys.stderr)
             
     return result
 
-def parse_pptx(file_path: str, output_dir: str) -> dict:
+def parse_pptx(file_path: str, output_dir: str, optimize_images: bool = True, 
+             image_format: str = 'WEBP', image_quality: int = 85,
+             max_width: int = 1920, max_height: int = 1080) -> Dict[str, Any]:
     """
-    PPTXファイルを解析する
+    PPTXファイルを解析し、スライド情報を抽出する
     
     Args:
         file_path (str): PPTXファイルのパス
         output_dir (str): 出力ディレクトリ
-    
+        optimize_images (bool): 画像最適化を行うかどうか
+        image_format (str): 出力画像形式 ('PNG', 'WEBP', 'JPEG')
+        image_quality (int): 画質 (0-100)
+        max_width (int): 最大幅
+        max_height (int): 最大高さ
+        
     Returns:
-        dict: 解析結果
+        Dict[str, Any]: 解析結果
     """
     try:
+        # プレゼンテーションを開く
         presentation = Presentation(file_path)
-        image_paths, image_size = convert_to_png(file_path, output_dir)
+        
+        # スライド画像を生成（最適化オプション付き）
+        image_paths, image_size = convert_to_png(
+            file_path, 
+            output_dir,
+            optimize=optimize_images,
+            format=image_format,
+            quality=image_quality,
+            max_width=max_width,
+            max_height=max_height
+        )
         
         if not image_paths:
             return {'error': 'Failed to convert slides to images'}
-            
-        metadata = extract_metadata(presentation)
-        slides_data = []
         
+        # 結果を格納する辞書
+        result = {
+            'slides': [],
+            'metadata': {
+                'image_format': image_format if optimize_images else 'PNG',
+                'image_quality': image_quality,
+                'image_dimensions': {
+                    'width': image_size[0],
+                    'height': image_size[1]
+                },
+                'optimized': optimize_images
+            }
+        }
+        
+        # メタデータを抽出
+        try:
+            result['metadata'].update(extract_metadata(presentation))
+        except Exception as e:
+            logger.warning(f"Error extracting metadata: {str(e)}")
+        
+        # 各スライドを処理
         for i, (slide, image_path) in enumerate(zip(presentation.slides, image_paths)):
             slide_data = {
                 'index': i,
                 'image_path': image_path,
-                'texts': [],
-                'shapes': [],
-                'background': extract_background(slide)
+                'elements': [],
+                'background': extract_background(slide),
+                'size': {
+                    'width': presentation.slide_width,
+                    'height': presentation.slide_height
+                }
             }
             
             for shape in slide.shapes:
-                if hasattr(shape, 'text') and shape.text.strip():
+                if hasattr(shape, "text") and shape.text.strip():
                     text_data = extract_text_from_shape(shape)
                     if text_data:
-                        slide_data['texts'].extend(text_data)
+                        slide_data['elements'].append(text_data)
                         
                 shape_info = extract_shape_info(shape)
                 if shape_info:
-                    slide_data['shapes'].append(shape_info)
+                    slide_data['elements'].append(shape_info)
                     
-            slides_data.append(slide_data)
+            result['slides'].append(slide_data)
             
-        return {
-            'metadata': metadata,
-            'slides': slides_data
-        }
+        return result
         
     except Exception as e:
         print(f"Error parsing PPTX: {str(e)}", file=sys.stderr)
@@ -604,30 +765,39 @@ def update_pptx_with_translations(
         return False
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <pptx_file> <output_dir>", file=sys.stderr)
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='PPTX Parser')
+    parser.add_argument('file_path', help='Path to PPTX file')
+    parser.add_argument('output_dir', help='Output directory')
+    parser.add_argument('--optimize', action='store_true', default=True, help='Optimize images')
+    parser.add_argument('--no-optimize', action='store_false', dest='optimize', help='Disable image optimization')
+    parser.add_argument('--format', choices=['PNG', 'WEBP', 'JPEG'], default='WEBP', help='Image format')
+    parser.add_argument('--quality', type=int, default=85, help='Image quality (0-100)')
+    parser.add_argument('--max-width', type=int, default=1920, help='Maximum image width')
+    parser.add_argument('--max-height', type=int, default=1080, help='Maximum image height')
+    args = parser.parse_args()
+    
+    # 入力ファイルが存在するか確認
+    if not os.path.exists(args.file_path):
+        print(f"Error: Input file '{args.file_path}' does not exist", file=sys.stderr)
         sys.exit(1)
-    
-    pptx_file = sys.argv[1]
-    output_dir = sys.argv[2]
-    
-    print(f"Starting PPTX parser with file={pptx_file}, output_dir={output_dir}", file=sys.stderr)
-    
-    try:
-        # PPTXファイルを解析
-        print(f"Calling parse_pptx...", file=sys.stderr)
-        slides = parse_pptx(pptx_file, output_dir)
         
-        # 処理結果をチェック
-        if not slides:
-            print("No slides returned from parse_pptx", file=sys.stderr)
-            sys.exit(1)
-        
-        print(f"Successfully processed {len(slides)} slides", file=sys.stderr)
-        
-        # 正常終了
-        sys.exit(0)
-    except Exception as e:
-        # エラー終了
-        print(f"Error in main: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+    # 出力ディレクトリが存在しない場合は作成
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # PPTXファイルを解析
+    result = parse_pptx(
+        args.file_path, 
+        args.output_dir,
+        optimize_images=args.optimize,
+        image_format=args.format,
+        image_quality=args.quality,
+        max_width=args.max_width,
+        max_height=args.max_height
+    )
+    
+    # 結果を出力
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    
+    logger.info(f"Successfully processed {len(result.get('slides', []))} slides")
