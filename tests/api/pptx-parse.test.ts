@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { expect } from '@jest/globals';
 import fs from 'fs/promises';
 import path from 'path';
+import { auth } from '@/lib/auth/auth';
+import { PPTXParser } from '@/lib/pptx/parser';
 
 // PPTXパーサーのモック
 jest.mock('@/lib/pptx/parser', () => ({
@@ -118,9 +120,34 @@ import fs from 'fs/promises';
 describe('PPTX Parse API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // 認証モックのデフォルト設定
+    (auth as jest.Mock).mockResolvedValue({
+      user: { id: 'test-user' }
+    });
+
+    // PPTXParserモックのデフォルト設定
+    (PPTXParser.getInstance as jest.Mock).mockReturnValue({
+      parsePPTX: jest.fn().mockResolvedValue({
+        success: true,
+        slides: [
+          { index: 1, texts: [{ text: 'Hello World' }] }
+        ]
+      })
+    });
+
+    // fsモックのデフォルト設定
+    (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+    (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+    (fs.unlink as jest.Mock).mockResolvedValue(undefined);
+    (fs.rm as jest.Mock).mockResolvedValue(undefined);
+
+    // pathモックのデフォルト設定
+    (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
   });
 
   describe('POST /api/pptx/parse', () => {
+<<<<<<< HEAD
     it('認証されていない場合はエラーを返す', async () => {
       // 認証モックを未認証状態に設定
       (auth as jest.Mock).mockResolvedValueOnce(null);
@@ -230,84 +257,93 @@ describe('PPTX Parse API', () => {
       // FormDataとFileオブジェクトのモック
       const mockFile = new File(['dummy content'], 'test.pptx', {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+=======
+    it('正常なPPTXファイルを解析できる', async () => {
+      // テスト用のファイルデータを作成
+      const file = new File(['test content'], 'test.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+>>>>>>> c58ec68 (実装途中)
       });
 
+      // FormDataの作成
       const formData = new FormData();
-      formData.append('file', mockFile);
+      formData.append('file', file);
 
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        formData: jest.fn().mockResolvedValue(formData),
-      } as unknown as NextRequest;
+      // リクエストの作成
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
+      });
 
-      // APIハンドラを呼び出す
-      const response = await POST(mockReq);
-
-      // レスポンスを検証
+      // APIエンドポイントを呼び出し
+      const response = await POST(req as unknown as NextRequest);
       expect(response.status).toBe(200);
 
-      // レスポンスボディを取得
       const data = await response.json();
-
-      // レスポンスボディを検証
       expect(data.success).toBe(true);
-      expect(data.fileId).toBe('test-uuid');
-      expect(data.slides).toHaveLength(2);
-      expect(data.slides[0].title).toBe('テストスライド1');
-      expect(data.metadata.title).toBe('テストプレゼンテーション');
+      expect(data.slides).toHaveLength(1);
+      expect(data.slides[0].texts[0].text).toBe('Hello World');
     });
 
-    it('ファイルが指定されていない場合はエラーを返す', async () => {
-      // 空のFormDataを作成
+    it('認証されていない場合は401エラーを返す', async () => {
+      // 認証モックをnullに設定
+      (auth as jest.Mock).mockResolvedValueOnce(null);
+
+      const file = new File(['test content'], 'test.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
       const formData = new FormData();
+      formData.append('file', file);
 
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        formData: jest.fn().mockResolvedValue(formData),
-      } as unknown as NextRequest;
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
+      });
 
-      // APIハンドラを呼び出す
-      const response = await POST(mockReq);
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(401);
 
-      // レスポンスを検証
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('ログインしてください');
+    });
+
+    it('ファイルが指定されていない場合は400エラーを返す', async () => {
+      const formData = new FormData();
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
+      });
+
+      const response = await POST(req as unknown as NextRequest);
       expect(response.status).toBe(400);
 
-      // レスポンスボディを取得
       const data = await response.json();
-
-      // レスポンスボディを検証
       expect(data.success).toBe(false);
       expect(data.error).toBe('ファイルが指定されていません');
     });
 
-    it('無効なファイルタイプの場合はエラーを返す', async () => {
-      // 無効なファイルタイプのFileオブジェクトを作成
-      const mockFile = new File(['dummy content'], 'test.txt', {
-        type: 'text/plain',
+    it('不正なファイルタイプの場合は400エラーを返す', async () => {
+      const file = new File(['test content'], 'test.txt', {
+        type: 'text/plain'
+      });
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
       });
 
-      const formData = new FormData();
-      formData.append('file', mockFile);
-
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        formData: jest.fn().mockResolvedValue(formData),
-      } as unknown as NextRequest;
-
-      // APIハンドラを呼び出す
-      const response = await POST(mockReq);
-
-      // レスポンスを検証
+      const response = await POST(req as unknown as NextRequest);
       expect(response.status).toBe(400);
 
-      // レスポンスボディを取得
       const data = await response.json();
-
-      // レスポンスボディを検証
       expect(data.success).toBe(false);
       expect(data.error).toBe('PPTXファイルのみアップロード可能です');
     });
 
+<<<<<<< HEAD
     it('メタデータの詳細な検証を行う', async () => {
       const mockFile = new File(['dummy content'], 'test.pptx', {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -440,10 +476,56 @@ describe('PPTX Parse API', () => {
       expect(data.slides).toHaveLength(1);
       expect(data.slides[0].title).toBe('特殊文字テスト: ①㈱♪、🎉絵文字も！');
       expect(data.slides[0].content).toBe('改行\nタブ\t特殊文字©®');
+=======
+    it('ファイルサイズが大きすぎる場合は400エラーを返す', async () => {
+      const largeFile = new File(['x'.repeat(21 * 1024 * 1024)], 'large.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+      const formData = new FormData();
+      formData.append('file', largeFile);
+
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('ファイルサイズは20MB以下にしてください');
+    });
+
+    it('パース処理でエラーが発生した場合は500エラーを返す', async () => {
+      // PPTXParserのモックをエラーを投げるように設定
+      (PPTXParser.getInstance as jest.Mock).mockReturnValue({
+        parsePPTX: jest.fn().mockRejectedValue(new Error('パースエラー'))
+      });
+
+      const file = new File(['test content'], 'test.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'POST',
+        body: formData
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('パースエラー');
+>>>>>>> c58ec68 (実装途中)
     });
   });
 
   describe('GET /api/pptx/parse', () => {
+<<<<<<< HEAD
     it('GETリクエストは許可されていない', async () => {
       const response = await GET();
 
@@ -456,16 +538,19 @@ describe('PPTX Parse API', () => {
     it('ヘルスチェックエンドポイントが正常に応答する', async () => {
       // APIハンドラを呼び出す
       const response = await GET();
+=======
+    it('GETリクエストは405エラーを返す', async () => {
+      const req = new Request('http://localhost:3000/api/pptx/parse', {
+        method: 'GET'
+      });
+>>>>>>> c58ec68 (実装途中)
 
-      // レスポンスを検証
-      expect(response.status).toBe(200);
+      const response = await GET(req as unknown as NextRequest);
+      expect(response.status).toBe(405);
 
-      // レスポンスボディを取得
       const data = await response.json();
-
-      // レスポンスボディを検証
-      expect(data.success).toBe(true);
-      expect(data.message).toBe('PPTXパーサーAPIは正常に動作しています');
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('メソッドが許可されていません');
     });
   });
 });

@@ -7,14 +7,17 @@
 1. **App Router APIルートのみを使用**
    - 新しいAPIエンドポイントは必ず`app/api/`ディレクトリ内に実装
    - Pages Router (`pages/api/`)は使用しない
+   - 既存のPages RouterベースのAPIは段階的にApp Routerに移行
 
 2. **API競合の防止**
    - API競合が発生した場合はApp Router（Route Handler）に一本化
    - 既存のPages RouterベースのAPIは段階的にApp Routerに移行
+   - 移行中は両方のAPIを並行稼働させ、クライアント側の移行をサポート
 
 3. **ルーティング構造**
    - RESTful原則に従い、リソースベースのパス構造を採用
    - 例: `/api/users/[id]/profile`, `/api/translations/[id]/status`
+   - クエリパラメータを活用したフィルタリング・ソート・ページネーション
 
 ## Route Handlerの実装ガイド
 
@@ -24,20 +27,45 @@
 // app/api/[resource]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { withAPILogging } from '@/lib/utils/api-logging';
+import { AppError, ErrorType, ErrorCodes } from '@/types/error';
+import { validateBody } from '@/lib/utils/validation';
+import { z } from 'zod';
 
 // ダイナミックレンダリングを使用（SSRモード）
 export const dynamic = 'force-dynamic';
 
+// リクエストスキーマの定義
+const requestSchema = z.object({
+  // スキーマ定義
+});
+
 // APIハンドラ実装
 async function handler(req: NextRequest) {
   try {
+    // バリデーション
+    const body = await validateBody(req, requestSchema);
+
     // 実装...
-    return NextResponse.json({ success: true, data: {...} });
+    return NextResponse.json({ 
+      success: true, 
+      data: {...},
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'エラーメッセージ' },
-      { status: 500 }
-    );
+    if (error instanceof AppError) {
+      return NextResponse.json({
+        error: error.code,
+        message: error.message,
+        timestamp: new Date().toISOString()
+      }, { status: error.statusCode });
+    }
+
+    // 未知のエラー
+    return NextResponse.json({
+      error: ErrorCodes.UNKNOWN_ERROR,
+      message: '予期せぬエラーが発生しました',
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
   }
 }
 
@@ -49,60 +77,153 @@ export const POST = withAPILogging(postHandler, 'resource-name');
 
 ### 認証・認可
 
-- すべてのAPIエンドポイントは適切な認証・認可処理を実装
-- NextAuthのセッショントークンまたはAPIキーを使用した認証を実装
-
 ```typescript
-import { getToken } from 'next-auth/jwt';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-// トークン認証
-const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-if (!token || !token.sub) {
-  return NextResponse.json(
-    { error: '認証が必要です' },
-    { status: 401 }
-  );
+// セッション認証
+const session = await getServerSession(authOptions);
+if (!session) {
+  throw new AppError({
+    message: '認証が必要です',
+    type: ErrorType.AUTH,
+    statusCode: 401,
+    code: ErrorCodes.UNAUTHORIZED
+  });
 }
 
-// 権限チェック（例: 管理者のみ）
-if (token.role !== 'ADMIN') {
-  return NextResponse.json(
-    { error: '権限がありません' },
-    { status: 403 }
-  );
+// 権限チェック
+if (session.user.role !== 'ADMIN') {
+  throw new AppError({
+    message: 'この操作を実行する権限がありません',
+    type: ErrorType.FORBIDDEN,
+    statusCode: 403,
+    code: ErrorCodes.FORBIDDEN
+  });
 }
 ```
 
 ### レスポンス形式の標準化
 
-- すべてのレスポンスは一貫したJSON形式を使用
-- 成功時は`{ success: true, data: {...} }`
-- エラー時は`{ error: 'エラーメッセージ' }`
-- ページネーションには`{ data: [...], pagination: { total, page, pageSize, pages } }`
+1. **成功レスポンス**
+```typescript
+{
+  success: true,
+  data: {...},
+  timestamp: "2024-04-15T12:34:56Z"
+}
+```
+
+2. **エラーレスポンス**
+```typescript
+{
+  error: ErrorCodes.ERROR_CODE,
+  message: "エラーメッセージ",
+  details?: {...},  // オプショナル
+  timestamp: "2024-04-15T12:34:56Z"
+}
+```
+
+3. **ページネーション**
+```typescript
+{
+  data: [...],
+  pagination: {
+    total: number,
+    page: number,
+    pageSize: number,
+    pages: number
+  },
+  timestamp: "2024-04-15T12:34:56Z"
+}
+```
 
 ### エラーハンドリング
 
-- 明示的なエラーハンドリングを実装
-- 適切なHTTPステータスコードを使用
-- 開発環境ではエラー詳細を含め、本番環境では一般的なエラーメッセージのみを返す
+- `AppError`クラスを使用した統一的なエラーハンドリング
+- 適切なHTTPステータスコードとエラーコードの使用
+- 開発環境では詳細なエラー情報を、本番環境では一般的なメッセージを返す
 
-## API移行ガイド
+```typescript
+try {
+  // 処理
+} catch (error) {
+  if (error instanceof AppError) {
+    throw error;
+  }
+  
+  // 未知のエラーを適切なAppErrorに変換
+  throw new AppError({
+    message: '予期せぬエラーが発生しました',
+    type: ErrorType.UNKNOWN,
+    statusCode: 500,
+    code: ErrorCodes.UNKNOWN_ERROR,
+    originalError: error
+  });
+}
+```
 
-既存のPages RouterベースのAPIをApp Routerに移行する手順：
+## テスト実装ガイド
 
-1. App Router (`app/api/`)内に同等の機能を持つRoute Handlerを実装
-2. 両方のAPIを短期間並行稼働させ、クライアント側の移行をサポート
-3. クライアント側の更新完了後、Pages Router版のAPIを廃止
-4. 移行完了後、Pages Routerディレクトリを削除
+1. **テストファイルの配置**
+```
+tests/
+  api/
+    [resource]/
+      route.test.ts  // APIルートのテスト
+  utils/
+    test-helpers.ts  // テストヘルパー関数
+    test-utils.ts    // テストユーティリティ
+```
+
+2. **テストの基本構造**
+```typescript
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { createMockRequest, mockPrisma } from '@/tests/utils/test-utils';
+import { setupTestDatabase, teardownTestDatabase } from '@/tests/utils/db';
+
+describe('API Route: [resource]', () => {
+  beforeAll(async () => {
+    await setupTestDatabase();
+  });
+
+  afterAll(async () => {
+    await teardownTestDatabase();
+  });
+
+  describe('GET /api/[resource]', () => {
+    it('should return data successfully', async () => {
+      const req = createMockRequest('GET');
+      const response = await GET(req);
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle errors appropriately', async () => {
+      // エラーケースのテスト
+    });
+  });
+});
+```
 
 ## パフォーマンス最適化
 
-- 不必要なデータベースクエリを避ける
-- 大きなレスポンスはストリーミングまたはページネーションを使用
-- キャッシュ戦略を適切に設定（`revalidate`オプションなど）
-- Long-runningな処理はバックグラウンドジョブに移行
+1. **データベースクエリの最適化**
+   - 必要なフィールドのみを取得
+   - 適切なインデックスの使用
+   - N+1問題の回避
+
+2. **キャッシュ戦略**
+   - レスポンスのキャッシュ設定
+   - クライアントサイドのキャッシュ活用
+   - 静的生成とISRの適切な使用
+
+3. **大規模データの処理**
+   - ストリーミングレスポンスの使用
+   - ページネーションの実装
+   - バックグラウンドジョブの活用
 
 ## API文書化
 
 - 各APIエンドポイントは`docs/api-reference.md`に文書化
-- リクエスト・レスポンスの例、パラメータ、認証要件などを明記 
+- OpenAPI/Swaggerフォーマットでの文書化を検討
+- リクエスト・レスポンスの例、認証要件、エラーケースを明記 

@@ -181,3 +181,137 @@ beforeEach(() => {
   // テスト環境のリセット
   jest.clearAllMocks();
 });
+
+import '@testing-library/jest-dom';
+import 'whatwg-fetch';
+
+// グローバルなモック設定
+global.jest = jest;
+
+// fetchのモック
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    json: () => Promise.resolve({}),
+    ok: true,
+    status: 200,
+  })
+);
+
+// IntersectionObserverのモック
+global.IntersectionObserver = class IntersectionObserver {
+  constructor() {
+    this.observe = jest.fn();
+    this.unobserve = jest.fn();
+    this.disconnect = jest.fn();
+  }
+};
+
+// matchMediaのモック
+global.matchMedia = jest.fn().mockImplementation(query => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: jest.fn(),
+  removeListener: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  dispatchEvent: jest.fn(),
+}));
+
+// ResizeObserverのモック
+global.ResizeObserver = class ResizeObserver {
+  constructor() {
+    this.observe = jest.fn();
+    this.unobserve = jest.fn();
+    this.disconnect = jest.fn();
+  }
+};
+
+// プロセス環境変数の設定
+process.env = {
+  ...process.env,
+  NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+  DATABASE_URL: 'postgresql://testuser:testpass@localhost:5433/ppt_translator_test',
+  NEXTAUTH_URL: 'http://localhost:3000',
+  NEXTAUTH_SECRET: 'test-secret',
+};
+
+// Prismaのモック
+jest.mock('@/lib/db', () => ({
+  prisma: {
+    user: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    file: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    translationHistory: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
+  },
+}));
+
+// next/routerのモック
+jest.mock('next/router', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    query: {},
+  })),
+}));
+
+// next/navigationのモック
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+  })),
+  usePathname: jest.fn(() => '/'),
+  useSearchParams: jest.fn(() => new URLSearchParams()),
+}));
+
+// Anthropic SDKのモック
+jest.mock('@anthropic-ai/sdk', () => {
+  return {
+    Anthropic: jest.fn().mockImplementation(() => ({
+      messages: {
+        create: jest.fn().mockResolvedValue({
+          content: [{ text: '翻訳されたテキスト' }],
+        }),
+      },
+    })),
+  };
+});
+
+// エラー型の定義
+global.ErrorType = {
+  AUTH: 'AUTH',
+  VALIDATION: 'VALIDATION',
+  NOT_FOUND: 'NOT_FOUND',
+  FORBIDDEN: 'FORBIDDEN',
+  DATABASE: 'DATABASE',
+  NETWORK: 'NETWORK',
+  RATE_LIMIT: 'RATE_LIMIT',
+  UNKNOWN: 'UNKNOWN',
+};
+
+// エラーコードの定義
+global.ErrorCodes = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+};

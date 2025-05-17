@@ -1,22 +1,49 @@
+<<<<<<< HEAD
 name: Test Coverage
 
 on:
   push:
     branches: [ main, develop, feature/* ]
+=======
+name: Test
+
+on:
+  push:
+    branches: [ main, develop ]
+>>>>>>> c58ec68 (実装途中)
   pull_request:
     branches: [ main, develop ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     
     strategy:
       matrix:
         node-version: [18.x]
+=======
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: ppt_translator_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+>>>>>>> c58ec68 (実装途中)
 
     steps:
     - uses: actions/checkout@v3
 
+<<<<<<< HEAD
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
@@ -66,3 +93,35 @@ jobs:
         key: ${{ runner.os }}-jest-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-jest- 
+=======
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Setup environment variables
+      run: |
+        echo "DATABASE_URL=postgresql://testuser:testpass@localhost:5433/ppt_translator_test" >> .env.test
+        echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> .env.test
+        echo "NEXTAUTH_URL=http://localhost:3000" >> .env.test
+        echo "NEXTAUTH_SECRET=test-secret" >> .env.test
+
+    - name: Run database migrations
+      run: npx prisma migrate deploy
+
+    - name: Run tests
+      run: npm run test
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          coverage/
+          junit.xml 
+>>>>>>> c58ec68 (実装途中)

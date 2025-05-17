@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { POST } from '@/app/api/auth/signup/route';
 import { User } from '@prisma/client';
 import { NextRequest } from 'next/server';
@@ -6,10 +7,28 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 
 // bcrypt.hash のモック
+=======
+import { NextRequest } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+
+// モック設定
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    user: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+    $disconnect: jest.fn(),
+  })),
+}));
+
+>>>>>>> c58ec68 (実装途中)
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
+<<<<<<< HEAD
 // crypto.randomUUID のモック
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
@@ -172,5 +191,180 @@ describe('POST /api/auth/signup', () => {
     expect(response.status).toBe(500);
     expect(responseBody.error).toBe('DB create error');
     // $disconnect might or might not be called
+=======
+describe('Signup API', () => {
+  let prisma: jest.Mocked<PrismaClient>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma = new PrismaClient() as jest.Mocked<PrismaClient>;
+  });
+
+  describe('POST /api/auth/signup', () => {
+    it('正常なサインアップリクエストを処理できる', async () => {
+      // ユーザーが存在しない場合のモック設定
+      prisma.user.findUnique.mockResolvedValue(null);
+      
+      // パスワードハッシュ化のモック
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_password');
+
+      // ユーザー作成のモック
+      prisma.user.create.mockResolvedValue({
+        id: 'test-user-id',
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'hashed_password',
+        credits: 100,
+        updatedAt: new Date(),
+      });
+
+      const req = new Request('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(201);
+
+      const data = await response.json();
+      expect(data.message).toBe('ユーザーが正常に作成されました');
+      expect(data.user).toEqual({
+        id: 'test-user-id',
+        name: 'Test User',
+        email: 'test@example.com',
+      });
+    });
+
+    it('必須フィールドが欠けている場合は400エラーを返す', async () => {
+      const testCases = [
+        { 
+          body: { email: 'test@example.com', password: 'password123' },
+          expectedError: '名前は必須です'
+        },
+        { 
+          body: { name: 'Test User', password: 'password123' },
+          expectedError: '有効なメールアドレスを入力してください'
+        },
+        { 
+          body: { name: 'Test User', email: 'test@example.com' },
+          expectedError: 'パスワードは6文字以上必要です'
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const req = new Request('http://localhost:3000/api/auth/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(testCase.body),
+        });
+
+        const response = await POST(req as unknown as NextRequest);
+        expect(response.status).toBe(400);
+
+        const data = await response.json();
+        expect(data.error).toBe(testCase.expectedError);
+      }
+    });
+
+    it('既存のメールアドレスの場合は400エラーを返す', async () => {
+      // ユーザーが既に存在する場合のモック設定
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'existing-user-id',
+        name: 'Existing User',
+        email: 'test@example.com',
+        password: 'hashed_password',
+      });
+
+      const req = new Request('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toBe('このメールアドレスは既に登録されています');
+    });
+
+    it('パスワードが短すぎる場合は400エラーを返す', async () => {
+      const req = new Request('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Test User',
+          email: 'test@example.com',
+          password: '12345', // 6文字未満
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toBe('パスワードは6文字以上必要です');
+    });
+
+    it('メールアドレスの形式が不正な場合は400エラーを返す', async () => {
+      const req = new Request('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Test User',
+          email: 'invalid-email', // 不正なメールアドレス形式
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toBe('有効なメールアドレスを入力してください');
+    });
+
+    it('データベースエラーの場合は500エラーを返す', async () => {
+      // データベースエラーのモック設定
+      prisma.user.findUnique.mockRejectedValue(new Error('Database error'));
+
+      const req = new Request('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.error).toBeTruthy();
+    });
+>>>>>>> c58ec68 (実装途中)
   });
 }); 

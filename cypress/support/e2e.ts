@@ -15,6 +15,9 @@
 
 // ファイルアップロード用のプラグインを追加
 import 'cypress-file-upload';
+import './commands';
+import '@cypress/code-coverage/support';
+import 'cypress-mochawesome-reporter/register';
 
 // グローバルタイムアウト設定
 Cypress.config('defaultCommandTimeout', 10000);
@@ -189,4 +192,37 @@ after(() => {
   cy.clearCookies();
   cy.clearLocalStorage();
   cy.task('log', 'テスト環境のクリーンアップが完了しました');
+});
+
+beforeEach(() => {
+  cy.intercept('POST', '/api/auth/session', {
+    statusCode: 200,
+    body: {
+      user: {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+        role: 'user',
+      },
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    },
+  }).as('session');
+
+  cy.intercept('GET', '/api/user/credits', {
+    statusCode: 200,
+    body: {
+      credits: 100,
+    },
+  }).as('credits');
+});
+
+Cypress.on('uncaught:exception', (err) => {
+  // Next.jsの開発サーバーで発生する一部のエラーを無視
+  if (err.message.includes('Hydration')) {
+    return false;
+  }
+  if (err.message.includes('Minified React error')) {
+    return false;
+  }
+  return true;
 });

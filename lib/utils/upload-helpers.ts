@@ -4,7 +4,7 @@
  * formidable v3.5.xを使用したファイルアップロード処理を簡単に行うための関数を提供します。
  */
 
-import * as formidable from 'formidable';
+import formidable from 'formidable';
 import { IncomingMessage } from 'http';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -33,11 +33,12 @@ export async function createUploadDir(userId: string): Promise<string> {
 /**
  * フォームのファイルをパースするための基本オプション
  */
-export const defaultFormOptions: formidable.Options = {
+export const defaultFormOptions = {
   keepExtensions: true,
   maxFileSize: 100 * 1024 * 1024, // 100MB
   maxFields: 10,
   maxFieldsSize: 1 * 1024 * 1024, // 1MB
+  // @ts-ignore - formidableのバージョン互換性の問題を回避
   hash: 'sha256',
   multiples: true,
 };
@@ -50,11 +51,11 @@ export const defaultFormOptions: formidable.Options = {
  */
 export async function parseForm(
   req: IncomingMessage,
-  options: Partial<formidable.Options> = {}
+  options = {}
 ): FormidablePromise {
   return new Promise((resolve, reject) => {
     // formidable v3の構文
-    const form = formidable({
+    const form = new formidable.IncomingForm({
       ...defaultFormOptions,
       ...options,
     });
@@ -84,7 +85,7 @@ export async function uploadFilesToUserDir(
   // タイムスタンプをファイル名に追加
   const timestamp = Date.now();
   
-  const form = formidable({
+  const form = new formidable.IncomingForm({
     ...defaultFormOptions,
     uploadDir,
     filename: (_name, ext) => {

@@ -70,6 +70,7 @@ async function uploadHandler(req: NextRequest) {
             storagePath: file.filepath,
             fileSize: file.size,
             mimeType: file.mimetype,
+            updatedAt: new Date(),
           }
         })
       )
