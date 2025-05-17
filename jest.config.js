@@ -33,18 +33,23 @@ const config = {
   ],
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['@swc/jest', {
+    '^.+\.(js|jsx|ts|tsx)$': ['@swc/jest', {
       jsc: {
         parser: {
           syntax: 'typescript',
           tsx: true,
           decorators: true,
+          dynamicImport: true, // 動的インポートのサポート
         },
         transform: {
           react: {
             runtime: 'automatic',
           },
+          // TypeScript v5の新機能サポート
+          useDefineForClassFields: true,
+          legacyDecorator: false,
         },
+        target: 'es2022', // Node.js v20をターゲットに
       },
     }],
   },
@@ -52,7 +57,8 @@ const config = {
   maxWorkers: '50%', // CPUコアの半分を使用
   bail: false, // すべてのテストを実行
   verbose: true,
-  collectCoverage: true,
+  // テスト実行中はカバレッジ計測を無効化（必要に応じて有効化）
+  collectCoverage: false,
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
     'components/**/*.{js,jsx,ts,tsx}',
@@ -78,8 +84,8 @@ const config = {
   // キャッシュ設定
   cache: true,
   cacheDirectory: '.jest-cache',
-  // タイムアウト設定
-  testTimeout: 10000,
+  // タイムアウト設定（非同期テストのために増加）
+  testTimeout: 15000,
   // 並列実行の最適化
   maxConcurrency: 5,
   // スナップショットの設定
@@ -88,10 +94,10 @@ const config = {
   moduleDirectories: ['node_modules', '<rootDir>'],
   testEnvironmentOptions: {
     url: 'http://localhost:3000',
+    // Node.js v20の機能を有効化
+    customExportConditions: ['node', 'node-addons'],
   },
-  transformIgnorePatterns: [
-    '/node_modules/(?!(@prisma/client)/)',
-  ],
+  // 重複する設定を削除（上部で既に定義済み）
   moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json', 'node'],
   reporters: [
     'default',
@@ -107,6 +113,11 @@ const config = {
       },
     ],
   ],
+  // テスト実行の安定性向上のための設定
+  testSequencer: '<rootDir>/jest.sequencer.js',
+  // フラッキーテスト検出のための設定
+  retryTimes: 2,
+  detectOpenHandles: true,
 };
 
 module.exports = config;

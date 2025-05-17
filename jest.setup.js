@@ -176,10 +176,27 @@ jest.mock('@/components/ui/use-toast', () => {
   };
 });
 
+// テスト環境管理のインポート
+const { setupTestEnvironment, teardownTestEnvironment } = require('./tests/utils/test-environment');
+
+// テスト実行前に全体のセットアップを行う
+beforeAll(async () => {
+  // テスト環境の初期化
+  await setupTestEnvironment();
+  console.log('テスト環境を初期化しました');
+});
+
 // 各テストの前に実行するグローバル設定
 beforeEach(() => {
   // テスト環境のリセット
   jest.clearAllMocks();
+});
+
+// 全テスト完了後にクリーンアップを行う
+afterAll(async () => {
+  // テスト環境のクリーンアップ
+  await teardownTestEnvironment();
+  console.log('テスト環境をクリーンアップしました');
 });
 
 import '@testing-library/jest-dom';

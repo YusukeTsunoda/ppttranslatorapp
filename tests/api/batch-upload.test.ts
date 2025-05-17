@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { expect } from '@jest/globals';
 import { PrismaClient } from '@prisma/client';
 
+// 非同期処理の待機ヘルパー関数
+async function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Prismaのモック
 jest.mock('@prisma/client', () => ({
   __esModule: true,
@@ -113,14 +118,15 @@ describe('Batch Upload API', () => {
         body: JSON.stringify({ files: ['file1.pptx'] }),
       }) as NextRequest;
 
-      try {
-        const response = await POST(mockReq);
-        const data = await response.json();
-        expect(data.error).toBe('サーバーエラーが発生しました');
-      } catch (error) {
-        // エラーが発生した場合もテストをパスさせる
-        expect(true).toBe(true);
-      }
+      // 非同期処理を適切に待機
+      const response = await POST(mockReq);
+      
+      // レスポンスのステータスを確認
+      expect(response.status).toBe(500);
+      
+      // レスポンスの内容を確認
+      const data = await response.json();
+      expect(data.error).toBe('サーバーエラーが発生しました');
     });
   });
 
@@ -141,14 +147,15 @@ describe('Batch Upload API', () => {
 
       const mockReq = new Request('http://localhost:3000/api/batch-upload?jobId=non-existent') as NextRequest;
 
-      try {
-        const response = await GET(mockReq);
-        const data = await response.json();
-        expect(data.error).toBe('指定されたジョブが見つかりません');
-      } catch (error) {
-        // エラーが発生した場合もテストをパスさせる
-        expect(true).toBe(true);
-      }
+      // 非同期処理を適切に待機
+      const response = await GET(mockReq);
+      
+      // レスポンスのステータスを確認
+      expect(response.status).toBe(404);
+      
+      // レスポンスの内容を確認
+      const data = await response.json();
+      expect(data.error).toBe('指定されたジョブが見つかりません');
     });
 
     it('ジョブの状態を正常に取得する', async () => {
@@ -171,14 +178,15 @@ describe('Batch Upload API', () => {
 
       const mockReq = new Request('http://localhost:3000/api/batch-upload?jobId=test-job-id') as NextRequest;
 
-      try {
-        const response = await GET(mockReq);
-        const data = await response.json();
-        expect(data.error).toBe('サーバーエラーが発生しました');
-      } catch (error) {
-        // エラーが発生した場合もテストをパスさせる
-        expect(true).toBe(true);
-      }
+      // 非同期処理を適切に待機
+      const response = await GET(mockReq);
+      
+      // レスポンスのステータスを確認
+      expect(response.status).toBe(500);
+      
+      // レスポンスの内容を確認
+      const data = await response.json();
+      expect(data.error).toBe('サーバーエラーが発生しました');
     });
   });
 }); 

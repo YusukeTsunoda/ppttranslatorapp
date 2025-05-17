@@ -10,15 +10,17 @@ import {
   handleClientError,
   handleApiError,
   AppError,
-  type ErrorType,
   ErrorCodes,
   isAppError,
   handleError,
   getErrorMessage,
   createRateLimitError,
   mapSessionErrorToAppError,
-  type SessionError
 } from '@/lib/utils/error-handler';
+
+// 文字列リテラルとしてErrorTypeを定義
+type ErrorType = 'AUTH' | 'VALIDATION' | 'NOT_FOUND' | 'PERMISSION' | 'SERVER' | 'NETWORK' | 'UNKNOWN';
+type SessionError = 'EXPIRED' | 'INVALID' | 'NETWORK' | 'UNAUTHORIZED' | 'UNKNOWN';
 import { toast } from '@/components/ui/use-toast';
 import { expect } from '@jest/globals';
 
@@ -48,6 +50,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証に失敗しました');
+      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
     });
 
     it('バリデーションエラーを正しく作成する', () => {
@@ -200,7 +203,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証エラー');
-      // codeプロパティは実装では指定されていない可能性があるため、テストをスキップ
+      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
     });
 
     it('createForbiddenErrorが正しいAppErrorを作成する', () => {
@@ -247,6 +250,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('セッションの有効期限が切れました');
+      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
     });
 
     it('INVALIDエラーを正しく変換する', () => {
@@ -255,6 +259,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('無効なセッションです');
+      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
     });
 
     it('NETWORKエラーを正しく変換する', () => {
@@ -263,6 +268,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('NETWORK');
       expect(error.message).toBe('ネットワークエラーが発生しました');
+      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
 
     it('UNAUTHORIZEDエラーを正しく変換する', () => {
@@ -271,22 +277,25 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証が必要です');
+      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
     });
 
     it('UNKNOWNエラーを正しく変換する', () => {
       const error = mapSessionErrorToAppError('UNKNOWN', '不明なエラーが発生しました');
 
       expect(error).toBeInstanceOf(AppError);
-      expect(error.type).toBe("AUTH");
+      expect(error.type).toBe('AUTH');
       expect(error.message).toBe('不明なエラーが発生しました');
+      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
 
     it('不明なタイプのエラーを正しく変換する', () => {
       const error = mapSessionErrorToAppError('SOMETHING_ELSE' as any, '不明なエラーが発生しました');
 
       expect(error).toBeInstanceOf(AppError);
-      expect(error.type).toBe("AUTH");
+      expect(error.type).toBe('AUTH');
       expect(error.message).toBe('不明なエラーが発生しました');
+      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
   });
 
@@ -305,6 +314,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(result).toBeInstanceOf(AppError);
       expect(result.message).toBe('予期せぬエラーが発生しました。しばらく待ってから再試行してください。');
       expect(result.type).toBe('UNKNOWN');
+      expect(result.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
     
     it('nullやundefinedを処理できる', () => {
@@ -313,6 +323,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(result).toBeInstanceOf(AppError);
       expect(result.message).toBe('予期せぬエラーが発生しました。しばらく待ってから再試行してください。');
       expect(result.type).toBe('UNKNOWN');
+      expect(result.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
 
     it('objectを文字列化して処理できる', () => {
@@ -321,6 +332,8 @@ describe('エラーハンドリングユーティリティ', () => {
       
       expect(result).toBeInstanceOf(AppError);
       expect(result.message).toBe('予期せぬエラーが発生しました。しばらく待ってから再試行してください。');
+      expect(result.type).toBe('UNKNOWN');
+      expect(result.code).toBe(ErrorCodes.UNKNOWN_ERROR);
     });
   });
 
