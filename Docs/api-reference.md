@@ -8,7 +8,8 @@
 4. [バッチ処理API](#バッチ処理api)
 5. [管理者API](#管理者api)
 6. [統計API](#統計api)
-7. [エラーハンドリング](#エラーハンドリング)
+7. [クエリパラメータフィルタリング](#クエリパラメータフィルタリング)
+8. [エラーハンドリング](#エラーハンドリング)
 
 ## 共通仕様
 
@@ -52,6 +53,88 @@ Authorization: Bearer <token>  // 認証が必要なエンドポイントの場�
   },
   "timestamp": "2024-04-15T12:34:56Z"
 }
+```
+
+## クエリパラメータフィルタリング
+
+本システムでは、主要なAPIエンドポイントで統一されたクエリパラメータによるサーバーサイドフィルタリング機能を提供しています。これによりクライアント側は必要なデータのみを効率的に取得できます。
+
+### 共通パラメータ
+
+以下のパラメータはすべてのフィルタリング対応APIで利用可能です：
+
+| パラメータ | 型 | デフォルト | 説明 |
+|------------|----|----|------|
+| `page` | number | 1 | ページ番号（1から開始） |
+| `limit` | number | 10 | 1ページあたりの最大件数（最大100） |
+| `sort` | string | createdAt | ソートするフィールド名 |
+| `order` | string | desc | ソート順（asc: 昇順、desc: 降順） |
+| `search` | string | - | 検索キーワード |
+| `startDate` | string | - | 開始日（YYYY-MM-DD形式） |
+| `endDate` | string | - | 終了日（YYYY-MM-DD形式） |
+
+### API固有のフィルタリングパラメータ
+
+#### 翻訳履歴 (`GET /api/history`)
+
+| パラメータ | 型 | 説明 |
+|------------|----|----|
+| `status` | string | 翻訳ステータス（PENDING, PROCESSING, COMPLETED, FAILED） |
+| `sourceLang` | string | 翻訳元言語 |
+| `targetLang` | string | 翻訳先言語 |
+| `minPageCount` | number | 最小ページ数 |
+| `maxPageCount` | number | 最大ページ数 |
+| `minCreditsUsed` | number | 最小使用クレジット |
+| `maxCreditsUsed` | number | 最大使用クレジット |
+| `minFileSize` | number | 最小ファイルサイズ（バイト） |
+| `maxFileSize` | number | 最大ファイルサイズ（バイト） |
+| `tags` | string[] | タグによるフィルタリング |
+
+#### ファイル一覧 (`GET /api/upload`)
+
+| パラメータ | 型 | 説明 |
+|------------|----|----|
+| `status` | string | ファイルステータス（READY, PROCESSING, ERROR） |
+| `mimeType` | string | MIMEタイプによるフィルタリング |
+| `minFileSize` | number | 最小ファイルサイズ（バイト） |
+| `maxFileSize` | number | 最大ファイルサイズ（バイト） |
+
+#### ユーザー管理 (`GET /api/admin/users`)
+
+| パラメータ | 型 | 説明 |
+|------------|----|----|
+| `role` | string | ユーザーロール（USER, ADMIN） |
+| `emailVerified` | boolean | メール確認状態 |
+| `minCredits` | number | 最小保有クレジット |
+| `maxCredits` | number | 最大保有クレジット |
+
+#### アクティビティログ (`GET /api/activity`)
+
+| パラメータ | 型 | 説明 |
+|------------|----|----|
+| `type` | string | アクティビティタイプ |
+| `userId` | string | ユーザーID（管理者のみ使用可能） |
+
+### レスポンス形式
+
+フィルタリング対応APIは、以下の統一されたレスポンス形式を返します：
+
+```json
+{
+  "data": [ ... ],  // データの配列
+  "total": 100,     // 総件数
+  "page": 1,        // 現在のページ番号
+  "limit": 10,      // 1ページあたりの件数
+  "pageCount": 10,  // 総ページ数
+  "hasNextPage": true,     // 次ページがあるか
+  "hasPreviousPage": false // 前ページがあるか
+}
+```
+
+### 使用例
+
+```
+GET /api/history?page=2&limit=20&status=COMPLETED&sort=createdAt&order=desc&startDate=2023-01-01&endDate=2023-12-31
 ```
 
 ## バッチ処理API
