@@ -17,7 +17,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
   
   // 管理者権限確認
-  const user = await prisma.user.findUnique({
+  const user = await prisma().user.findUnique({
     where: { id: session.user.id },
     select: { role: true },
   });
