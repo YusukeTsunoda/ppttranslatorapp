@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Activity,
   ShieldAlert,
+  Files,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
@@ -85,6 +86,7 @@ function Sidebar() {
 
   const navigation = [
     { name: '翻訳', href: '/translate', icon: Settings },
+    { name: 'バッチ翻訳', href: '/translate/batch', icon: Files },
     { name: '履歴', href: '/history', icon: History },
     { name: 'アクティビティ', href: '/activity', icon: Activity },
     { name: 'プロフィール', href: '/profile', icon: User },
