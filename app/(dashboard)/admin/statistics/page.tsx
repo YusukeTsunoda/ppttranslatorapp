@@ -7,6 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/TabsCl
 import Link from 'next/link';
 import { UserRole } from '@prisma/client';
 
+// 動的レンダリングを明示的に指定
+export const dynamic = 'force-dynamic';
+
 console.log("=== [admin/statistics/page.tsx] SSR実行 ===");
 console.log("imported Card:", Card);
 console.log("imported prisma:", prisma);

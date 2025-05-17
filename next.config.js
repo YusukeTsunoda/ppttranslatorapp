@@ -5,11 +5,14 @@ const fs = require('fs');
 
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: false, // SWCによるミニファイを無効化
+  swcMinify: true, // SWCによるミニファイを有効化
   // SSR運用のためoutput: 'standalone' のみを指定
   output: 'standalone',
   experimental: {
-    forceSwcTransforms: false // SWC変換を強制しない
+    forceSwcTransforms: false, // SWC変換を強制しない
+    // サーバーコンポーネントの最適化
+    serverMinification: true,
+    serverSourceMaps: false,
   },
   onDemandEntries: {
     maxInactiveAge: 1000 * 60 * 60, // 1時間キャッシュ
@@ -27,6 +30,30 @@ const nextConfig = {
   },
   // ビルドから除外するディレクトリやファイル
   transpilePackages: [],
+  // サーバーレス関数のサイズを削減するための設定
+  outputFileTracing: {
+    // バンドルから除外するパス
+    ignoredModules: [
+      'sharp', // 使っていない場合は不要
+      // 他のJavaScriptビルドに含まれない大きなライブラリなど
+      '@swc/core',
+      'esbuild',
+      'babel-plugin-transform-runtime',
+      '@babel/runtime',
+      // Prismaのエンジンバイナリはライブラリモードで使用するため除外
+      'prisma',
+      '@prisma/engines',
+    ],
+    // バンドルから除外するファイルパスパターン
+    ignoredModuleFiles: [
+      '**/.next/cache/**',
+      // Prismaエンジンバイナリは必要なものだけ含め、他は除外する
+      '**/node_modules/.prisma/client/libquery_engine-*',
+      // Vercel環境ではrhelベースのLinuxが使用されるため、これだけを許可
+      '!**/node_modules/.prisma/client/libquery_engine-rhel-openssl-*',
+      '**/node_modules/sharp/**/*.node', // 使っていない場合は不要
+    ],
+  },
   // ビルド時の詳細なエラー出力
   webpack: (config, { isServer, buildId, dev }) => {
     if (!config.infrastructureLogging) config.infrastructureLogging = {};
@@ -45,7 +72,12 @@ const nextConfig = {
     // 一時ディレクトリとscripts/tempディレクトリを除外
     config.watchOptions = {
       ...config.watchOptions,
-      ignored: ['**/temp/**', '**/scripts/temp/**', ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : [])],
+      ignored: [
+        '**/temp/**', 
+        '**/scripts/temp/**', 
+        '**/.next/cache/**',
+        ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : [])
+      ],
     };
     
     // APIルートファイルの検出

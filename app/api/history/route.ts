@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
-import { prisma } from '@/lib/db/prisma';
-import { Language, Prisma } from '@prisma/client';
-import { TranslationStatus } from '@prisma/client';
+import { Language, Prisma, TranslationStatus } from '@prisma/client';
+import { translationPrisma } from '@/lib/db/prisma';
+import { translationUtils } from '@/lib/db/db-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,8 +66,6 @@ export async function GET(req: Request) {
                    ? statusParam as TranslationStatus
                    : null;
 
-    const skip = (page - 1) * limit;
-
     const whereCondition: Prisma.TranslationHistoryWhereInput = {
       userId: userId,
     };
@@ -123,14 +121,29 @@ export async function GET(req: Request) {
         } as Prisma.TranslationHistoryOrderByWithRelationInput;
     }
 
-    const [totalCount, history] = await prisma.$transaction([
-      prisma.translationHistory.count({ where: whereCondition }),
-      prisma.translationHistory.findMany({
+    // 最適化されたトランザクションを使用してデータを取得
+    const [totalCount, history] = await translationPrisma.$transaction([
+      translationPrisma.translationHistory.count({ where: whereCondition }),
+      translationPrisma.translationHistory.findMany({
         where: whereCondition,
         orderBy: orderByCondition,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          creditsUsed: true,
+          sourceLang: true,
+          targetLang: true,
+          model: true,
+          createdAt: true,
+          updatedAt: true,
+          pageCount: true,
+          fileSize: true,
+          status: true,
+          processingTime: true,
+          tags: true,
+          metadata: true,
+          thumbnailPath: true,
           file: {
             select: {
               originalName: true,
@@ -144,11 +157,6 @@ export async function GET(req: Request) {
     const historyWithFileName = history.map(item => ({
         ...item,
         originalFileName: item.file.originalName,
-        tags: item.tags,
-        metadata: item.metadata,
-        thumbnailPath: item.thumbnailPath,
-        processingTime: item.processingTime,
-        fileSize: item.fileSize,
       }));
 
     return NextResponse.json({
