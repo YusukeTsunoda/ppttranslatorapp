@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { getServerSession } from 'next-auth';
 
@@ -37,7 +37,7 @@ export const createMockUser = (overrides = {}) => ({
   credits: 10,
   createdAt: new Date(),
   updatedAt: new Date(),
-  role: 'USER',
+  role: UserRole.USER,
   deletedAt: null,
   emailVerified: null,
   stripeCustomerId: null,

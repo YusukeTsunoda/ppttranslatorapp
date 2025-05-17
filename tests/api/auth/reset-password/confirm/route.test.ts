@@ -21,6 +21,9 @@ jest.mock('@/lib/auth/password', () => ({
   hashPassword: jest.fn(),
 }));
 
+// UserRoleの型をインポート
+import { UserRole } from '@prisma/client';
+
 // console.logのモック
 // consoleのモック化
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
@@ -56,6 +59,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       email: 'dummy@example.com',
       name: 'Dummy User',
       password: 'old_hashed_password',
+      role: UserRole.USER,
     });
     prismaMock.user.findFirst.mockResolvedValue(mockUser);
     prismaMock.user.update.mockResolvedValue(mockUser);
@@ -114,8 +118,8 @@ describe('POST /api/auth/reset-password/confirm', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
   });
 
   it('should return 500 if hashPassword fails', async () => {
@@ -129,16 +133,16 @@ describe('POST /api/auth/reset-password/confirm', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const mockUser = createMockUser({ id: 'dummy-user-id' });
+    const mockUser = createMockUser({ id: 'dummy-user-id', role: UserRole.USER });
     prismaMock.user.findFirst.mockResolvedValue(mockUser);
     hashPasswordMock.mockRejectedValue(new Error('Hashing failed'));
 
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+    actualExpect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
   it('should return 500 if prisma.user.update fails', async () => {
@@ -152,7 +156,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const mockUser = createMockUser({ id: 'dummy-user-id' });
+    const mockUser = createMockUser({ id: 'dummy-user-id', role: UserRole.USER });
     prismaMock.user.findFirst.mockResolvedValue(mockUser);
     hashPasswordMock.mockResolvedValue('new_hashed_password');
     prismaMock.user.update.mockRejectedValue(new Error('DB update failed'));
@@ -160,8 +164,8 @@ describe('POST /api/auth/reset-password/confirm', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
   });
 
   it('should validate request body structure', async () => {
@@ -181,9 +185,9 @@ describe('POST /api/auth/reset-password/confirm', () => {
       const response = await POST(req as Request);
       const responseBody = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
-      expect(mockConsoleError).toHaveBeenCalled();
+      actualExpect(response.status).toBe(500);
+      actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+      actualExpect(mockConsoleError).toHaveBeenCalled();
     }
   });
 
@@ -205,8 +209,8 @@ describe('POST /api/auth/reset-password/confirm', () => {
       const response = await POST(req as Request);
       const responseBody = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+      actualExpect(response.status).toBe(500);
+      actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
     }
   });
 
@@ -224,6 +228,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
     const mockUser = createMockUser({
       id: 'test-user-id',
       email: 'dummy@example.com',
+      role: UserRole.USER,
     });
 
     prismaMock.user.findFirst.mockResolvedValue(mockUser);
@@ -249,15 +254,15 @@ describe('POST /api/auth/reset-password/confirm', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const mockUser = createMockUser({ id: 'test-user-id' });
+    const mockUser = createMockUser({ id: 'test-user-id', role: UserRole.USER });
     prismaMock.user.findFirst.mockResolvedValue(mockUser);
     prismaMock.user.update.mockRejectedValue(new Error('P2002')); // Prisma unique constraint error
 
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
-    expect(mockConsoleError).toHaveBeenCalled();
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードのリセットに失敗しました');
+    actualExpect(mockConsoleError).toHaveBeenCalled();
   });
 }); 
