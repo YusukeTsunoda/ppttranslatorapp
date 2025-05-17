@@ -20,6 +20,8 @@ import './commands';
 // require('./commands')
 
 import { mount } from 'cypress/react18';
+import '@cypress/code-coverage/support';
+import 'cypress-mochawesome-reporter/register';
 
 // Augment the Cypress namespace to include type definitions for
 // your custom command.
@@ -35,3 +37,20 @@ Cypress.Commands.add('mount', mount);
 
 // Example use:
 // cy.mount(<MyComponent />);
+
+// グローバルスタイルの読み込み
+import '../app/globals.css';
+
+beforeEach(() => {
+  // テスト用のビューポートを設定
+  cy.viewport(1280, 720);
+});
+
+// React18のStrictModeでの警告を抑制
+const originalLog = Cypress.log;
+Cypress.log = function (opts, ...other) {
+  if (opts.displayName === 'script error' && opts.message?.includes('StrictMode')) {
+    return;
+  }
+  return originalLog(opts, ...other);
+};

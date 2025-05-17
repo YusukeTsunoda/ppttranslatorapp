@@ -1,6 +1,7 @@
 // Jest setup file
 import '@testing-library/jest-dom';
 import { expect } from '@jest/globals';
+import { setupTestDatabase, cleanupTestDatabase } from './utils/db-setup';
 
 // NextAuth のモック
 jest.mock('next-auth/react', () => ({
@@ -78,7 +79,14 @@ global.localStorage = new LocalStorageMock();
 // console.error のモック（テスト出力をクリーンに保つため）
 console.error = jest.fn();
 
-// テスト環境のクリーンアップ
-afterEach(() => {
-  jest.clearAllMocks();
+beforeAll(async () => {
+  await setupTestDatabase();
+});
+
+afterEach(async () => {
+  await cleanupTestDatabase();
+});
+
+afterAll(async () => {
+  await cleanupTestDatabase();
 });

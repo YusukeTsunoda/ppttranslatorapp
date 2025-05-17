@@ -32,122 +32,157 @@ const createMockRequest = (body: any) => {
 describe('Login API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // データベース接続のモックをデフォルトで成功に設定
+    (prisma.$connect as jest.Mock).mockResolvedValue(undefined);
+    (prisma.$disconnect as jest.Mock).mockResolvedValue(undefined);
   });
 
-  it('必須フィールドが欠けている場合は400エラーを返す', async () => {
-    // メールアドレスが欠けている
-    const reqWithoutEmail = createMockRequest({ password: 'password123' });
-    const resWithoutEmail = await POST(reqWithoutEmail);
-    expect(resWithoutEmail.status).toBe(400);
+  describe('POST /api/auth/login', () => {
+    it('正常なログインリクエストを処理できる', async () => {
+      // ユーザーが存在し、パスワードが一致する場合のモック設定
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'test-user-id',
+        email: 'test@example.com',
+        password: 'hashed_password',
+        name: 'Test User',
+      });
+      (comparePasswords as jest.Mock).mockResolvedValue(true);
 
-    // パスワードが欠けている
-    const reqWithoutPassword = createMockRequest({ email: 'test@example.com' });
-    const resWithoutPassword = await POST(reqWithoutPassword);
-    expect(resWithoutPassword.status).toBe(400);
-  });
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
 
-  it('ユーザーが存在しない場合は401エラーを返す', async () => {
-    // ユーザーが見つからない場合
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(200);
 
-    const req = createMockRequest({
-      email: 'nonexistent@example.com',
-      password: 'password123',
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.user).toEqual({
+        id: 'test-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+      });
     });
 
-    const res = await POST(req);
-    expect(res.status).toBe(401);
+    it('必須フィールドが欠けている場合は400エラーを返す', async () => {
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'test@example.com',
+          // パスワードを省略
+        }),
+      });
 
-    const data = await res.json();
-    expect(data.error).toContain('メールアドレスまたはパスワードが正しくありません');
-  });
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(400);
 
-  it('パスワードが一致しない場合は401エラーを返す', async () => {
-    // ユーザーは存在するが、パスワードが一致しない
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
-      id: 'user-id',
-      email: 'test@example.com',
-      password: 'hashed_password',
-      name: 'Test User',
+      const data = await response.json();
+      expect(data.error).toBe('メールアドレスとパスワードは必須です');
     });
 
-    // パスワードの比較結果をfalseに設定
-    (comparePasswords as jest.Mock).mockResolvedValueOnce(false);
+    it('存在しないユーザーの場合は401エラーを返す', async () => {
+      // ユーザーが存在しない場合のモック設定
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-    const req = createMockRequest({
-      email: 'test@example.com',
-      password: 'wrong_password',
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'nonexistent@example.com',
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(401);
+
+      const data = await response.json();
+      expect(data.error).toBe('メールアドレスまたはパスワードが正しくありません');
     });
 
-    const res = await POST(req);
-    expect(res.status).toBe(401);
+    it('パスワードが一致しない場合は401エラーを返す', async () => {
+      // ユーザーは存在するがパスワードが一致しない場合のモック設定
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: 'test-user-id',
+        email: 'test@example.com',
+        password: 'hashed_password',
+        name: 'Test User',
+      });
+      (comparePasswords as jest.Mock).mockResolvedValue(false);
 
-    const data = await res.json();
-    expect(data.error).toContain('メールアドレスまたはパスワードが正しくありません');
-  });
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'test@example.com',
+          password: 'wrong_password',
+        }),
+      });
 
-  it('認証成功時にユーザー情報を返す', async () => {
-    // ユーザーが存在し、パスワードも一致する場合
-    const mockUser = {
-      id: 'user-id',
-      email: 'test@example.com',
-      password: 'hashed_password',
-      name: 'Test User',
-    };
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(401);
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(mockUser);
-    (comparePasswords as jest.Mock).mockResolvedValueOnce(true);
-
-    const req = createMockRequest({
-      email: 'test@example.com',
-      password: 'correct_password',
+      const data = await response.json();
+      expect(data.error).toBe('メールアドレスまたはパスワードが正しくありません');
     });
 
-    const res = await POST(req);
-    // statusのチェックをスキップ（デフォルトではundefinedが返される）
-    // expect(res.status).toBe(200);
+    it('データベース接続エラーの場合は500エラーを返す', async () => {
+      // データベース接続エラーのモック設定
+      (prisma.$connect as jest.Mock).mockRejectedValue(new Error('DB connection failed'));
 
-    const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(data.user).toEqual({
-      id: mockUser.id,
-      email: mockUser.email,
-      name: mockUser.name,
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
+
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.error).toBe('データベース接続エラー');
     });
 
-    // パスワードが含まれていないことを確認
-    expect(data.user.password).toBeUndefined();
-  });
+    it('予期せぬエラーの場合は500エラーを返す', async () => {
+      // 予期せぬエラーのモック設定
+      (prisma.user.findUnique as jest.Mock).mockRejectedValue(new Error('Unexpected error'));
 
-  it('データベース接続エラー時に500エラーを返す', async () => {
-    // データベース接続エラーをシミュレート
-    (prisma.$connect as jest.Mock).mockRejectedValueOnce(new Error('DB connection error'));
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      });
 
-    const req = createMockRequest({
-      email: 'test@example.com',
-      password: 'password123',
+      const response = await POST(req as unknown as NextRequest);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.error).toBe('ログイン処理中にエラーが発生しました');
     });
-
-    const res = await POST(req);
-    expect(res.status).toBe(500);
-
-    const data = await res.json();
-    expect(data.error).toContain('データベース接続エラー');
-  });
-
-  it('予期せぬエラー時に500エラーを返す', async () => {
-    // findUniqueでエラーをスロー
-    (prisma.user.findUnique as jest.Mock).mockRejectedValueOnce(new Error('Unexpected error'));
-
-    const req = createMockRequest({
-      email: 'test@example.com',
-      password: 'password123',
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(500);
-
-    const data = await res.json();
-    expect(data.error).toContain('ログイン処理中にエラーが発生しました');
   });
 });

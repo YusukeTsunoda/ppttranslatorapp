@@ -297,10 +297,21 @@ export class PPTXParser {
 
           return {
             index: slideIndex,
+<<<<<<< HEAD
             imageUrl,
             textElements: this.processTextElements(slide.texts || [], slideIndex),
             shapes: this.processShapes(slide.shapes || []),
             background: this.processBackground(slide.background)
+=======
+            imagePath: imageUrl,
+            textElements: slide.texts.map((textObj: any) => ({
+              id: `text-${slideIndex}-${uuidv4().substring(0, 8)}`,
+              text: textObj.text,
+              position: textObj.position,
+              type: textObj.type || 'text',
+              fontInfo: textObj.paragraphs?.[0]?.font || {}
+            }))
+>>>>>>> c58ec68 (実装途中)
           };
         });
       })
@@ -340,6 +351,35 @@ export class PPTXParser {
     }
   }
 
+<<<<<<< HEAD
+=======
+  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
+    if (!result || !result.slides || !Array.isArray(result.slides)) {
+      throw new Error('Invalid result format from Python script');
+    }
+
+    return {
+      metadata: {
+        ...result.metadata || {},
+        totalSlides: result.slides.length,
+        title: result.title || path.basename(inputPath),
+        lastModified: result.lastModified || new Date().toISOString()
+      },
+      slides: result.slides.map((slide: any, index: number) => ({
+        index,
+        imagePath: slide.imageUrl || slide.imagePath,
+        textElements: (slide.texts || []).map((textObj: any) => ({
+          id: `text-${index}-${uuidv4().substring(0, 8)}`,
+          text: textObj.text,
+          position: textObj.position,
+          type: textObj.type || 'text',
+          fontInfo: textObj.paragraphs?.[0]?.font || {}
+        }))
+      }))
+    };
+  }
+
+>>>>>>> c58ec68 (実装途中)
   public async parsePPTX(inputPath: string, outputDir: string, forceReparse: boolean = false): Promise<PPTXParseResult> {
     try {
       // ファイルハッシュを計算

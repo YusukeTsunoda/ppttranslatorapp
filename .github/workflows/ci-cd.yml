@@ -215,6 +215,27 @@ jobs:
         path: code-quality-report.md
         retention-days: 14
 
+    - name: Post code quality report to PR
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('code-quality-report.md', 'utf8');
+          const conclusion = 
+            '${{ steps.eslint.outcome }}' === 'success' && 
+            '${{ steps.tsc.outcome }}' === 'success' && 
+            '${{ steps.prettier.outcome }}' === 'success' 
+              ? '✅ すべてのコード品質チェックに合格しました！' 
+              : '⚠️ 一部のコード品質チェックに問題があります。詳細は以下をご確認ください。';
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `# コード品質チェック結果\n\n${conclusion}\n\n${report}`
+          });
+
     - name: Failed if any check failed
       if: steps.tsc.outcome == 'failure' || steps.prettier.outcome == 'failure'
       run: exit 1
@@ -356,6 +377,24 @@ jobs:
           reports
           test-summary.md
         retention-days: 14
+
+    - name: Post test results to PR
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const coverageReport = fs.readFileSync('test-summary.md', 'utf8');
+          const conclusion = '${{ steps.jest.outcome }}' === 'success' 
+            ? '✅ すべてのテストが成功しました！' 
+            : '❌ テストに失敗があります。詳細は以下をご確認ください。';
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `# テスト実行結果\n\n${conclusion}\n\n${coverageReport}`
+          });
 
   e2e-tests:
     name: E2E Tests

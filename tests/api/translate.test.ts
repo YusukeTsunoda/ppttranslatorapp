@@ -165,6 +165,7 @@ describe('Translate API', () => {
       expect(data.error).toBe('Invalid request');
     });
 
+<<<<<<< HEAD
     it('テキスト前処理を正しく行う', async () => {
       // 特殊なテキストを含むリクエストボディの作成
       const requestBody = {
@@ -180,10 +181,25 @@ describe('Translate API', () => {
       };
 
       // モックのリクエストオブジェクトを作成
+=======
+    it('認証されていないリクエストで401エラーを返す', async () => {
+      // next-authのモックを一時的にオーバーライド
+      const getServerSession = require('next-auth').getServerSession;
+      getServerSession.mockResolvedValueOnce(null);
+
+      const requestBody = {
+        texts: ['Hello'],
+        sourceLanguage: 'en',
+        targetLanguage: 'ja',
+        fileId: 'test-file-id'
+      };
+
+>>>>>>> c58ec68 (実装途中)
       const mockReq = {
         json: jest.fn().mockResolvedValue(requestBody),
       };
 
+<<<<<<< HEAD
       // APIハンドラを呼び出す
       const response = await POST(mockReq as unknown as NextRequest);
 
@@ -237,12 +253,31 @@ describe('Translate API', () => {
             create: jest.fn().mockRejectedValue(mockAnthropicError),
           },
         }));
+=======
+      const response = await POST(mockReq as unknown as NextRequest);
+      expect(response.status).toBe(401);
+
+      const data = await response.json();
+      expect(data.error).toBe('認証が必要です');
+    });
+
+    it('無料ユーザーは基本モデルのみ使用可能', async () => {
+      // next-authのモックを一時的にオーバーライド
+      const getServerSession = require('next-auth').getServerSession;
+      getServerSession.mockResolvedValueOnce({
+        user: {
+          id: 'test-user',
+          email: 'test@example.com',
+          isPremium: false,
+        },
+>>>>>>> c58ec68 (実装途中)
       });
 
       const requestBody = {
         texts: ['Hello'],
         sourceLanguage: 'en',
         targetLanguage: 'ja',
+<<<<<<< HEAD
         fileId: 'test-file-id',
       };
 
@@ -273,6 +308,10 @@ describe('Translate API', () => {
             ],
           },
         ],
+=======
+        model: 'claude-3-opus-20240229',
+        fileId: 'test-file-id'
+>>>>>>> c58ec68 (実装途中)
       };
 
       const mockReq = {
@@ -281,6 +320,7 @@ describe('Translate API', () => {
 
       const response = await POST(mockReq as unknown as NextRequest);
       expect(response.status).toBe(200);
+<<<<<<< HEAD
       const data = await response.json();
       expect(data.translations).toBeDefined();
       expect(Array.isArray(data.translations)).toBe(true);
@@ -298,12 +338,56 @@ describe('Translate API', () => {
             isPremium: false,
           },
         }),
+=======
+
+      // Anthropic APIが基本モデルで呼び出されたことを確認
+      const Anthropic = require('@anthropic-ai/sdk');
+      const anthropicInstance = Anthropic.mock.instances[0];
+      expect(anthropicInstance.messages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-3-haiku-20240307'
+        })
+      );
+    });
+
+    it('ファイルIDが存在しない場合は404エラーを返す', async () => {
+      // prismaのモックを一時的にオーバーライド
+      const { prisma } = require('@/lib/db/prisma');
+      prisma.file.findUnique = jest.fn().mockResolvedValue(null);
+
+      const requestBody = {
+        texts: ['Hello'],
+        sourceLanguage: 'en',
+        targetLanguage: 'ja',
+        fileId: 'non-existent-file-id'
+      };
+
+      const mockReq = {
+        json: jest.fn().mockResolvedValue(requestBody),
+      };
+
+      const response = await POST(mockReq as unknown as NextRequest);
+      expect(response.status).toBe(404);
+
+      const data = await response.json();
+      expect(data.error).toBe('指定されたファイルIDがデータベースに存在しません');
+    });
+
+    it('翻訳処理でエラーが発生した場合は500エラーを返す', async () => {
+      // Anthropicのモックを一時的にオーバーライド
+      const Anthropic = require('@anthropic-ai/sdk');
+      Anthropic.mockImplementationOnce(() => ({
+        messages: {
+          create: jest.fn().mockRejectedValue(new Error('Translation failed'))
+        }
+>>>>>>> c58ec68 (実装途中)
       }));
 
       const requestBody = {
         texts: ['Hello'],
         sourceLanguage: 'en',
         targetLanguage: 'ja',
+<<<<<<< HEAD
         fileId: 'test-file-id',
         model: 'claude-3-opus-20240229',
       };
@@ -573,6 +657,9 @@ describe('Translate API', () => {
         targetLanguage: 'ja',
         fileId: 'test-file-id',
         slides: [{ index: 0, texts: [{ text: 'Hello', index: 0 }] }],
+=======
+        fileId: 'test-file-id'
+>>>>>>> c58ec68 (実装途中)
       };
 
       const mockReq = {
@@ -581,8 +668,34 @@ describe('Translate API', () => {
 
       const response = await POST(mockReq as unknown as NextRequest);
       expect(response.status).toBe(500);
+<<<<<<< HEAD
       const data = await response.json();
       expect(data.error).toBe('最大リトライ回数を超えました。後でもう一度お試しください。');
+=======
+
+      const data = await response.json();
+      expect(data.error).toContain('翻訳処理中にエラーが発生しました');
+    });
+
+    it('スライドデータが不正な場合は400エラーを返す', async () => {
+      const requestBody = {
+        texts: ['Hello'],
+        sourceLanguage: 'en',
+        targetLanguage: 'ja',
+        fileId: 'test-file-id',
+        slides: 'invalid-slides-data' // 配列ではない不正なデータ
+      };
+
+      const mockReq = {
+        json: jest.fn().mockResolvedValue(requestBody),
+      };
+
+      const response = await POST(mockReq as unknown as NextRequest);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toBe('スライドデータが不正です');
+>>>>>>> c58ec68 (実装途中)
     });
   });
 

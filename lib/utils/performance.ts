@@ -4,6 +4,21 @@
  * パフォーマンス測定用ユーティリティ関数
  */
 
+// Chrome向けのPerformance型拡張
+interface MemoryInfo {
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+  usedJSHeapSize: number;
+}
+
+interface ExtendedPerformance extends Performance {
+  memory?: MemoryInfo;
+}
+
+interface ExtendedWindow extends Window {
+  performance: ExtendedPerformance;
+}
+
 // 処理時間を計測するユーティリティ
 export function measureExecutionTime<T>(
   func: () => T,
@@ -67,8 +82,9 @@ export function reportMemoryUsage(label: string = 'Memory usage') {
     return;
   }
   
-  if (window.performance && window.performance.memory) {
-    const memory = (window.performance as any).memory;
+  const win = window as ExtendedWindow;
+  if (win.performance && win.performance.memory) {
+    const memory = win.performance.memory;
     console.log(`${label}:`, {
       usedJSHeapSize: `${(memory.usedJSHeapSize / 1048576).toFixed(2)} MB`,
       totalJSHeapSize: `${(memory.totalJSHeapSize / 1048576).toFixed(2)} MB`,

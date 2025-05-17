@@ -59,6 +59,7 @@ export interface TextElement {
   id: string;
   text: string;
   position: Position;
+<<<<<<< HEAD
   type: 'title' | 'subtitle' | 'body' | 'header' | 'footer' | 'text';
   font: Font;
   style?: TextStyle;
@@ -119,6 +120,11 @@ export interface Metadata {
   language: string;
   presentationFormat: string;
   createdApplication: string;
+=======
+  fontInfo?: any; // フォント情報（サイズ、種類、スタイルなど）
+  id?: string; // 要素のID
+  type?: string; // テキストタイプ
+>>>>>>> c58ec68 (実装途中)
 }
 
 // レイアウト要素（シェイプ、プレースホルダーなど）

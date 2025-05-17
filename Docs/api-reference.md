@@ -3,86 +3,290 @@
 ## 目次
 
 1. [認証API](#認証api)
-   - [サインイン](#サインイン)
-   - [サインアウト](#サインアウト)
-   - [サインアップ](#サインアップ)
-   - [パスワードリセット](#パスワードリセット)
-   - [セッション検証](#セッション検証)
-
 2. [ユーザーAPI](#ユーザーapi)
-   - [プロフィール取得](#プロフィール取得)
-   - [プロフィール更新](#プロフィール更新)
-   - [アバター更新](#アバター更新)
-
 3. [翻訳API](#翻訳api)
-   - [ファイルアップロード](#ファイルアップロード)
-   - [スライド取得](#スライド取得)
-   - [翻訳実行](#翻訳実行)
-   - [翻訳済みファイルダウンロード](#翻訳済みファイルダウンロード)
+4. [バッチ処理API](#バッチ処理api)
+5. [管理者API](#管理者api)
+6. [統計API](#統計api)
+7. [エラーハンドリング](#エラーハンドリング)
 
-4. [エラーハンドリング](#エラーハンドリング)
-   - [エラーレスポンスの形式](#エラーレスポンスの形式)
-   - [エラーコード](#エラーコード)
-   - [エラー処理のベストプラクティス](#エラー処理のベストプラクティス)
+## 共通仕様
 
-5. [認証と認可](#認証と認可)
-   - [トークンの仕組み](#トークンの仕組み)
-   - [トークン更新](#トークン更新)
-   - [アクセス制御](#アクセス制御)
+### リクエストヘッダー
 
-### バッチアップロードAPI
-
-**エンドポイント**: POST /api/batch-upload  
-**リクエスト**: multipart/form-data, files[]  
-**レスポンス**: { jobId: string, accepted: number, rejected: number }
-
-### APIキー管理API
-
-- GET /api/api-keys
-- POST /api/api-keys
-- DELETE /api/api-keys/:id
-
-**レスポンス例**:
-```json
-[
-  { "id": "dummy", "key": "xxxx-xxxx", "isActive": true }
-]
+```
+Content-Type: application/json
+Authorization: Bearer <token>  // 認証が必要なエンドポイントの場合
 ```
 
-### APIキー使用量監視API
+### レスポンス形式
 
-- GET /api/api-keys/usage
-- 認証ユーザーのAPIキーごとの使用量（tokenCount, apiCalls, month, year）を返す
-- レスポンス例:
+1. **成功時**
 ```json
-[
-  { "userId": "user1", "tokenCount": 100, "apiCalls": 10, "month": 4, "year": 2025 }
-]
+{
+  "success": true,
+  "data": { ... },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
 ```
 
-### 請求書PDF生成API
+2. **エラー時**
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "エラーメッセージ",
+  "details": { ... },  // オプショナル
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
 
-- POST /api/invoice/generate
-- リクエスト: { userId, amount, items, ... }
-- レスポンス: PDFバイナリ
+3. **ページネーション**
+```json
+{
+  "data": [ ... ],
+  "pagination": {
+    "total": 100,
+    "page": 1,
+    "pageSize": 20,
+    "pages": 5
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
 
-### 請求書メール送信API
+## バッチ処理API
 
-- POST /api/invoice/send
-- リクエスト: { to, subject, pdfBase64 }
-- レスポンス: { success: true, message: string } または { error: string, detail?: string }
+### バッチアップロード
 
-### 統計データAPI
+**エンドポイント**: `POST /api/batch-upload`  
+**認証**: 必須  
+**Content-Type**: `multipart/form-data`
 
-- GET /api/statistics
-- レスポンス: { dailyTranslations: number[], creditUsage: number[] }
+**リクエスト**:
+```
+files[]: File[]  // 複数のPPTXファイル
+```
 
-### 統計エクスポートAPI
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "job_xxxxx",
+    "accepted": 2,
+    "rejected": 0,
+    "timestamp": "2024-04-15T12:34:56Z"
+  }
+}
+```
 
-- GET /api/statistics/export
-- レスポンス: CSVファイル（userId,tokenCount,apiCalls,month,year...）
+### バッチジョブ状態取得
 
----
+**エンドポイント**: `GET /api/batch-upload/status/:jobId`  
+**認証**: 必須
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "status": "PROCESSING",  // PENDING, PROCESSING, COMPLETED, FAILED
+    "progress": 1,
+    "total": 2,
+    "completedFiles": ["file1.pptx"],
+    "pendingFiles": ["file2.pptx"],
+    "error": null,
+    "timestamp": "2024-04-15T12:34:56Z"
+  }
+}
+```
+
+## 管理者API
+
+### ユーザー管理
+
+#### ユーザー一覧取得
+
+**エンドポイント**: `GET /api/admin/users`  
+**認証**: 必須（ADMINロールのみ）  
+**クエリパラメータ**:
+- `page`: ページ番号（デフォルト: 1）
+- `limit`: 1ページあたりの件数（デフォルト: 20）
+- `sort`: ソートフィールド（例: "createdAt"）
+- `order`: ソート順（"asc" or "desc"）
+- `search`: 検索キーワード
+- `role`: ロールでフィルタ（"USER" or "ADMIN"）
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": "user_id",
+        "email": "user@example.com",
+        "name": "User Name",
+        "role": "USER",
+        "createdAt": "2024-04-15T12:34:56Z",
+        "lastLoginAt": "2024-04-15T12:34:56Z"
+      }
+    ]
+  },
+  "pagination": {
+    "total": 100,
+    "page": 1,
+    "pageSize": 20,
+    "pages": 5
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+#### ユーザー作成
+
+**エンドポイント**: `POST /api/admin/users`  
+**認証**: 必須（ADMINロールのみ）
+
+**リクエスト**:
+```json
+{
+  "email": "newuser@example.com",
+  "name": "New User",
+  "role": "USER",
+  "password": "initialPassword123"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "new_user_id",
+      "email": "newuser@example.com",
+      "name": "New User",
+      "role": "USER",
+      "createdAt": "2024-04-15T12:34:56Z"
+    }
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+#### ユーザー更新
+
+**エンドポイント**: `PUT /api/admin/users/:id`  
+**認証**: 必須（ADMINロールのみ）
+
+**リクエスト**:
+```json
+{
+  "name": "Updated Name",
+  "role": "ADMIN"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user_id",
+      "email": "user@example.com",
+      "name": "Updated Name",
+      "role": "ADMIN",
+      "updatedAt": "2024-04-15T12:34:56Z"
+    }
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+#### ユーザー削除
+
+**エンドポイント**: `DELETE /api/admin/users/:id`  
+**認証**: 必須（ADMINロールのみ）
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "message": "ユーザーを削除しました",
+    "userId": "deleted_user_id"
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+### 統計API
+
+#### 利用統計取得
+
+**エンドポイント**: `GET /api/admin/statistics`  
+**認証**: 必須（ADMINロールのみ）  
+**クエリパラメータ**:
+- `from`: 開始日（YYYY-MM-DD）
+- `to`: 終了日（YYYY-MM-DD）
+- `type`: 統計タイプ（"daily", "weekly", "monthly"）
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "data": {
+    "translations": {
+      "total": 1000,
+      "series": [
+        {
+          "date": "2024-04-15",
+          "count": 50,
+          "credits": 100
+        }
+      ]
+    },
+    "users": {
+      "total": 100,
+      "active": 80,
+      "new": 5
+    },
+    "credits": {
+      "consumed": 1000,
+      "remaining": 5000
+    }
+  },
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+#### 統計エクスポート
+
+**エンドポイント**: `GET /api/admin/statistics/export`  
+**認証**: 必須（ADMINロールのみ）  
+**クエリパラメータ**: 同上
+
+**レスポンス**:
+```
+Content-Type: text/csv
+Content-Disposition: attachment; filename="statistics_2024-04-15.csv"
+```
+
+## エラーコード
+
+| コード | 説明 |
+|--------|------|
+| `UNAUTHORIZED` | 認証が必要です |
+| `FORBIDDEN` | アクセス権限がありません |
+| `NOT_FOUND` | リソースが見つかりません |
+| `VALIDATION_ERROR` | リクエストデータが無効です |
+| `RATE_LIMIT_EXCEEDED` | レート制限を超えました |
+| `DATABASE_ERROR` | データベースエラーが発生しました |
+| `API_ERROR` | APIエラーが発生しました |
+| `NETWORK_ERROR` | ネットワークエラーが発生しました |
+| `UNKNOWN_ERROR` | 不明なエラーが発生しました |
 
 ## 認証API
 
@@ -232,8 +436,6 @@
 }
 ```
 
----
-
 ## ユーザーAPI
 
 ユーザーAPIは、ユーザープロフィールの管理に関するエンドポイントを提供します。
@@ -309,8 +511,6 @@ avatar: [ファイルデータ]
   "avatar": "https://example.com/new-avatar.jpg"
 }
 ```
-
----
 
 ## 翻訳API
 
@@ -474,8 +674,6 @@ Content-Disposition: attachment; filename="translated_presentation.pptx"
 - キャッシュ有効期間や再検証戦略を明記
 - 例: `useSWR('/api/history', fetcher, { revalidateOnFocus: true })`
 
----
-
 ## エラーハンドリング
 
 APIは、一貫したエラーレスポンスの形式を提供し、クライアントがエラーを適切に処理できるようにします。
@@ -494,22 +692,6 @@ APIは、一貫したエラーレスポンスの形式を提供し、クライ�
   "timestamp": "2023-01-01T00:00:00Z"
 }
 ```
-
-### エラーコード
-
-APIは、以下のエラーコードを使用します：
-
-| エラーコード | HTTPステータス | 説明 |
-|------------|--------------|------|
-| `UNAUTHORIZED` | 401 | 認証が必要です |
-| `FORBIDDEN` | 403 | アクセス権限がありません |
-| `NOT_FOUND` | 404 | リソースが見つかりません |
-| `VALIDATION_ERROR` | 400 | リクエストデータが無効です |
-| `RATE_LIMIT_EXCEEDED` | 429 | レート制限を超えました |
-| `DATABASE_ERROR` | 500 | データベースエラーが発生しました |
-| `API_ERROR` | 500 | APIエラーが発生しました |
-| `NETWORK_ERROR` | 500 | ネットワークエラーが発生しました |
-| `UNKNOWN_ERROR` | 500 | 不明なエラーが発生しました |
 
 ### エラー処理のベストプラクティス
 
@@ -551,8 +733,6 @@ async function fetchData() {
   }
 }
 ```
-
----
 
 ## 認証と認可
 
