@@ -736,7 +736,58 @@ Content-Disposition: attachment; filename="translated_presentation.pptx"
 [ファイルデータ]
 ```
 
-### サムネイル画像遅延ロード
+### スライド画像API
+
+スライド画像を取得するAPIです。
+
+#### スライド画像取得
+
+**エンドポイント**: `GET /api/slides/:fileId/slides/:imageName`  
+**認証**: 必須
+
+**パスパラメータ**:
+- `fileId`: スライドが属するファイルのID
+- `imageName`: 取得するスライド画像の名前（例: `1.png`、`2.png`など）
+
+**クエリパラメータ**:
+- `width`: 画像の最大幅（オプション）
+- `height`: 画像の最大高さ（オプション）
+- `quality`: 画像の品質（オプション、1-100の範囲）
+
+**レスポンス**:
+- Content-Type: `image/png`（または適切な画像形式）
+- ステータスコード: 200 OK
+
+**エラーレスポンス**:
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "エラーメッセージ",
+  "timestamp": "2024-04-15T12:34:56Z"
+}
+```
+
+**エラーコード**:
+- `UNAUTHORIZED`: 認証が必要です
+- `NOT_FOUND`: ファイルが見つかりません
+- `BAD_REQUEST`: 無効なパス形式です
+- `INTERNAL_SERVER_ERROR`: サーバーエラーが発生しました
+
+#### 旧形式のパスサポート（リダイレクト）
+
+**エンドポイント**: `GET /api/slides/:fileId/:imageName`  
+**認証**: 必須
+
+**パスパラメータ**:
+- `fileId`: スライドが属するファイルのID
+- `imageName`: 取得するスライド画像の名前（例: `slide_1.png`、`slide_2.png`など）
+
+**動作**:
+- 新形式のパス `/api/slides/:fileId/slides/:imageName` にリダイレクトします
+- ステータスコード: 307 Temporary Redirect
+- 認証情報は保持されます
+
+#### サムネイル画像遅延ロード
 
 **エンドポイント例**: `GET /api/slides/:fileId/thumbnail/:index`
 

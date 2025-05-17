@@ -4,60 +4,119 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
-import { createReadStream } from 'fs';
-import { stat } from 'fs/promises';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { withAPILogging } from '@/lib/utils/api-logging';
 
 // パスの検証関数
 const validatePath = (path: string): boolean => {
   // パスに '..' が含まれていないことを確認（ディレクトリトラバーサル対策）
   if (path.includes('..')) return false;
 
-  // パスの形式を検証（例：fileId/slide_1.png）
-  const pathPattern = /^[\w-]+\/slide_\d+\.png$/;
+  // パスの形式を検証（fileIdのみを許可）
+  const pathPattern = /^[\w-]+$/;
   if (!pathPattern.test(path)) return false;
 
   return true;
 };
 
-export async function GET(request: NextRequest, { params }: { params: { path: string } }) {
+/**
+ * 旧形式のパス `/api/slides/{fileId}/{imageName}` から
+ * 新形式のパス `/api/slides/{fileId}/slides/{imageName}` へリダイレクトするハンドラー
+ */
+async function handleGET(request: NextRequest, { params }: { params: { path: string } }) {
   try {
-    // セッションチェックを新しい方式に変更
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
-    }
+    console.log('スライドAPI - 旧形式パスリクエスト:', {
+      url: request.url,
+      path: params.path,
+      method: request.method,
+      timestamp: new Date().toISOString()
+    });
 
     // パスの検証
     if (!validatePath(params.path)) {
-      return NextResponse.json({ error: '無効なファイルパスです' }, { status: 400 });
+      return NextResponse.json({ 
+        error: '無効なファイルパスです',
+        message: '新形式のパス `/api/slides/{fileId}/slides/{imageName}` を使用してください'
+      }, { status: 400 });
     }
 
-    // userIdを文字列に変換
-    const userId = session.user.id.toString();
-    const userSlidesDir = join(process.cwd(), 'tmp', 'users', userId, 'slides');
-    const filePath = join(userSlidesDir, params.path);
-
-    // ファイルの存在確認
-    try {
-      await stat(filePath);
-    } catch (error) {
-      return NextResponse.json({ error: 'ファイルが見つかりません' }, { status: 404 });
+    // パスからファイルIDを抽出
+    const fileId = params.path;
+    
+    // リクエストURLからクエリパラメータを取得
+    const url = new URL(request.url);
+    const searchParams = url.searchParams.toString();
+    const queryString = searchParams ? `?${searchParams}` : '';
+    
+    // 新しいURLを構築
+    // 例: /api/slides/abc123 → /api/slides/abc123/slides/1.png
+    const originalUrl = new URL(request.url);
+    const pathSegments = originalUrl.pathname.split('/');
+    
+    // 最後のセグメントがファイルIDの場合は、デフォルトで最初のスライドにリダイレクト
+    let newPath = `/api/slides/${fileId}/slides/1.png${queryString}`;
+    
+    // URLに画像名が含まれている場合（例: /api/slides/abc123/slide_1.png）
+    if (pathSegments.length > 3) {
+      const imageName = pathSegments[pathSegments.length - 1];
+      if (imageName.match(/slide_\d+\.png/)) {
+        // slide_1.png → 1.png のように変換
+        const slideNumber = imageName.replace('slide_', '');
+        newPath = `/api/slides/${fileId}/slides/${slideNumber}${queryString}`;
+      }
     }
-
-    // ストリームを作成
-    const stream = createReadStream(filePath);
-
-    // レスポンスを返す
-    return new NextResponse(stream as any, {
+    
+    console.log('スライドAPI - リダイレクト:', {
+      from: request.url,
+      to: newPath,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 307 Temporary Redirectでリダイレクト
+    // 307は元のHTTPメソッドとリクエストボディを保持する
+    return NextResponse.redirect(new URL(newPath, request.url), {
+      status: 307,
       headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=3600',
-      },
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Credentials': 'true',
+      }
     });
   } catch (error) {
-    console.error('Error serving slide image:', error);
-    return NextResponse.json({ error: 'スライド画像の取得に失敗しました' }, { status: 500 });
+    console.error('スライドAPI - リダイレクトエラー:', {
+      url: request.url,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    return NextResponse.json({ 
+      error: 'リダイレクト処理中にエラーが発生しました',
+      message: '新形式のパス `/api/slides/{fileId}/slides/{imageName}` を直接使用してください'
+    }, { status: 500 });
   }
 }
+
+// OPTIONSリクエストハンドラー
+async function handleOPTIONS(request: NextRequest) {
+  console.log('スライドAPI - 旧形式パスOPTIONSリクエスト:', {
+    url: request.url,
+    method: request.method,
+    timestamp: new Date().toISOString()
+  });
+  
+  // CORSヘッダーを設定
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400',
+  };
+
+  return new NextResponse(null, {
+    status: 200,
+    headers,
+  });
+}
+
+// API ルートハンドラーにロギングを追加
+export const GET = withAPILogging(handleGET, 'slide-image-redirect');
+export const OPTIONS = withAPILogging(handleOPTIONS, 'slide-image-options-redirect');
