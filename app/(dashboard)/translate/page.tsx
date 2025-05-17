@@ -91,7 +91,7 @@ export default function TranslatePage() {
   const extractFileIdFromUrl = (url?: string): string => {
     if (!url) return '';
     // /api/slides/{fileId}/slides/{imageName} の形式からfileIdを抽出
-    const matches = url.match(/\/api\/slides\/([^\/]+)\/slides\//);
+    const matches = url.match(/\/api\/slides\/([^/]+)\/slides\//);
     return matches ? matches[1] : '';
   };
 
@@ -443,7 +443,7 @@ export default function TranslatePage() {
       // fileIdがない場合はスライドのimageUrlから抽出
       if (!extractedFileId && slides.length > 0 && slides[0].imageUrl) {
         // URLパターン: /api/slides/{fileId}/slides/slide_1.png
-        const matches = slides[0].imageUrl.match(/\/api\/slides\/([^\/]+)\/slides\//); 
+        const matches = slides[0].imageUrl.match(/\/api\/slides\/([^/]+)\/slides\//); 
         extractedFileId = matches ? matches[1] : null;
       }
       

@@ -59,6 +59,8 @@ export default [
         MSApp: 'readonly',
         __REACT_DEVTOOLS_GLOBAL_HOOK__: 'readonly',
         __MOBX_DEVTOOLS_GLOBAL_HOOK__: 'readonly',
+        NodeJS: 'readonly',
+        HeadersInit: 'readonly',
       },
     },
     rules: {

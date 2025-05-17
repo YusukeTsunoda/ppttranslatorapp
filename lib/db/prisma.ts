@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 // グローバル変数の型定義
 declare global {
-  // eslint-disable-next-line no-var
+   
   var prisma: PrismaClient | undefined;
   var prismaInstances: Record<string, PrismaClient> | undefined;
 }

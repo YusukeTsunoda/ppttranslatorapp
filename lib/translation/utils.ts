@@ -87,7 +87,7 @@ export function cleanTranslatedText(text: string): string {
     /^The text "([^"]+)" can be translated to English as:\s*/i,
     /^The text "([^"]+)" in English is:\s*/i,
     /^The English translation of "([^"]+)" is:\s*/i,
-    /^\"(.+)\"$/,
+    /^"(.+)"$/,
     /^(.+):$/,
   ];
 

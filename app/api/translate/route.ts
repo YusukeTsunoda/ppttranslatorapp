@@ -193,7 +193,7 @@ async function handler(req: NextRequest) {
               /^The text "([^"]+)" can be translated to English as:\s*/i,  // The text "..." can be translated to English as: パターンを削除
               /^The text "([^"]+)" in English is:\s*/i,  // The text "..." in English is: パターンを削除
               /^The English translation of "([^"]+)" is:\s*/i,  // The English translation of "..." is: パターンを削除
-              /^\"(.+)\"$/,  // 引用符で囲まれたテキストから引用符を削除
+              /^"(.+)"$/,  // 引用符で囲まれたテキストから引用符を削除
               /^(.+):$/,     // ダブルコロンで終わるパターンを削除
             ];
             
