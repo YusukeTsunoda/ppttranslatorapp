@@ -45,6 +45,17 @@ export async function translateConcurrently(
   if (signal?.aborted) {
     throw new Error('Translation cancelled');
   }
+  
+  // キャンセルイベントを監視するプロミス
+  let cancelPromise: Promise<never> | null = null;
+  if (signal) {
+    cancelPromise = new Promise<never>((_, reject) => {
+      const abortHandler = () => {
+        reject(new Error('Translation cancelled'));
+      };
+      signal.addEventListener('abort', abortHandler);
+    });
+  }
 
   // テキストを指定サイズのバッチに分割
   const batches = chunk(texts, batchSize);
@@ -95,6 +106,15 @@ export async function translateConcurrently(
       });
 
       // 現在のバッチセットの結果を取得
+      const batchPromisesWithCancel = cancelPromise 
+        ? [...batchPromises, cancelPromise] 
+        : batchPromises;
+      
+      // Promise.raceを使用してキャンセルを先に処理
+      if (cancelPromise) {
+        await Promise.race([Promise.all(batchPromises), cancelPromise]);
+      }
+      
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults.flat());
 

@@ -103,13 +103,30 @@ describe('Translation Concurrent Processing', () => {
       const sourceLanguage = 'en';
       const targetLanguage = 'ja';
       const abortController = new AbortController();
+      
+      // 長時間かかる翻訳関数をモック
+      const mockTranslate = jest.fn().mockImplementation((text) => {
+        return new Promise((resolve) => {
+          // 翻訳に時間がかかるようにする
+          setTimeout(() => {
+            resolve({
+              original: text,
+              translated: `Translated: ${text}`
+            });
+          }, 500); // 各翻訳に500msかかるようにする
+        });
+      });
 
       // 翻訳を開始して即座にキャンセル
-      setTimeout(() => abortController.abort(), 100);
+      const translationPromise = translateConcurrently(texts, sourceLanguage, targetLanguage, { 
+        signal: abortController.signal,
+        translate: mockTranslate
+      });
+      
+      // 翻訳開始後にキャンセル
+      abortController.abort();
 
-      await expect(
-        translateConcurrently(texts, sourceLanguage, targetLanguage, { signal: abortController.signal })
-      ).rejects.toThrow('Translation cancelled');
+      await expect(translationPromise).rejects.toThrow('Translation cancelled');
     });
 
     it('メモリ使用量を監視する', async () => {
