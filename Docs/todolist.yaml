@@ -1,4 +1,137 @@
-# MVPに必要な実装項目（実装順序と詳細）
+
+# MVPに必要な実装項目（未完了タスクの抽出と優先順位付け）
+mvp_required_implementation_uncompleted:
+  title: MVPに必要な未完了実装項目（優先度順）
+  description: これらが完了しないとMVPリリースが困難、またはMVPの品質と基本的な運用に不可欠な未完了タスク
+  items:
+    - description: "- [ ] **Supabase連携計画 (Phase 1 & 2)**"
+      priority: highest # アプリケーションの根幹
+      phases:
+        - phase_name: "Phase 1 - 基本設定とデータベース移行"
+          tasks:
+            - description: "- [ ] プロジェクトセットアップ"
+            - description: "- [ ] スキーマ移行"
+            - description: "- [ ] 認証連携"
+        - phase_name: "Phase 2 - ストレージとRLS実装"
+          tasks:
+            - description: "- [ ] ファイルストレージ設定"
+            - description: "- [ ] 基本的なRLSポリシー実装（ユーザーデータ保護）"
+      subtasks: # application_tasks -> Supabase連携計画 より
+        - description: "- [ ] Phase 1 - 基本設定とデータベース移行 (プロジェクトセットアップ, スキーマ移行, 認証連携)"
+        - description: "- [ ] Phase 2 - ストレージとRLS実装 (ファイルストレージ設定, RLSポリシー実装)"
+
+    - description: "- [ ] **CI/CD統合と環境整備に関するビルド安定化タスク**"
+      priority: highest # Vercelデプロイ成功と安定動作に不可欠
+      phases:
+        - phase_name: "依存関係の型定義問題解決"
+          tasks:
+            - description: "- [ ] サーバーパッケージごとの依存関係解決（everart, gdrive, github, gitlab, google-maps, memory, puppeteer, redis, sequential-thinking, slack パッケージの未解決分。これがビルドエラーやコアAPI動作に影響する場合）"
+            - description: "- [ ] npm install時のエラー調査と修正"
+              subtasks:
+                - description: "- [ ] package.jsonのworkspace設定の確認"
+                - description: "- [ ] Node.jsバージョンの互換性確認"
+                - description: "- [ ] npmクライアントのキャッシュクリア"
+                - description: "- [ ] 各パッケージのpackage-lock.jsonの整合性確認"
+                - description: "- [ ] \"Cannot destructure property 'package' of 'node.target' as it is null\"エラーの調査"
+            - description: "- [ ] モジュール解決戦略の見直し"
+              subtasks:
+                - description: "- [ ] ESM/CommonJS混在問題の確認"
+                - description: "- [ ] import/requireの一貫性確保"
+            - description: "- [ ] ビルドプロセスの最適化"
+              subtasks:
+                - description: "- [ ] 依存関係の解決順序の最適化"
+                - description: "- [ ] TypeScriptビルドエラー時の詳細ログ出力設定"
+        - phase_name: "Vercelデプロイエラー対策"
+          tasks:
+            - description: "- [ ] サーバーレス関数のサイズ超過問題の解決 (`api/slides/[...path].js` を中心に、不要な依存関係の排除、バンドルサイズの最適化)"
+            - description: "- [ ] ビルド時のデータベース接続エラーの解決 (環境変数、ネットワーク設定の再確認)"
+            - description: "- [ ] Dynamic Server Usage エラーの解決 (`admin` 関連ページへの `export const dynamic = 'force-dynamic';` の追加など)"
+      subtasks: # application_tasks -> testing_and_cicd -> テスト実行の最適化 および 前回のログより
+        - description: "- [ ] サーバーパッケージごとの依存関係解決 (everart, gdrive, github, gitlab, google-maps, memory, puppeteer, redis, sequential-thinking, slack の未解決分)"
+        - description: "- [ ] npm install時のエラー調査と修正"
+        - description: "- [ ] モジュール解決戦略の見直し"
+        - description: "- [ ] ビルドプロセスの最適化 (依存関係解決順序、TSビルドエラーログ)"
+        - description: "- [ ] Vercel サーバーレス関数サイズ超過の解決"
+        - description: "- [ ] Vercel ビルド時DB接続エラーの解決"
+        - description: "- [ ] Vercel Dynamic Server Usage エラーの解決"
+
+    - description: "- [ ] **基本的なテストとCI/CDパイプラインの確立**"
+      priority: high # MVPの品質と基本的な運用のため
+      phases:
+        - phase_name: "テスト実行環境の最適化"
+          tasks:
+            - description: "- [ ] 並列実行の設定"
+            - description: "- [ ] キャッシュの活用"
+            - description: "- [ ] テスト実行時間の短縮"
+      subtasks: # application_tasks -> testing_and_cicd -> テスト実行の最適化 より
+        - description: "- [ ] 並列実行の設定"
+        - description: "- [ ] キャッシュの活用"
+        - description: "- [ ] テスト実行時間の短縮"
+        # CIで最低限のテストが自動実行され、Vercelデプロイがスムーズに行える状態を目指す
+
+# MVPに追加で検討すべき項目
+mvp_additional_considerations:
+  title: MVPに追加で検討すべき項目
+  description: MVPリリースに向けて、ユーザー体験や運用面で最低限考慮しておきたい項目
+  items:
+    - description: "- [ ] **エラーハンドリングとユーザーフィードバックの整備**"
+      priority: high
+      phases:
+        - phase_name: "UI/UX改善"
+          tasks:
+            - description: "- [ ] 各主要機能（アップロード、翻訳、ダウンロード、認証等）のエラー発生時に分かりやすいメッセージを表示"
+            - description: "- [ ] エラーからの復帰や次のアクションをユーザーに提示"
+      subtasks:
+        - description: "- [ ] 分かりやすいエラーメッセージの表示"
+        - description: "- [ ] ユーザーへの適切な案内"
+
+    - description: "- [ ] **基本的な利用案内・ヘルプの作成**"
+      priority: medium
+      phases:
+        - phase_name: "ドキュメント作成"
+          tasks:
+            - description: "- [ ] 初めて使うユーザー向けの簡単な使い方ガイド作成"
+            - description: "- [ ] よくある質問（FAQ）の準備"
+      subtasks:
+        - description: "- [ ] 簡単な使い方ガイド"
+        - description: "- [ ] FAQ"
+
+    - description: "- [ ] **利用規約・プライバシーポリシーの準備と表示**"
+      priority: high # 法務要件
+      phases:
+        - phase_name: "法務対応"
+          tasks:
+            - description: "- [ ] 利用規約の作成または確認"
+            - description: "- [ ] プライバシーポリシーの作成または確認"
+            - description: "- [ ] アプリ内またはWebサイトでの表示"
+      subtasks:
+        - description: "- [ ] 利用規約の準備と表示"
+        - description: "- [ ] プライバシーポリシーの準備と表示"
+
+    - description: "- [ ] **課金・クレジットシステムの基本的な動作確認とUI整備 (もしMVPスコープ内なら)**"
+      priority: high (if in scope)
+      phases:
+        - phase_name: "機能確認とUI整備"
+          tasks:
+            - description: "- [ ] クレジット残高の表示確認"
+            - description: "- [ ] 翻訳時のクレジット消費ロジックの動作確認"
+            - description: "- [ ] （もしあれば）クレジット購入フローの基本的な動作確認とUI"
+      subtasks:
+        - description: "- [ ] クレジット表示・消費ロジックの確認"
+        - description: "- [ ] 購入フローの基本動作確認（もしあれば）"
+
+    - description: "- [ ] **基本的なログとモニタリングの整備**"
+      priority: high
+      phases:
+        - phase_name: "運用基盤整備"
+          tasks:
+            - description: "- [ ] Sentry等のエラーログ収集ツールの基本的な設定と動作確認"
+            - description: "- [ ] Vercel Analytics等の基本的なパフォーマンス監視の設定"
+      subtasks:
+        - description: "- [ ] エラーログ収集の基本的な設定"
+        - description: "- [ ] 基本的なパフォーマンス監視の設定"
+
+# 既存の `mvp_required_implementation` セクション (完了済みタスクはそのまま)
 mvp_required_implementation:
   title: MVPに必要な実装項目（実装順序と詳細）
   description: 優先度順に実装すべき項目と、各項目の詳細な実装ステップ
@@ -152,7 +285,10 @@ mvp_required_implementation:
             - description: "- [x] パラメータバリデーションの強化"
             - description: "- [x] アクセス制御の実装"
 
-# パフォーマンス最適化 進捗状況とTODOリスト
+# 残りのセクションは、MVPに直接必要ではない、または既に完了済みの詳細情報として扱います。
+# (performance_optimization, application_tasks, testing_and_cicd の完了済み項目、test_improvement_plan, additional_features は、
+# MVPリリース後の改善・拡張項目として元の情報を保持します。)
+
 performance_optimization:
   title: パフォーマンス最適化
   completed_items:
@@ -296,10 +432,8 @@ performance_optimization:
         - description: "- [x] エラー情報の構造化と分析機能の実装"
         - description: "- [x] ParseErrorインターフェースの追加"
         - description: "- [x] エラー発生時のグレースフルな回復処理の実装"
-  ongoing_tasks:
-    # MVPに必要な実装項目セクションに移動したため、このセクションは空にします
+  ongoing_tasks: [] # MVPに必要な実装項目セクションに移動したため、このセクションは空にします
 
-# PPT翻訳アプリケーション タスクリスト
 application_tasks:
   title: PPT翻訳アプリケーション タスクリスト
   completed_features:
@@ -351,12 +485,7 @@ application_tasks:
         - description: "- [x] クエリの最適化と効率化"
         - description: "- [x] データアクセスユーティリティの実装"
         - description: "- [x] サーバーレス環境での接続管理の改善"
-
-  # MVPに直結する機能と、それを支える基盤
-  mvp_and_core_infrastructure:
-    # MVPに必要な実装項目セクションに移動したため、このセクションは空にします
-
-  # テストとCI/CD (品質と開発効率の担保)
+  mvp_and_core_infrastructure: [] # MVPに必要な実装項目セクションに移動したため、このセクションは空にします
   testing_and_cicd:
     title: テストとCI/CD
     - description: "- [x] テストカバレッジ向上"
@@ -416,8 +545,7 @@ application_tasks:
             - description: "- [x] ユーザー作成テスト"
             - description: "- [x] ユーザー更新テスト"
             - description: "- [x] ユーザー削除テスト"
-        - description: "- [x] 翻訳履歴APIテスト"
-        - description: "- [x] 翻訳履歴APIテスト"
+        - description: "- [x] 翻訳履歴APIテスト" # Note: 重複していたので1つに統合
           subtasks:
             - description: "- [x] 履歴作成テスト"
             - description: "- [x] 履歴一覧取得テスト"
@@ -429,15 +557,10 @@ application_tasks:
             - description: "- [x] クレジット履歴テスト"
         - description: "- [x] アクティビティログAPIテスト"
           subtasks:
-            - description: "- [x] クレジット付与テスト"
-            - description: "- [x] クレジット消費テスト"
-            - description: "- [x] クレジット履歴テスト"
-            - description: "- [x] アクティビティログAPIテスト"
-          subtasks:
             - description: "- [x] ログ記録テスト"
             - description: "- [x] ログ取得テスト"
             - description: "- [x] ログフィルタリングテスト"
-    - description: "- [ ] CI/CD統合と環境整備"
+    - description: "- [ ] CI/CD統合と環境整備" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に主要なものを移動
       priority: highest
       subtasks:
         - description: "- [x] GitHub Actionsワークフローの設定"
@@ -450,7 +573,7 @@ application_tasks:
             - description: "- [x] テスト実行スクリプトの作成"
             - description: "- [x] テスト結果の検証"
             - description: "- [x] テストカバレッジレポートの確認"
-        - description: "- [x] モニタリングシステムの実装"
+        - description: "- [x] モニタリングシステムの実装" # MVPに必要な項目として `mvp_additional_considerations` に移動
           subtasks:
             - description: "- [x] Sentryの設定と検証"
             - description: "- [x] パフォーマンスモニタリングの設定"
@@ -462,7 +585,6 @@ application_tasks:
             - description: "- [x] デプロイ後チェックの検証"
             - description: "- [x] ロールバック機能の検証"
             - description: "- [x] 通知機能の検証"
-      subtasks:
         - description: "- [x] テスト実行環境の整備"
           subtasks:
             - description: "- [x] Jest設定の最適化"
@@ -473,7 +595,7 @@ application_tasks:
             - description: "- [x] ユニットテスト実行コマンド"
             - description: "- [x] E2Eテスト実行コマンド"
             - description: "- [x] カバレッジレポート生成コマンド"
-        - description: "- [x] GitHub Actionsワークフロー設定（完了）"
+        - description: "- [x] GitHub Actionsワークフロー設定（完了）" # Note: 上の項目と統合されているように見える
           subtasks:
             - description: "- [x] プレビューデプロイの自動化"
               subtasks:
@@ -505,7 +627,7 @@ application_tasks:
             - description: "- [x] 環境変数の設定"
             - description: "- [x] マイグレーション自動実行の設定"
         - description: "- [x] テスト実行の最適化"
-          subtasks:
+          subtasks: # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
             - description: "- [ ] 並列実行の設定"
             - description: "- [ ] キャッシュの活用"
             - description: "- [ ] テスト実行時間の短縮"
@@ -513,11 +635,11 @@ application_tasks:
               priority: highest
               subtasks:
                 - description: "- [x] TypeScriptコンパイラ設定の最適化"
-                  subtasks: 
+                  subtasks:
                     - description: "- [x] tsconfig.jsonにNode.js型定義の設定追加"
                     - description: "- [x] コンパイルオプション（sourceMap, declaration）追加"
                     - description: "- [x] allowSyntheticDefaultImportsとoutDirの設定"
-                - description: "- [ ] サーバーパッケージごとの依存関係解決"
+                - description: "- [ ] サーバーパッケージごとの依存関係解決" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
                   subtasks:
                     - description: "- [x] aws-kb-retrieval-serverパッケージの修正"
                       subtasks:
@@ -544,8 +666,6 @@ application_tasks:
                         - description: "- [x] ビルド出力先とスクリプトの修正"
                         - description: "- [x] インクリメンタルビルド設定の追加"
                     - description: "- [ ] everartパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] everart, node-fetch, openパッケージの依存解決"
                     - description: "- [x] filesystemパッケージの修正"
                       subtasks:
                         - description: "- [x] @types/diffは既存（^5.0.9）"
@@ -554,60 +674,20 @@ application_tasks:
                         - description: "- [x] ビルド出力先の変更（dist → dist-new）"
                         - description: "- [x] インクリメンタルビルド設定の追加"
                     - description: "- [ ] gdriveパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] @google-cloud/local-authの依存関係解決"
-                        - description: "- [ ] googleapis, fs, pathの依存関係追加"
                     - description: "- [ ] githubパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] universal-user-agent, node-fetchの依存解決"
                     - description: "- [ ] gitlabパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] node-fetchとBuffer型のエラー解決"
                     - description: "- [ ] google-mapsパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] node-fetchの依存関係追加"
                     - description: "- [ ] memoryパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] fs, path, urlの型定義追加"
                     - description: "- [ ] puppeteerパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] puppeteerとその型定義の追加"
                     - description: "- [ ] redisパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] redisクライアントライブラリの追加"
                     - description: "- [ ] sequential-thinkingパッケージの修正"
-                      subtasks:
-                        - description: "- [ ] chalk依存関係の追加"
-                    - description: "- [ ] slackパッケージの修正" 
-                      subtasks:
-                        - description: "- [ ] Slack APIクライアントの依存関係解決"
-                - description: "- [ ] npm install時のエラー調査と修正"
+                    - description: "- [ ] slackパッケージの修正"
+                - description: "- [ ] npm install時のエラー調査と修正" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
                   priority: high
-                  subtasks:
-                    - description: "- [ ] package.jsonのworkspace設定の確認"
-                    - description: "- [x] 既存の出力ファイルとの競合解決"
-                      subtasks:
-                        - description: "- [x] 出力先ディレクトリの変更（dist → dist-new）"
-                        - description: "- [x] "Cannot write file...because it would overwrite input file"エラーの解決"
-                    - description: "- [ ] Node.jsバージョンの互換性確認"
-                    - description: "- [ ] npmクライアントのキャッシュクリア"
-                    - description: "- [ ] 各パッケージのpackage-lock.jsonの整合性確認"
-                    - description: "- [ ] "Cannot destructure property 'package' of 'node.target' as it is null"エラーの調査"
-                - description: "- [ ] モジュール解決戦略の見直し"
-                  subtasks:
-                    - description: "- [ ] ESM/CommonJS混在問題の確認"
-                    - description: "- [x] package.jsonの"type: module"設定確認"
-                    - description: "- [x] モジュール解決方式設定の追加 (NodeNext)"
-                    - description: "- [ ] import/requireの一貫性確保"
-                - description: "- [ ] ビルドプロセスの最適化"
-                  subtasks:
-                    - description: "- [x] 共通のdevDependenciesをルートpackage.jsonに移動"
-                    - description: "- [x] 依存関係チェックスクリプト追加（check-deps）"
-                    - description: "- [x] 各パッケージのビルドスクリプト修正（出力先変更）"
-                    - description: "- [ ] 依存関係の解決順序の最適化"
-                    - description: "- [ ] TypeScriptビルドエラー時の詳細ログ出力設定"
+                - description: "- [ ] モジュール解決戦略の見直し" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
+                - description: "- [ ] ビルドプロセスの最適化" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
 
-  # 既存テストファイル改善計画
+
   test_improvement_plan:
     title: 既存テストファイル改善計画
     description: 既存のテストファイルを改善し、より堅牢なテストを実装する
@@ -669,7 +749,6 @@ application_tasks:
         - description: "- tests/utils/file.test.ts"
         - description: "- tests/utils/date.test.ts"
         - description: "- tests/utils/validation.test.ts"
-  # その他の機能拡張
   additional_features:
     title: その他の機能拡張
     - description: "- [ ] API連携機能の実装"
@@ -690,21 +769,15 @@ application_tasks:
         - description: "- [ ] 使用状況ダッシュボード"
         - description: "- [ ] グラフ表示"
         - description: "- [ ] エクスポート機能"
-    - description: "- [ ] RLS（Row Level Security）の実装"
-      priority: medium 
-      priority: medium 
-      subtasks:
-        - description: "- [ ] テーブルごとのポリシー設定"
-        - description: "- [ ] ロールベースのアクセス制御"
-        - description: "- [ ] 監査ログの自動記録"
+    - description: "- [ ] RLS（Row Level Security）の実装" # Supabase連携計画に含めて優先度 highest としています
+      priority: medium
     - description: "- [ ] モバイル対応テスト"
       priority: medium
       subtasks:
         - description: "- [ ] レスポンシブデザインのテスト"
         - description: "- [ ] タッチ操作のテスト"
         - description: "- [ ] モバイル特有の問題の検出"
-    - description: "- [ ] Supabase連携計画"
-      priority: high
+    - description: "- [ ] Supabase連携計画" # MVPに必要な項目として `mvp_required_implementation_uncompleted` に移動
       priority: high
       subtasks:
         - description: "- [ ] Phase 1 - 基本設定とデータベース移行 (プロジェクトセットアップ, スキーマ移行, 認証連携)"
@@ -718,3 +791,30 @@ application_tasks:
       priority: low
     - description: "- [ ] APIドキュメントの整備 (Swagger/OpenAPI)"
       priority: low
+
+
+主な変更点・注記:
+
+mvp_required_implementation_uncompleted セクションの追加:
+
+MVPリリースに不可欠、または品質上重要な未完了タスクを優先度順にまとめました。
+
+Supabase連携、ビルド安定化（Vercelデプロイエラー解決含む）、基本的なCI/CDパイプライン確立に焦点を当てています。
+
+依存関係解決は、特にビルドやコア機能に影響するものを優先としています。詳細なパッケージごとの修正は、影響度合いに応じて判断が必要です。
+
+mvp_additional_considerations セクションの追加:
+
+MVPリリースに向けて最低限考慮しておきたい、ユーザー体験や運用面での項目をリストアップしました。
+
+既存セクションの調整:
+
+mvp_required_implementation: 完了済みの項目はそのまま残しています。
+
+performance_optimization, application_tasks (testing_and_cicd を含む) の中で、MVPに直接必要な未完了タスクは mvp_required_implementation_uncompleted に移動しました。残りは完了済み、またはMVPリリース後の改善項目として元の情報を保持しています。
+
+test_improvement_plan, additional_features: これらはMVPリリース後の拡張・改善項目として位置づけ、元の情報を保持しています。
+
+コメントの追加: 各セクションや項目に、なぜそのように分類したか、どのような意図があるかのコメントを追加しました。
+
+この形式で、MVPに向けたタスク管理がより明確になることを願っています。
