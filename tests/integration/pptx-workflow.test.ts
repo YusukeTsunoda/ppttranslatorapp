@@ -10,7 +10,70 @@ import { v4 as uuidv4 } from 'uuid';
 
 // モックの設定
 jest.mock('fs/promises');
-jest.mock('@/lib/pptx/parser');
+jest.mock('@/lib/pptx/parser', () => {
+  return {
+    PPTXParser: {
+      getInstance: jest.fn().mockReturnValue({
+        parsePPTX: jest.fn().mockImplementation(async (filePath: string, options: any = {}) => {
+          // テストケースに応じて異なる動作をシミュレート
+          const testCase = options.testCase || 'default';
+          
+          if (testCase === 'error') {
+            throw new Error('パース中にエラーが発生しました');
+          }
+          
+          // デフォルトの成功レスポンス
+          return {
+            success: true,
+            slides: [
+              {
+                id: 'slide1',
+                title: 'スライド1',
+                content: 'スライド1のコンテンツ',
+                texts: [
+                  { id: 'text1', text: 'スライド1', type: 'title' },
+                  { id: 'text2', text: 'スライド1のコンテンツ', type: 'body' }
+                ],
+                index: 0
+              },
+              {
+                id: 'slide2',
+                title: 'スライド2',
+                content: 'スライド2のコンテンツ',
+                texts: [
+                  { id: 'text3', text: 'スライド2', type: 'title' },
+                  { id: 'text4', text: 'スライド2のコンテンツ', type: 'body' }
+                ],
+                index: 1
+              }
+            ],
+            metadata: {
+              title: 'テストプレゼンテーション',
+              author: 'テストユーザー',
+              totalSlides: 2,
+              createdAt: new Date().toISOString(),
+              lastModified: new Date().toISOString(),
+              fileSize: 1024
+            }
+          };
+        }),
+        generatePPTX: jest.fn().mockImplementation(async (data: any, options: any = {}) => {
+          const testCase = options.testCase || 'default';
+          
+          if (testCase === 'error') {
+            throw new Error('生成中にエラーが発生しました');
+          }
+          
+          // 成功時は一時ファイルのパスを返す
+          return {
+            success: true,
+            filePath: path.join(process.cwd(), 'tmp', 'test-uuid', 'output.pptx')
+          };
+        })
+      })
+    }
+  };
+});
 jest.mock('@/lib/translation/translator');
 jest.mock('@/lib/auth/auth-options');
 
@@ -44,30 +107,14 @@ describe('PPTX ワークフロー統合テスト', () => {
     jest.clearAllMocks();
     
     // fs/promisesのモック設定
-    (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
-    (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
-    (fs.unlink as jest.Mock).mockResolvedValue(undefined);
-    (fs.rm as jest.Mock).mockResolvedValue(undefined);
+    (fs.mkdir as jest.MockedFunction<typeof fs.mkdir>).mockResolvedValue(undefined);
+    (fs.writeFile as jest.MockedFunction<typeof fs.writeFile>).mockResolvedValue(undefined);
+    (fs.unlink as jest.MockedFunction<typeof fs.unlink>).mockResolvedValue(undefined);
+    (fs.rm as jest.MockedFunction<typeof fs.rm>).mockResolvedValue(undefined);
     
     // PPTXParserのモック設定
-    (PPTXParser.getInstance as jest.Mock).mockReturnValue({
-      parsePPTX: jest.fn().mockImplementation(async (filePath: string, options: any = {}) => {
-        // テストケースに応じて異なる動作をシミュレート
-        const testCase = options.testCase || 'default';
-        
-        await wait(50); // 非同期処理をシミュレート
-        
-        if (testCase === 'error') {
-          throw new TestError('パース中にエラーが発生しました', TestErrorType.PARSE);
-        }
-        
-        // デフォルトの成功レスポンス
-        return {
-          success: true,
-          slides: [
-            {
-              id: 'slide1',
-              title: 'スライド1',
+    // ファイル先頭ですでにモック化されているため、ここでの設定は不要
+    // テストケースに応じた動作を設定する場合は、個別のテスト内で設定する
               content: 'スライド1のコンテンツ',
               texts: [
                 { id: 'text1', text: 'スライド1', type: 'title' },
@@ -191,7 +238,7 @@ describe('PPTX ワークフロー統合テスト', () => {
     
     // 全体のワークフローが正常に完了したことを確認
     expect(PPTXParser.getInstance().parsePPTX).toHaveBeenCalled();
-    expect(PPTXParser.getInstance().generatePPTX).toHaveBeenCalled();
+    expect((PPTXParser.getInstance() as any).generatePPTX).toHaveBeenCalled();
   });
   
   /**
@@ -271,10 +318,11 @@ describe('PPTX ワークフロー統合テスト', () => {
     expect(translateResponse.status).toBe(200);
     
     // 生成処理
+    const translateData = await translateResponse.json();
     const generateReq = {
       method: 'POST',
       json: () => Promise.resolve({
-        slides: (await translateResponse.json()).translatedSlides,
+        slides: translateData.translatedSlides,
         metadata: parseData.metadata,
         filename: 'large_translated.pptx'
       }),
@@ -289,7 +337,7 @@ describe('PPTX ワークフロー統合テスト', () => {
     
     // 全体のワークフローが正常に完了したことを確認
     expect(PPTXParser.getInstance().parsePPTX).toHaveBeenCalled();
-    expect(PPTXParser.getInstance().generatePPTX).toHaveBeenCalled();
+    expect((PPTXParser.getInstance() as any).generatePPTX).toHaveBeenCalled();
   });
   
   /**

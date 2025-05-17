@@ -6,7 +6,13 @@ import { performance } from 'perf_hooks';
 
 // モックの設定
 jest.mock('fs/promises');
-jest.mock('@/lib/pptx/parser');
+jest.mock('@/lib/pptx/parser', () => {
+  return {
+    PPTXParser: {
+      getInstance: jest.fn()
+    }
+  };
+});
 
 // テスト用の待機関数
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -60,14 +66,14 @@ describe('PPTX パフォーマンステスト', () => {
     jest.clearAllMocks();
     
     // fs/promisesのモック設定
-    (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
-    (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
-    (fs.unlink as jest.Mock).mockResolvedValue(undefined);
-    (fs.rm as jest.Mock).mockResolvedValue(undefined);
+    (fs.mkdir as jest.MockedFunction<typeof fs.mkdir>).mockResolvedValue(undefined);
+    (fs.writeFile as jest.MockedFunction<typeof fs.writeFile>).mockResolvedValue(undefined);
+    (fs.unlink as jest.MockedFunction<typeof fs.unlink>).mockResolvedValue(undefined);
+    (fs.rm as jest.MockedFunction<typeof fs.rm>).mockResolvedValue(undefined);
     
     // PPTXParserのモック設定
-    (PPTXParser.getInstance as jest.Mock).mockReturnValue({
-      parsePPTX: jest.fn().mockImplementation(async (filePath: string, options: any = {}) => {
+    (PPTXParser.getInstance as jest.Mock).mockImplementation(() => ({
+      parsePPTX: (jest.fn() as any).mockImplementation(async (filePath: string, options: any = {}) => {
         const slideCount = options.slideCount || 10;
         await wait(slideCount * 5); // スライド数に応じた処理時間をシミュレート
         
@@ -94,7 +100,7 @@ describe('PPTX パフォーマンステスト', () => {
           filePath: path.join(process.cwd(), 'tmp', 'test-uuid', 'output.pptx')
         };
       })
-    } as any); // any型を使用して型エラーを回避
+    } as any)); // any型を使用して型エラーを回避
   });
   
   // テスト後のクリーンアップ

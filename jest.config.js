@@ -116,7 +116,6 @@ const config = {
   // テスト実行の安定性向上のための設定
   testSequencer: '<rootDir>/jest.sequencer.js',
   // フラッキーテスト検出のための設定
-  retryTimes: 2,
   detectOpenHandles: true,
 };
 

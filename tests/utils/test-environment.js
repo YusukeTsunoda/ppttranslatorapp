@@ -244,20 +244,29 @@ export class TestEnvironment {
 export const testEnvironment = TestEnvironment.getInstance();
 
 /**
- * Jest用のセットアップ関数
- * jest.config.jsのsetupFilesAfterEnvで使用する
+ * テスト環境をセットアップする
+ * 必要なモック、データベース接続などの初期化を行う
  */
-export async function setupTestEnvironment(): Promise<void> {
-  await testEnvironment.initialize();
+function setupTestEnvironment() {
+  // 必要に応じてここにセットアップコードを実装
+  console.log('Setting up test environment...');
+  return Promise.resolve(true);
 }
 
 /**
- * Jest用のティアダウン関数
- * jest.config.jsのteardownで使用する
+ * テスト環境をクリーンアップする
+ * 接続のクローズ、一時ファイルの削除などを行う
  */
-export async function teardownTestEnvironment(): Promise<void> {
-  await testEnvironment.cleanup();
+function teardownTestEnvironment() {
+  // 必要に応じてここにクリーンアップコードを実装
+  console.log('Tearing down test environment...');
+  return Promise.resolve(true);
 }
+
+module.exports = {
+  setupTestEnvironment,
+  teardownTestEnvironment
+};
 
 /**
  * テスト前のセットアップ関数

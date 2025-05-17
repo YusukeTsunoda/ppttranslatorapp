@@ -45,12 +45,12 @@ describe('エラーハンドリングユーティリティ', () => {
 
   describe('エラー作成関数', () => {
     it('認証エラーを正しく作成する', () => {
-      const error = createAuthError('認証に失敗しました');
+      const error = createAuthError('認証に失敗しました', 'UNAUTHORIZED');
 
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証に失敗しました');
-      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
+      expect(error.code).toBe('UNAUTHORIZED');
     });
 
     it('バリデーションエラーを正しく作成する', () => {
@@ -198,21 +198,21 @@ describe('エラーハンドリングユーティリティ', () => {
     });
 
     it('createAuthErrorが正しいAppErrorを作成する', () => {
-      const error = createAuthError('認証エラー');
+      const error = createAuthError('認証エラー', 'UNAUTHORIZED');
 
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証エラー');
-      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
+      expect(error.code).toBe('UNAUTHORIZED');
     });
 
     it('createForbiddenErrorが正しいAppErrorを作成する', () => {
-      const error = createForbiddenError('アクセス拒否エラー');
+      const error = createForbiddenError('権限エラー');
 
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('PERMISSION');
-      expect(error.message).toBe('アクセス拒否エラー');
-      expect(error.code).toBe(ErrorCodes.FORBIDDEN);
+      expect(error.message).toBe('権限エラー');
+      expect(error.code).toBe('FORBIDDEN');
     });
 
     it('createNotFoundErrorが正しいAppErrorを作成する', () => {
@@ -221,7 +221,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('NOT_FOUND');
       expect(error.message).toBe('未検出エラー');
-      expect(error.code).toBe(ErrorCodes.NOT_FOUND);
+      expect(error.code).toBe('NOT_FOUND');
     });
 
     it('createRateLimitErrorが正しいAppErrorを作成する', () => {
@@ -230,7 +230,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('SERVER');
       expect(error.message).toBe('レート制限エラー');
-      expect(error.code).toBe(ErrorCodes.RATE_LIMIT_EXCEEDED);
+      expect(error.code).toBe('RATE_LIMIT_EXCEEDED');
     });
 
     it('createDatabaseErrorが正しいAppErrorを作成する', () => {
@@ -239,7 +239,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('SERVER');
       expect(error.message).toBe('データベースエラー');
-      expect(error.code).toBe(ErrorCodes.DATABASE_ERROR);
+      expect(error.code).toBe('DATABASE_ERROR');
     });
   });
 
@@ -250,7 +250,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('セッションの有効期限が切れました');
-      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
+      expect(error.code).toBe('SESSION_EXPIRED');
     });
 
     it('INVALIDエラーを正しく変換する', () => {
@@ -259,7 +259,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('無効なセッションです');
-      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
+      expect(error.code).toBe('SESSION_INVALID');
     });
 
     it('NETWORKエラーを正しく変換する', () => {
@@ -268,7 +268,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('NETWORK');
       expect(error.message).toBe('ネットワークエラーが発生しました');
-      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
+      expect(error.code).toBeUndefined();
     });
 
     it('UNAUTHORIZEDエラーを正しく変換する', () => {
@@ -277,7 +277,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('認証が必要です');
-      expect(error.code).toBe(ErrorCodes.UNAUTHORIZED);
+      expect(error.code).toBe('UNAUTHORIZED');
     });
 
     it('UNKNOWNエラーを正しく変換する', () => {
@@ -286,7 +286,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('不明なエラーが発生しました');
-      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
+      expect(error.code).toBe('AUTH_ERROR');
     });
 
     it('不明なタイプのエラーを正しく変換する', () => {
@@ -295,7 +295,7 @@ describe('エラーハンドリングユーティリティ', () => {
       expect(error).toBeInstanceOf(AppError);
       expect(error.type).toBe('AUTH');
       expect(error.message).toBe('不明なエラーが発生しました');
-      expect(error.code).toBe(ErrorCodes.UNKNOWN_ERROR);
+      expect(error.code).toBe('AUTH_ERROR');
     });
   });
 

@@ -20,6 +20,9 @@ jest.mock('fs/promises', () => ({
   readFile: jest.fn(),
   writeFile: jest.fn(),
   mkdir: jest.fn(),
+  unlink: jest.fn(),
+  rm: jest.fn(),
+  rmdir: jest.fn(),
 }));
 
 // fsのモック
@@ -29,7 +32,11 @@ jest.mock('fs', () => ({
     readFile: jest.fn(),
     writeFile: jest.fn(),
     mkdir: jest.fn(),
+    unlink: jest.fn(),
+    rm: jest.fn(),
+    rmdir: jest.fn(),
   },
+  existsSync: jest.fn().mockReturnValue(true),
   createReadStream: jest.fn(),
   createWriteStream: jest.fn(),
 }));
@@ -176,8 +183,8 @@ jest.mock('@/components/ui/use-toast', () => {
   };
 });
 
-// テスト環境管理のインポート
-const { setupTestEnvironment, teardownTestEnvironment } = require('./tests/utils/test-environment');
+// テスト環境管理のインポート - CommonJSスタイルに戻す
+const { setupTestEnvironment, teardownTestEnvironment } = require('./tests/utils/test-environment.js');
 
 // テスト実行前に全体のセットアップを行う
 beforeAll(async () => {
@@ -199,8 +206,7 @@ afterAll(async () => {
   console.log('テスト環境をクリーンアップしました');
 });
 
-import '@testing-library/jest-dom';
-import 'whatwg-fetch';
+require('whatwg-fetch');
 
 // グローバルなモック設定
 global.jest = jest;
@@ -248,87 +254,76 @@ global.ResizeObserver = class ResizeObserver {
 process.env = {
   ...process.env,
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-  DATABASE_URL: 'postgresql://testuser:testpass@localhost:5433/ppt_translator_test',
+  NEXT_PUBLIC_VERCEL_URL: 'localhost:3000',
   NEXTAUTH_URL: 'http://localhost:3000',
   NEXTAUTH_SECRET: 'test-secret',
+  DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/ppttranslator_test',
+  NODE_ENV: 'test',
+  STRIPE_SECRET_KEY: 'sk_test_mock',
+  STRIPE_WEBHOOK_SECRET: 'whsec_mock',
+  ANTHROPIC_API_KEY: 'sk-ant-mock',
+  SMTP_HOST: 'smtp.example.com',
+  SMTP_PORT: '587',
+  SMTP_USER: 'test@example.com',
+  SMTP_PASSWORD: 'password',
+  EMAIL_FROM: 'test@example.com',
 };
 
-// Prismaのモック
-jest.mock('@/lib/db', () => ({
-  prisma: {
-    user: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    file: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    translationHistory: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-    },
-  },
-}));
+// TextEncoderとTextDecoderのグローバル定義
+if (typeof TextEncoder === 'undefined') {
+  global.TextEncoder = require('util').TextEncoder;
+}
+if (typeof TextDecoder === 'undefined') {
+  global.TextDecoder = require('util').TextDecoder;
+}
 
-// next/routerのモック
-jest.mock('next/router', () => ({
-  useRouter: jest.fn(() => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    query: {},
-  })),
-}));
-
-// next/navigationのモック
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(() => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    back: jest.fn(),
-  })),
-  usePathname: jest.fn(() => '/'),
-  useSearchParams: jest.fn(() => new URLSearchParams()),
-}));
-
-// Anthropic SDKのモック
-jest.mock('@anthropic-ai/sdk', () => {
-  return {
-    Anthropic: jest.fn().mockImplementation(() => ({
-      messages: {
-        create: jest.fn().mockResolvedValue({
-          content: [{ text: '翻訳されたテキスト' }],
-        }),
-      },
-    })),
-  };
-});
-
-// エラー型の定義
-global.ErrorType = {
-  AUTH: 'AUTH',
-  VALIDATION: 'VALIDATION',
-  NOT_FOUND: 'NOT_FOUND',
-  FORBIDDEN: 'FORBIDDEN',
-  DATABASE: 'DATABASE',
-  NETWORK: 'NETWORK',
-  RATE_LIMIT: 'RATE_LIMIT',
-  UNKNOWN: 'UNKNOWN',
+// FormDataのモック
+global.FormData = class FormData {
+  constructor() {
+    this.data = {};
+  }
+  
+  append(key, value, filename) {
+    this.data[key] = { value, filename };
+  }
+  
+  get(key) {
+    return this.data[key]?.value;
+  }
+  
+  getAll(key) {
+    return this.data[key] ? [this.data[key].value] : [];
+  }
+  
+  has(key) {
+    return key in this.data;
+  }
+  
+  delete(key) {
+    delete this.data[key];
+  }
+  
+  *entries() {
+    for (const key in this.data) {
+      yield [key, this.data[key].value];
+    }
+  }
+  
+  *keys() {
+    for (const key in this.data) {
+      yield key;
+    }
+  }
+  
+  *values() {
+    for (const key in this.data) {
+      yield this.data[key].value;
+    }
+  }
 };
 
-// エラーコードの定義
-global.ErrorCodes = {
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  NOT_FOUND: 'NOT_FOUND',
-  DATABASE_ERROR: 'DATABASE_ERROR',
-  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
-};
+// ブラウザAPIのモック
+if (typeof window !== 'undefined') {
+  window.URL.createObjectURL = jest.fn().mockImplementation(file => `mock-url-${file.name}`);
+  window.URL.revokeObjectURL = jest.fn();
+}
