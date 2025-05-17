@@ -11,6 +11,8 @@ import { prisma } from '@/lib/db/prisma';
 import { v4 as uuidv4 } from 'uuid';
 import { Language, TranslationStatus } from '@prisma/client';
 import { withAPILogging } from '@/lib/utils/api-logging';
+import { handleTranslationError, withRetry, logTranslationError } from '@/lib/translation/error-handler';
+import { validateTranslationRequest } from '@/lib/translation/utils';
 
 interface CustomSession extends Session {
   user: {
@@ -373,29 +375,40 @@ async function handler(req: NextRequest) {
 // ログ機能を適用したハンドラをエクスポート
 export const POST = withAPILogging(handler, 'translate');
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return new NextResponse(JSON.stringify({ error: 'Authentication required' }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      });
+    // セッションの取得
+    const session = await getServerSession();
+    if (!session?.user) {
+      throw Object.assign(new Error('認証が必要です'), { name: 'AuthenticationError' });
     }
 
-    return NextResponse.json({ status: 'ok' });
-  } catch (error) {
-    console.error('Translation status error:', error);
-    return new NextResponse(JSON.stringify({ error: 'Failed to get translation status' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, max-age=0',
+    // 翻訳履歴の取得
+    const translations = await prisma.translation.findMany({
+      where: {
+        userId: session.user.id,
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
+
+    return new Response(JSON.stringify({ translations }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (error) {
+    // エラーログの記録
+    logTranslationError(error as Error, {
+      userId: (await getServerSession())?.user?.id,
+      operation: 'get_translations',
+    });
+
+    // エラーレスポンスの生成
+    return handleTranslationError(error as Error);
   }
 }
 

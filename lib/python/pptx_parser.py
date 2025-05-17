@@ -284,95 +284,284 @@ def extract_text_from_shape(shape):
         
     return text_info
 
-def parse_pptx(file_path: str, output_dir: str) -> List[Dict[str, Any]]:
-    try:
-        print(f"Starting parse_pptx: file_path={file_path}, output_dir={output_dir}", file=sys.stderr)
-        prs = Presentation(file_path)
-        slides = []
+def extract_metadata(presentation: Presentation) -> dict:
+    """
+    プレゼンテーションのメタデータを抽出する
+    
+    Args:
+        presentation (Presentation): PowerPointプレゼンテーション
+    
+    Returns:
+        dict: メタデータ情報
+    """
+    core_props = presentation.core_properties
+    
+    metadata = {
+        'title': core_props.title or '',
+        'author': core_props.author or '',
+        'created': core_props.created.isoformat() if core_props.created else '',
+        'modified': core_props.modified.isoformat() if core_props.modified else '',
+        'company': core_props.company or '',
+        'version': core_props.version or '',
+        'lastModifiedBy': core_props.last_modified_by or '',
+        'revision': core_props.revision or 0,
+        'subject': core_props.subject or '',
+        'keywords': core_props.keywords.split(',') if core_props.keywords else [],
+        'category': core_props.category or '',
+        'description': core_props.description or '',
+        'language': core_props.language or 'ja-JP',
+        'presentationFormat': 'widescreen' if presentation.slide_width > 9144000 else 'standard',
+        'createdApplication': core_props.application or ''
+    }
+    
+    return metadata
+
+def extract_font_info(run) -> dict:
+    """
+    テキストのフォント情報を抽出する
+    
+    Args:
+        run: テキストラン
+    
+    Returns:
+        dict: フォント情報
+    """
+    font = run.font
+    return {
+        'name': font.name or 'Arial',
+        'size': font.size.pt if font.size else 12,
+        'color': f'#{font.color.rgb:06x}' if font.color and font.color.type == 'RGB' else '#000000',
+        'bold': bool(font.bold),
+        'italic': bool(font.italic),
+        'underline': bool(font.underline),
+        'strikethrough': bool(font.strike),
+        'superscript': bool(font.superscript),
+        'subscript': bool(font.subscript),
+        'characterSpacing': font.char_spacing or 0,
+        'kerning': bool(font.kerning)
+    }
+
+def extract_text_style(paragraph) -> dict:
+    """
+    段落のスタイル情報を抽出する
+    
+    Args:
+        paragraph: 段落オブジェクト
+    
+    Returns:
+        dict: スタイル情報
+    """
+    alignment_map = {
+        0: 'left',
+        1: 'center',
+        2: 'right',
+        3: 'justify'
+    }
+    
+    return {
+        'alignment': alignment_map.get(paragraph.alignment, 'left'),
+        'lineSpacing': paragraph.line_spacing or 1.0,
+        'indentation': paragraph.indent or 0,
+        'direction': 'rtl' if paragraph.rtl else 'ltr',
+        'bulletStyle': extract_bullet_style(paragraph)
+    }
+
+def extract_bullet_style(paragraph) -> dict:
+    """
+    箇条書きのスタイル情報を抽出する
+    
+    Args:
+        paragraph: 段落オブジェクト
+    
+    Returns:
+        dict: 箇条書きスタイル情報
+    """
+    if not paragraph.bullet:
+        return None
         
-        print(f"Successfully loaded presentation with {len(prs.slides)} slides", file=sys.stderr)
+    return {
+        'type': 'number' if paragraph.bullet.numbered else 'bullet',
+        'format': paragraph.bullet.format if hasattr(paragraph.bullet, 'format') else None,
+        'startAt': paragraph.bullet.start_num if hasattr(paragraph.bullet, 'start_num') else None
+    }
+
+def extract_shape_info(shape) -> dict:
+    """
+    シェイプの情報を抽出する
+    
+    Args:
+        shape: シェイプオブジェクト
+    
+    Returns:
+        dict: シェイプ情報
+    """
+    shape_type = shape.shape_type
+    
+    base_info = {
+        'type': str(shape_type),
+        'x': shape.left,
+        'y': shape.top,
+        'width': shape.width,
+        'height': shape.height,
+        'rotation': shape.rotation,
+        'fillColor': extract_fill_color(shape),
+        'strokeColor': extract_line_color(shape),
+        'strokeWidth': shape.line.width if shape.line else 1,
+        'opacity': shape.fill.transparency if shape.fill else 1
+    }
+    
+    # 円の場合は半径を追加
+    if shape_type == 'OVAL':
+        base_info['radius'] = min(shape.width, shape.height) / 2
         
-        # スライドを画像に変換
-        image_paths, (image_width, image_height) = convert_to_png(file_path, output_dir)
+    # 多角形の場合は頂点情報を追加
+    if hasattr(shape, 'points'):
+        base_info['points'] = [{'x': point[0], 'y': point[1]} for point in shape.points]
         
-        if not image_paths:
-            print("No image paths returned from convert_to_png", file=sys.stderr)
-            return []
-            
-        print(f"Got {len(image_paths)} image paths, image size: {image_width}x{image_height}", file=sys.stderr)
-            
-        for slide_index, slide in enumerate(prs.slides):
-            texts = []
-            
-            # スライドのサイズを取得
-            slide_width = prs.slide_width
-            slide_height = prs.slide_height
-            
-            print(f"Processing slide {slide_index+1}/{len(prs.slides)}, size: {slide_width}x{slide_height}", file=sys.stderr)
-            
-            for shape in slide.shapes:
-                text_info = extract_text_from_shape(shape)
-                if text_info:
-                    # 座標を変換
-                    position = convert_coordinates(
-                        shape.left, shape.top, 
-                        shape.width, shape.height,
-                        slide_width, slide_height,
-                        image_width, image_height
-                    )
-                    text_info["position"] = position
-                    texts.append(text_info)
-            
-            # グループ化されたシェイプも処理
-            def process_group_shapes(group_shape):
-                group_texts = []
-                for child in group_shape.shapes:
-                    if hasattr(child, 'shapes'):  # ネストされたグループ
-                        group_texts.extend(process_group_shapes(child))
-                    else:
-                        text_info = extract_text_from_shape(child)
-                        if text_info:
-                            # 座標を変換
-                            position = convert_coordinates(
-                                child.left + group_shape.left, 
-                                child.top + group_shape.top,
-                                child.width, child.height,
-                                slide_width, slide_height,
-                                image_width, image_height
-                            )
-                            text_info["position"] = position
-                            group_texts.append(text_info)
-                return group_texts
-            
-            # グループシェイプを処理
-            for shape in slide.shapes:
-                if hasattr(shape, 'shapes'):  # グループシェイプ
-                    texts.extend(process_group_shapes(shape))
-            
-            print(f"Extracted {len(texts)} text elements from slide {slide_index+1}", file=sys.stderr)
-            
-            slides.append({
-                "index": slide_index,
-                "texts": texts,
-                "image_path": image_paths[slide_index] if slide_index < len(image_paths) else None
-            })
+    return base_info
+
+def extract_fill_color(shape) -> str:
+    """
+    シェイプの塗りつぶし色を抽出する
+    
+    Args:
+        shape: シェイプオブジェクト
+    
+    Returns:
+        str: 色情報（16進数）
+    """
+    if not shape.fill or shape.fill.type == 'NONE':
+        return 'transparent'
         
-        print(f"Processed {len(slides)} slides in total", file=sys.stderr)
+    if shape.fill.type == 'SOLID':
+        return f'#{shape.fill.fore_color.rgb:06x}' if shape.fill.fore_color else '#000000'
         
-        # 最終結果を構築
-        result_structure = {
-            "slides": slides
+    return 'transparent'
+
+def extract_line_color(shape) -> str:
+    """
+    シェイプの線の色を抽出する
+    
+    Args:
+        shape: シェイプオブジェクト
+    
+    Returns:
+        str: 色情報（16進数）
+    """
+    if not shape.line or shape.line.fill.type == 'NONE':
+        return 'transparent'
+        
+    return f'#{shape.line.color.rgb:06x}' if shape.line.color else '#000000'
+
+def extract_background(slide) -> dict:
+    """
+    スライドの背景情報を抽出する
+    
+    Args:
+        slide: スライドオブジェクト
+    
+    Returns:
+        dict: 背景情報
+    """
+    background = slide.background
+    
+    if not background:
+        return {
+            'color': '#FFFFFF',
+            'image': None,
+            'pattern': None,
+            'gradient': None,
+            'transparency': 0
         }
         
-        # 結果を標準出力に出力（これだけがstdoutに出力される）
-        print(json.dumps(result_structure))
-        return slides
+    fill = background.fill
+    result = {
+        'color': '#FFFFFF',
+        'image': None,
+        'pattern': None,
+        'gradient': None,
+        'transparency': fill.transparency if fill else 0
+    }
+    
+    if fill:
+        if fill.type == 'SOLID':
+            result['color'] = f'#{fill.fore_color.rgb:06x}' if fill.fore_color else '#FFFFFF'
+        elif fill.type == 'PICTURE':
+            result['image'] = {
+                'rId': fill.image.rId,
+                'filename': fill.image.filename
+            }
+        elif fill.type == 'PATTERN':
+            result['pattern'] = {
+                'type': str(fill.pattern),
+                'foreColor': f'#{fill.fore_color.rgb:06x}' if fill.fore_color else '#000000',
+                'backColor': f'#{fill.back_color.rgb:06x}' if fill.back_color else '#FFFFFF'
+            }
+        elif fill.type == 'GRADIENT':
+            result['gradient'] = {
+                'type': 'linear' if fill.gradient_stops else 'radial',
+                'stops': [
+                    {
+                        'position': stop.position,
+                        'color': f'#{stop.color.rgb:06x}'
+                    }
+                    for stop in fill.gradient_stops
+                ],
+                'angle': fill.gradient_angle if hasattr(fill, 'gradient_angle') else 0
+            }
+            
+    return result
+
+def parse_pptx(file_path: str, output_dir: str) -> dict:
+    """
+    PPTXファイルを解析する
+    
+    Args:
+        file_path (str): PPTXファイルのパス
+        output_dir (str): 出力ディレクトリ
+    
+    Returns:
+        dict: 解析結果
+    """
+    try:
+        presentation = Presentation(file_path)
+        image_paths, image_size = convert_to_png(file_path, output_dir)
+        
+        if not image_paths:
+            return {'error': 'Failed to convert slides to images'}
+            
+        metadata = extract_metadata(presentation)
+        slides_data = []
+        
+        for i, (slide, image_path) in enumerate(zip(presentation.slides, image_paths)):
+            slide_data = {
+                'index': i,
+                'image_path': image_path,
+                'texts': [],
+                'shapes': [],
+                'background': extract_background(slide)
+            }
+            
+            for shape in slide.shapes:
+                if hasattr(shape, 'text') and shape.text.strip():
+                    text_data = extract_text_from_shape(shape)
+                    if text_data:
+                        slide_data['texts'].extend(text_data)
+                        
+                shape_info = extract_shape_info(shape)
+                if shape_info:
+                    slide_data['shapes'].append(shape_info)
+                    
+            slides_data.append(slide_data)
+            
+        return {
+            'metadata': metadata,
+            'slides': slides_data
+        }
         
     except Exception as e:
-        # エラー時も適切なJSONを返す
-        print(f"Error in parse_pptx: {str(e)}", file=sys.stderr)
-        print(json.dumps({"slides": [], "error": str(e)}))
-        return []
+        print(f"Error parsing PPTX: {str(e)}", file=sys.stderr)
+        return {'error': str(e)}
 
 def update_pptx_with_translations(
     original_file: str,

@@ -95,41 +95,223 @@ export class PPTXParser {
     }
   }
 
-  // スライド処理を並列実行するための補助関数
-  private async processSlidesBatch(slides: any[], outputDir: string): Promise<SlideContent[]> {
-    // CPUコア数に基づいて適切なバッチサイズを設定
-    const batchSize = Math.max(1, Math.ceil(slides.length / this.maxConcurrentProcesses));
-    const batches = [];
-    
-    // スライドをバッチに分割
-    for (let i = 0; i < slides.length; i += batchSize) {
-      batches.push(slides.slice(i, i + batchSize));
+  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
+    if (!result || !result.slides || !Array.isArray(result.slides)) {
+      throw new Error('Invalid result format from Python script');
     }
-    
+
+    return {
+      filename: path.basename(inputPath),
+      totalSlides: result.slides.length,
+      metadata: this.processMetadata(result.metadata || {}),
+      slides: result.slides.map((slide: any, index: number) => ({
+        index,
+        imageUrl: slide.imageUrl || slide.image_path,
+        textElements: this.processTextElements(slide.texts || [], index),
+        shapes: this.processShapes(slide.shapes || []),
+        background: this.processBackground(slide.background)
+      }))
+    };
+  }
+
+  private processMetadata(metadata: any): Record<string, any> {
+    // メタデータの検証と整形
+    const processedMetadata = {
+      title: metadata.title || '',
+      author: metadata.author || '',
+      created: metadata.created || '',
+      modified: metadata.modified || '',
+      company: metadata.company || '',
+      version: metadata.version || '',
+      lastModifiedBy: metadata.lastModifiedBy || '',
+      revision: metadata.revision || 0,
+      subject: metadata.subject || '',
+      keywords: metadata.keywords || [],
+      category: metadata.category || '',
+      description: metadata.description || '',
+      language: metadata.language || 'ja-JP',
+      presentationFormat: metadata.presentationFormat || 'widescreen',
+      createdApplication: metadata.createdApplication || ''
+    };
+
+    // 日付形式の検証と変換
+    if (processedMetadata.created) {
+      try {
+        const date = new Date(processedMetadata.created);
+        processedMetadata.created = date.toISOString();
+      } catch (error) {
+        console.warn('Invalid created date format:', error);
+      }
+    }
+
+    if (processedMetadata.modified) {
+      try {
+        const date = new Date(processedMetadata.modified);
+        processedMetadata.modified = date.toISOString();
+      } catch (error) {
+        console.warn('Invalid modified date format:', error);
+      }
+    }
+
+    return processedMetadata;
+  }
+
+  private processTextElements(texts: any[], slideIndex: number): TextElement[] {
+    return texts.map((textObj: any, index: number) => {
+      // テキスト要素の基本情報
+      const textElement: TextElement = {
+        id: `text-${slideIndex}-${uuidv4().substring(0, 8)}`,
+        text: textObj.text || '',
+        position: this.processPosition(textObj.position),
+        type: textObj.type || 'text',
+        font: this.processFont(textObj.font || textObj.paragraphs?.[0]?.font || {})
+      };
+
+      // 追加のスタイル情報
+      if (textObj.style) {
+        textElement.style = {
+          alignment: textObj.style.alignment,
+          lineSpacing: textObj.style.lineSpacing,
+          indentation: textObj.style.indentation,
+          direction: textObj.style.direction,
+          bulletStyle: textObj.style.bulletStyle
+        };
+      }
+
+      // ハイパーリンク情報
+      if (textObj.hyperlink) {
+        textElement.hyperlink = {
+          url: textObj.hyperlink.url,
+          tooltip: textObj.hyperlink.tooltip
+        };
+      }
+
+      // アニメーション情報
+      if (textObj.animation) {
+        textElement.animation = {
+          type: textObj.animation.type,
+          duration: textObj.animation.duration,
+          delay: textObj.animation.delay,
+          trigger: textObj.animation.trigger
+        };
+      }
+
+      return textElement;
+    });
+  }
+
+  private processPosition(position: any): Position {
+    return {
+      x: position?.x || 0,
+      y: position?.y || 0,
+      width: position?.width || 0,
+      height: position?.height || 0,
+      rotation: position?.rotation || 0,
+      zIndex: position?.zIndex || 0
+    };
+  }
+
+  private processFont(font: any): Record<string, any> {
+    return {
+      name: font.name || 'Arial',
+      size: font.size || 12,
+      color: font.color || '#000000',
+      bold: font.bold || false,
+      italic: font.italic || false,
+      underline: font.underline || false,
+      strikethrough: font.strikethrough || false,
+      superscript: font.superscript || false,
+      subscript: font.subscript || false,
+      characterSpacing: font.characterSpacing || 0,
+      kerning: font.kerning !== undefined ? font.kerning : true
+    };
+  }
+
+  private processShapes(shapes: any[]): any[] {
+    return shapes.map(shape => ({
+      type: shape.type,
+      x: shape.x || 0,
+      y: shape.y || 0,
+      width: shape.width || 0,
+      height: shape.height || 0,
+      rotation: shape.rotation || 0,
+      fillColor: shape.fillColor || 'transparent',
+      strokeColor: shape.strokeColor || '#000000',
+      strokeWidth: shape.strokeWidth || 1,
+      opacity: shape.opacity || 1,
+      radius: shape.radius, // 円の場合のみ
+      points: shape.points // 多角形の場合のみ
+    }));
+  }
+
+  private processBackground(background: any): Record<string, any> {
+    return {
+      color: background?.color || '#FFFFFF',
+      image: background?.image || null,
+      pattern: background?.pattern || null,
+      gradient: background?.gradient || null,
+      transparency: background?.transparency || 0
+    };
+  }
+
+  // 大量のスライドを効率的に処理するための最適化
+  private async processSlidesBatch(slides: any[], outputDir: string): Promise<SlideContent[]> {
+    // バッチサイズを動的に調整
+    const optimalBatchSize = Math.max(
+      1,
+      Math.min(
+        Math.ceil(slides.length / this.maxConcurrentProcesses),
+        50 // 最大バッチサイズ
+      )
+    );
+
+    const batches = [];
+    for (let i = 0; i < slides.length; i += optimalBatchSize) {
+      batches.push(slides.slice(i, i + optimalBatchSize));
+    }
+
+    // メモリ使用量を監視
+    const memoryThreshold = 0.8; // 80%のメモリ使用率を閾値とする
+    const initialMemoryUsage = process.memoryUsage().heapUsed;
+    const maxMemory = process.memoryUsage().heapTotal;
+
     // 各バッチを並列処理
     const results = await Promise.all(
-      batches.map(async (batch) => {
-        return batch.map((slide: any, index: number) => {
+      batches.map(async (batch, batchIndex) => {
+        // メモリ使用量をチェック
+        const currentMemoryUsage = process.memoryUsage().heapUsed;
+        const memoryUsageRatio = currentMemoryUsage / maxMemory;
+
+        if (memoryUsageRatio > memoryThreshold) {
+          // メモリ使用量が閾値を超えた場合、ガベージコレクションを促す
+          if (global.gc) {
+            global.gc();
+          }
+          // 処理を一時停止して、メモリを解放する時間を設ける
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        return batch.map((slide: any) => {
           const slideIndex = slide.index;
           const imageUrl = `/api/slides/${path.basename(outputDir)}/slides/${slideIndex + 1}.png`;
-          
+
           return {
             index: slideIndex,
             imageUrl,
-            textElements: slide.texts.map((textObj: any) => ({
-              id: `text-${slideIndex}-${uuidv4().substring(0, 8)}`,
-              text: textObj.text,
-              position: textObj.position,
-              type: textObj.type || 'text',
-              fontInfo: textObj.paragraphs?.[0]?.font || {}
-            }))
+            textElements: this.processTextElements(slide.texts || [], slideIndex),
+            shapes: this.processShapes(slide.shapes || []),
+            background: this.processBackground(slide.background)
           };
         });
       })
     );
-    
-    // 結果を平坦化して返す
-    return results.flat();
+
+    // メモリ使用量の変化をログ
+    const finalMemoryUsage = process.memoryUsage().heapUsed;
+    const memoryDiff = finalMemoryUsage - initialMemoryUsage;
+    console.log(`Memory usage change: ${(memoryDiff / 1024 / 1024).toFixed(2)}MB`);
+
+    return results.flat().sort((a, b) => a.index - b.index);
   }
 
   private async executePythonScript(inputPath: string, outputDir: string): Promise<any> {
@@ -156,29 +338,6 @@ export class PPTXParser {
       console.error('Python script execution failed:', error);
       throw new Error(`Failed to execute Python script: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  private validateAndProcessResult(result: any, inputPath: string): PPTXParseResult {
-    if (!result || !result.slides || !Array.isArray(result.slides)) {
-      throw new Error('Invalid result format from Python script');
-    }
-
-    return {
-      filename: path.basename(inputPath),
-      totalSlides: result.slides.length,
-      metadata: result.metadata || {},
-      slides: result.slides.map((slide: any, index: number) => ({
-        index,
-        imageUrl: slide.imageUrl,
-        textElements: (slide.texts || []).map((textObj: any) => ({
-          id: `text-${index}-${uuidv4().substring(0, 8)}`,
-          text: textObj.text,
-          position: textObj.position,
-          type: textObj.type || 'text',
-          fontInfo: textObj.paragraphs?.[0]?.font || {}
-        }))
-      }))
-    };
   }
 
   public async parsePPTX(inputPath: string, outputDir: string, forceReparse: boolean = false): Promise<PPTXParseResult> {
