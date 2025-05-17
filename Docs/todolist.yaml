@@ -72,6 +72,37 @@ performance_optimization:
         - description: "- [x] エラーケーステストの実行"
         - description: "- [x] 統合テストの実行"
         - description: "- [x] 負荷テスト"
+    - description: "- [x] データベースアクセス最適化"
+      subtasks:
+        - description: "- [x] Prismaクライアントのドメイン別シャーディング"
+          subtasks:
+            - description: "- [x] userPrisma - ユーザー関連モデル専用"
+            - description: "- [x] filePrisma - ファイル関連モデル専用"
+            - description: "- [x] translationPrisma - 翻訳関連モデル専用"
+            - description: "- [x] activityPrisma - アクティビティログ専用"
+        - description: "- [x] データベース操作の効率化"
+          subtasks:
+            - description: "- [x] 必要最小限のフィールド取得（select最適化）"
+            - description: "- [x] N+1問題の回避（関連データの一括取得）"
+            - description: "- [x] クエリキャッシュの有効化"
+            - description: "- [x] コネクションプールの最適化"
+        - description: "- [x] パフォーマンス改善ユーティリティの実装"
+          subtasks:
+            - description: "- [x] 効率的なトランザクション関数"
+            - description: "- [x] モデル特化型クエリヘルパー"
+            - description: "- [x] バンドルサイズを最小化するプロキシ関数"
+    - description: "- [x] APIエンドポイントの最適化"
+      subtasks:
+        - description: "- [x] 履歴API（/api/history）の最適化"
+          subtasks:
+            - description: "- [x] 高度なフィルタリング・ソート機能"
+            - description: "- [x] クエリパラメータによるページネーション"
+            - description: "- [x] レスポンス形式の統一と最適化"
+        - description: "- [x] 履歴詳細API（/api/history/[id]）の最適化"
+          subtasks:
+            - description: "- [x] 必要なデータのみを効率的に取得"
+            - description: "- [x] トランザクションを使用した一貫性の確保"
+            - description: "- [x] データ構造の整理とフロントエンド連携の改善"
   ongoing_tasks:
     - description: "- [ ] PPTXパーサーの最適化（継続）"
       priority: high
@@ -128,6 +159,12 @@ application_tasks:
     - description: "- [x] PPTXファイル処理エラー修正 (初期)"
       subtasks:
         - description: "- [x] クライアントとサーバー間のリクエストデータの不一致修正"
+    - description: "- [x] データベース最適化"
+      subtasks:
+        - description: "- [x] Prismaクライアントのシャーディング実装"
+        - description: "- [x] クエリの最適化と効率化"
+        - description: "- [x] データアクセスユーティリティの実装"
+        - description: "- [x] サーバーレス環境での接続管理の改善"
 
   # MVPに直結する機能と、それを支える基盤
   mvp_and_core_infrastructure:
@@ -181,12 +218,12 @@ application_tasks:
             - description: "- [x] ユーザー削除テスト"
         - description: "- [ ] 翻訳履歴APIテスト"
           subtasks:
+            - description: "- [x] 履歴一覧取得テスト"
+            - description: "- [x] 履歴詳細取得テスト"
             - description: "- [ ] 履歴作成テスト"
-            - description: "- [ ] 履歴一覧取得テスト"
-            - description: "- [ ] 履歴詳細取得テスト"
         - description: "- [ ] クレジット管理APIテスト"
           subtasks:
-            - description: "- [ ] クレジット付与テスト"
+            - description: "- [x] クレジット付与テスト"
             - description: "- [ ] クレジット消費テスト"
             - description: "- [ ] クレジット履歴テスト"
         - description: "- [ ] アクティビティログAPIテスト"
@@ -243,6 +280,103 @@ application_tasks:
             - description: "- [ ] 並列実行の設定"
             - description: "- [ ] キャッシュの活用"
             - description: "- [ ] テスト実行時間の短縮"
+            - description: "- [ ] 依存関係の型定義問題解決"
+              priority: highest
+              subtasks:
+                - description: "- [x] TypeScriptコンパイラ設定の最適化"
+                  subtasks: 
+                    - description: "- [x] tsconfig.jsonにNode.js型定義の設定追加"
+                    - description: "- [x] コンパイルオプション（sourceMap, declaration）追加"
+                    - description: "- [x] allowSyntheticDefaultImportsとoutDirの設定"
+                - description: "- [ ] サーバーパッケージごとの依存関係解決"
+                  subtasks:
+                    - description: "- [x] aws-kb-retrieval-serverパッケージの修正"
+                      subtasks:
+                        - description: "- [x] @aws-sdk/client-bedrock-agent-runtimeの依存確認"
+                        - description: "- [x] @types/nodeの依存確認 (^22.15.18)"
+                        - description: "- [x] 個別tsconfig.jsonの作成"
+                        - description: "- [x] ビルド出力先をdist-newに変更してコンフリクト解決"
+                    - description: "- [x] postgresパッケージの修正"
+                      subtasks:
+                        - description: "- [x] @types/pgパッケージの追加"
+                        - description: "- [x] ビルド出力先の変更（dist → dist-new）"
+                        - description: "- [x] インクリメンタルビルド設定の追加"
+                        - description: "- [x] tsconfig.jsonの依存関係エラー修正"
+                    - description: "- [x] brave-searchパッケージの修正"
+                      subtasks:
+                        - description: "- [x] node-fetch依存関係の追加"
+                        - description: "- [x] 環境変数アクセスのNull安全性問題修正"
+                        - description: "- [x] ビルド出力先の変更（dist → dist-new）"
+                        - description: "- [x] インクリメンタルビルド設定の追加"
+                    - description: "- [x] everythingパッケージの修正"
+                      subtasks:
+                        - description: "- [x] express依存関係のバージョン修正（^4.21.1 → ^4.18.2）"
+                        - description: "- [x] @types/expressのバージョン修正（^5.0.0 → ^4.17.21）"
+                        - description: "- [x] ビルド出力先とスクリプトの修正"
+                        - description: "- [x] インクリメンタルビルド設定の追加"
+                    - description: "- [ ] everartパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] everart, node-fetch, openパッケージの依存解決"
+                    - description: "- [x] filesystemパッケージの修正"
+                      subtasks:
+                        - description: "- [x] @types/diffは既存（^5.0.9）"
+                        - description: "- [x] @types/minimatchは既存（^5.1.2）"
+                        - description: "- [x] モジュール解決方式をNodeNextに設定"
+                        - description: "- [x] ビルド出力先の変更（dist → dist-new）"
+                        - description: "- [x] インクリメンタルビルド設定の追加"
+                    - description: "- [ ] gdriveパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] @google-cloud/local-authの依存関係解決"
+                        - description: "- [ ] googleapis, fs, pathの依存関係追加"
+                    - description: "- [ ] githubパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] universal-user-agent, node-fetchの依存解決"
+                    - description: "- [ ] gitlabパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] node-fetchとBuffer型のエラー解決"
+                    - description: "- [ ] google-mapsパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] node-fetchの依存関係追加"
+                    - description: "- [ ] memoryパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] fs, path, urlの型定義追加"
+                    - description: "- [ ] puppeteerパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] puppeteerとその型定義の追加"
+                    - description: "- [ ] redisパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] redisクライアントライブラリの追加"
+                    - description: "- [ ] sequential-thinkingパッケージの修正"
+                      subtasks:
+                        - description: "- [ ] chalk依存関係の追加"
+                    - description: "- [ ] slackパッケージの修正" 
+                      subtasks:
+                        - description: "- [ ] Slack APIクライアントの依存関係解決"
+                - description: "- [ ] npm install時のエラー調査と修正"
+                  priority: high
+                  subtasks:
+                    - description: "- [ ] package.jsonのworkspace設定の確認"
+                    - description: "- [x] 既存の出力ファイルとの競合解決"
+                      subtasks:
+                        - description: "- [x] 出力先ディレクトリの変更（dist → dist-new）"
+                        - description: "- [x] 「Cannot write file...because it would overwrite input file」エラーの解決"
+                    - description: "- [ ] Node.jsバージョンの互換性確認"
+                    - description: "- [ ] npmクライアントのキャッシュクリア"
+                    - description: "- [ ] 各パッケージのpackage-lock.jsonの整合性確認"
+                    - description: "- [ ] 「Cannot destructure property 'package' of 'node.target' as it is null」エラーの調査"
+                - description: "- [ ] モジュール解決戦略の見直し"
+                  subtasks:
+                    - description: "- [ ] ESM/CommonJS混在問題の確認"
+                    - description: "- [x] package.jsonの「type: module」設定確認"
+                    - description: "- [x] モジュール解決方式設定の追加 (NodeNext)"
+                    - description: "- [ ] import/requireの一貫性確保"
+                - description: "- [ ] ビルドプロセスの最適化"
+                  subtasks:
+                    - description: "- [x] 共通のdevDependenciesをルートpackage.jsonに移動"
+                    - description: "- [x] 依存関係チェックスクリプト追加（check-deps）"
+                    - description: "- [x] 各パッケージのビルドスクリプト修正（出力先変更）"
+                    - description: "- [ ] 依存関係の解決順序の最適化"
+                    - description: "- [ ] TypeScriptビルドエラー時の詳細ログ出力設定"
 
   # その他の機能拡張
   additional_features:
