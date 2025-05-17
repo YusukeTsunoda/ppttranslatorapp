@@ -14,9 +14,6 @@ export const createPrismaClient = (options: any = {}) => {
     errorFormat: 'minimal',
     // クエリキャッシュを有効化（データベースへのラウンドトリップを削減）
     // Vercelのサーバーレス環境でもリクエスト内でのキャッシュが有効
-    __internal: {
-      useUds: true,
-    },
     ...options,
   });
 
