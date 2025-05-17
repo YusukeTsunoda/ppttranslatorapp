@@ -1,7 +1,11 @@
-import { NextRequest } from 'next/server';
+import { POST } from '@/app/api/auth/reset-password/route';
 import { prisma } from '@/lib/db/prisma';
 import { generateResetToken } from '@/lib/auth/token';
 import { sendPasswordResetEmail } from '@/lib/email/send';
+import { UserRole } from '@prisma/client';
+
+// Jestのexpect関数をモック化しないようにする
+const actualExpect = global.expect;
 
 // モック設定
 jest.mock('@/lib/db/prisma', () => ({
@@ -64,14 +68,14 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(200);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(200);
 
       const data = await response.json();
-      expect(data.success).toBe(true);
+      actualExpect(data.success).toBe(true);
 
       // メール送信が呼び出されたことを確認
-      expect(sendPasswordResetEmail).toHaveBeenCalledWith('test@example.com', 'test-reset-token');
+      actualExpect(sendPasswordResetEmail).toHaveBeenCalledWith('test@example.com', 'test-reset-token');
     });
 
     it('存在しないユーザーの場合でも成功レスポンスを返す（セキュリティ対策）', async () => {
@@ -88,14 +92,14 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(200);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(200);
 
       const data = await response.json();
-      expect(data.success).toBe(true);
+      actualExpect(data.success).toBe(true);
 
       // メール送信が呼び出されていないことを確認
-      expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+      actualExpect(sendPasswordResetEmail).not.toHaveBeenCalled();
     });
 
     it('メールアドレスの形式が不正な場合は400エラーを返す', async () => {
@@ -109,11 +113,11 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(400);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(400);
 
       const data = await response.json();
-      expect(data.error).toBeTruthy();
+      actualExpect(data.error).toBeTruthy();
     });
 
     it('メール送信サービスの設定がない場合は500エラーを返す', async () => {
@@ -130,11 +134,11 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(500);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(500);
 
       const data = await response.json();
-      expect(data.error).toBe('Email service configuration error');
+      actualExpect(data.error).toBe('Email service configuration error');
     });
 
     it('メール送信に失敗した場合は500エラーを返す', async () => {
@@ -157,11 +161,11 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(500);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(500);
 
       const data = await response.json();
-      expect(data.error).toBe('パスワードリセットの要求に失敗しました');
+      actualExpect(data.error).toBe('パスワードリセットの要求に失敗しました');
     });
 
     it('データベースエラーの場合は500エラーを返す', async () => {
@@ -178,11 +182,11 @@ describe('Password Reset API', () => {
         }),
       });
 
-      const response = await POST(req as unknown as NextRequest);
-      expect(response.status).toBe(500);
+      const response = await POST(req as Request);
+      actualExpect(response.status).toBe(500);
 
       const data = await response.json();
-      expect(data.error).toBe('パスワードリセットの要求に失敗しました');
+      actualExpect(data.error).toBe('パスワードリセットの要求に失敗しました');
     });
   });
 }); 

@@ -8,7 +8,6 @@ import { User, UserRole } from '@prisma/client'; // UserRoleもインポート
 
 // getServerSession のモック
 jest.mock('next-auth', () => ({
-    ...jest.requireActual('next-auth'),
     getServerSession: jest.fn(),
 }));
 

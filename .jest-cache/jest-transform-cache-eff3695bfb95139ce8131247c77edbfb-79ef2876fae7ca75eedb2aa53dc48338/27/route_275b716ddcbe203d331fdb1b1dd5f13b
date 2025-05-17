@@ -1,0 +1,71 @@
+c8e11c6ed1dfbaaf250f61f67811f8f7
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    GET: function() {
+        return GET;
+    },
+    dynamic: function() {
+        return dynamic;
+    }
+});
+const _server = require("next/server");
+const _nextauth = require("next-auth");
+const _authoptions = require("@/lib/auth/auth-options");
+const _prisma = require("@/lib/db/prisma");
+const dynamic = 'force-dynamic';
+async function GET(request) {
+    try {
+        var _session_user;
+        // セッションからユーザーIDを取得
+        const session = await (0, _nextauth.getServerSession)(_authoptions.authOptions);
+        if (!(session === null || session === void 0 ? void 0 : (_session_user = session.user) === null || _session_user === void 0 ? void 0 : _session_user.id)) {
+            return _server.NextResponse.json({
+                isAdmin: false,
+                role: null
+            }, {
+                status: 401
+            });
+        }
+        // ユーザーロールを取得
+        const user = await _prisma.prisma.user.findUnique({
+            where: {
+                id: session.user.id
+            },
+            select: {
+                role: true
+            }
+        });
+        if (!user) {
+            return _server.NextResponse.json({
+                isAdmin: false,
+                role: null
+            }, {
+                status: 404
+            });
+        }
+        // 管理者かどうかをチェック
+        const isAdmin = user.role === 'ADMIN';
+        return _server.NextResponse.json({
+            isAdmin,
+            role: user.role
+        });
+    } catch (error) {
+        console.error('ユーザーロール取得エラー:', error);
+        return _server.NextResponse.json({
+            error: 'ユーザーロールの取得に失敗しました'
+        }, {
+            status: 500
+        });
+    }
+}
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC9hcHAvYXBpL3VzZXIvcm9sZS9yb3V0ZS50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBOZXh0UmVxdWVzdCwgTmV4dFJlc3BvbnNlIH0gZnJvbSAnbmV4dC9zZXJ2ZXInO1xuaW1wb3J0IHsgZ2V0U2VydmVyU2Vzc2lvbiB9IGZyb20gJ25leHQtYXV0aCc7XG5pbXBvcnQgeyBhdXRoT3B0aW9ucyB9IGZyb20gJ0AvbGliL2F1dGgvYXV0aC1vcHRpb25zJztcbmltcG9ydCB7IHByaXNtYSB9IGZyb20gJ0AvbGliL2RiL3ByaXNtYSc7XG5cbmV4cG9ydCBjb25zdCBkeW5hbWljID0gJ2ZvcmNlLWR5bmFtaWMnO1xuXG5leHBvcnQgYXN5bmMgZnVuY3Rpb24gR0VUKHJlcXVlc3Q6IE5leHRSZXF1ZXN0KSB7XG4gIHRyeSB7XG4gICAgLy8g44K744OD44K344On44Oz44GL44KJ44Om44O844K244O8SUTjgpLlj5blvpdcbiAgICBjb25zdCBzZXNzaW9uID0gYXdhaXQgZ2V0U2VydmVyU2Vzc2lvbihhdXRoT3B0aW9ucyk7XG5cbiAgICBpZiAoIXNlc3Npb24/LnVzZXI/LmlkKSB7XG4gICAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oeyBpc0FkbWluOiBmYWxzZSwgcm9sZTogbnVsbCB9LCB7IHN0YXR1czogNDAxIH0pO1xuICAgIH1cblxuICAgIC8vIOODpuODvOOCtuODvOODreODvOODq+OCkuWPluW+l1xuICAgIGNvbnN0IHVzZXIgPSBhd2FpdCBwcmlzbWEudXNlci5maW5kVW5pcXVlKHtcbiAgICAgIHdoZXJlOiB7IGlkOiBzZXNzaW9uLnVzZXIuaWQgfSxcbiAgICAgIHNlbGVjdDogeyByb2xlOiB0cnVlIH0sXG4gICAgfSk7XG5cbiAgICBpZiAoIXVzZXIpIHtcbiAgICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IGlzQWRtaW46IGZhbHNlLCByb2xlOiBudWxsIH0sIHsgc3RhdHVzOiA0MDQgfSk7XG4gICAgfVxuXG4gICAgLy8g566h55CG6ICF44GL44Gp44GG44GL44KS44OB44Kn44OD44KvXG4gICAgY29uc3QgaXNBZG1pbiA9IHVzZXIucm9sZSA9PT0gJ0FETUlOJztcblxuICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IGlzQWRtaW4sIHJvbGU6IHVzZXIucm9sZSB9KTtcbiAgfSBjYXRjaCAoZXJyb3IpIHtcbiAgICBjb25zb2xlLmVycm9yKCfjg6bjg7zjgrbjg7zjg63jg7zjg6vlj5blvpfjgqjjg6njg7w6JywgZXJyb3IpO1xuICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IGVycm9yOiAn44Om44O844K244O844Ot44O844Or44Gu5Y+W5b6X44Gr5aSx5pWX44GX44G+44GX44GfJyB9LCB7IHN0YXR1czogNTAwIH0pO1xuICB9XG59XG4iXSwibmFtZXMiOlsiR0VUIiwiZHluYW1pYyIsInJlcXVlc3QiLCJzZXNzaW9uIiwiZ2V0U2VydmVyU2Vzc2lvbiIsImF1dGhPcHRpb25zIiwidXNlciIsImlkIiwiTmV4dFJlc3BvbnNlIiwianNvbiIsImlzQWRtaW4iLCJyb2xlIiwic3RhdHVzIiwicHJpc21hIiwiZmluZFVuaXF1ZSIsIndoZXJlIiwic2VsZWN0IiwiZXJyb3IiLCJjb25zb2xlIl0sIm1hcHBpbmdzIjoiOzs7Ozs7Ozs7OztJQU9zQkEsR0FBRztlQUFIQTs7SUFGVEMsT0FBTztlQUFQQTs7O3dCQUw2QjswQkFDVDs2QkFDTDt3QkFDTDtBQUVoQixNQUFNQSxVQUFVO0FBRWhCLGVBQWVELElBQUlFLE9BQW9CO0lBQzVDLElBQUk7WUFJR0M7UUFITCxtQkFBbUI7UUFDbkIsTUFBTUEsVUFBVSxNQUFNQyxJQUFBQSwwQkFBZ0IsRUFBQ0Msd0JBQVc7UUFFbEQsSUFBSSxFQUFDRixvQkFBQUEsK0JBQUFBLGdCQUFBQSxRQUFTRyxJQUFJLGNBQWJILG9DQUFBQSxjQUFlSSxFQUFFLEdBQUU7WUFDdEIsT0FBT0Msb0JBQVksQ0FBQ0MsSUFBSSxDQUFDO2dCQUFFQyxTQUFTO2dCQUFPQyxNQUFNO1lBQUssR0FBRztnQkFBRUMsUUFBUTtZQUFJO1FBQ3pFO1FBRUEsYUFBYTtRQUNiLE1BQU1OLE9BQU8sTUFBTU8sY0FBTSxDQUFDUCxJQUFJLENBQUNRLFVBQVUsQ0FBQztZQUN4Q0MsT0FBTztnQkFBRVIsSUFBSUosUUFBUUcsSUFBSSxDQUFDQyxFQUFFO1lBQUM7WUFDN0JTLFFBQVE7Z0JBQUVMLE1BQU07WUFBSztRQUN2QjtRQUVBLElBQUksQ0FBQ0wsTUFBTTtZQUNULE9BQU9FLG9CQUFZLENBQUNDLElBQUksQ0FBQztnQkFBRUMsU0FBUztnQkFBT0MsTUFBTTtZQUFLLEdBQUc7Z0JBQUVDLFFBQVE7WUFBSTtRQUN6RTtRQUVBLGVBQWU7UUFDZixNQUFNRixVQUFVSixLQUFLSyxJQUFJLEtBQUs7UUFFOUIsT0FBT0gsb0JBQVksQ0FBQ0MsSUFBSSxDQUFDO1lBQUVDO1lBQVNDLE1BQU1MLEtBQUtLLElBQUk7UUFBQztJQUN0RCxFQUFFLE9BQU9NLE9BQU87UUFDZEMsUUFBUUQsS0FBSyxDQUFDLGlCQUFpQkE7UUFDL0IsT0FBT1Qsb0JBQVksQ0FBQ0MsSUFBSSxDQUFDO1lBQUVRLE9BQU87UUFBb0IsR0FBRztZQUFFTCxRQUFRO1FBQUk7SUFDekU7QUFDRiJ9

@@ -6,6 +6,7 @@ const fs = require('fs');
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true, // SWCによるミニファイを有効化
+  swcMinify: true, // SWCによるミニファイを有効化
   // SSR運用のためoutput: 'standalone' のみを指定
   output: 'standalone',
   experimental: {
@@ -72,6 +73,12 @@ const nextConfig = {
     // 一時ディレクトリとscripts/tempディレクトリを除外
     config.watchOptions = {
       ...config.watchOptions,
+      ignored: [
+        '**/temp/**', 
+        '**/scripts/temp/**', 
+        '**/.next/cache/**',
+        ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : [])
+      ],
       ignored: [
         '**/temp/**', 
         '**/scripts/temp/**', 

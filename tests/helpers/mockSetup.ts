@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { getServerSession } from 'next-auth';
 
@@ -13,11 +13,13 @@ export const createPrismaMock = () => {
 
 // getServerSessionのモック作成
 export const createSessionMock = () => {
-  const sessionMock = jest.fn();
-  jest.mock('next-auth', () => ({
-    ...jest.requireActual('next-auth'),
-    getServerSession: sessionMock,
-  }));
+  const sessionMock = jest.fn().mockResolvedValue(null);
+  jest.mock('next-auth', () => {
+    return {
+      __esModule: true,
+      getServerSession: () => sessionMock(),
+    };
+  });
   return sessionMock;
 };
 
@@ -35,7 +37,7 @@ export const createMockUser = (overrides = {}) => ({
   credits: 10,
   createdAt: new Date(),
   updatedAt: new Date(),
-  role: 'USER',
+  role: UserRole.USER,
   deletedAt: null,
   emailVerified: null,
   stripeCustomerId: null,

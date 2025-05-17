@@ -1,0 +1,252 @@
+216b801c4afdccba9f1fef70a5f434a4
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _cache = require("@/lib/translation/cache");
+(0, _globals.describe)('Translation Cache', ()=>{
+    let cache;
+    (0, _globals.beforeEach)(()=>{
+        cache = new _cache.TranslationCache({
+            maxSize: 1000,
+            ttl: 3600
+        });
+    });
+    (0, _globals.describe)('基本的な操作', ()=>{
+        (0, _globals.it)('キャッシュに値を設定して取得する', ()=>{
+            const key = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const value = {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            };
+            cache.set(key, value);
+            const cached = cache.get(key);
+            (0, _globals.expect)(cached).toEqual(value);
+        });
+        (0, _globals.it)('存在しないキーはnullを返す', ()=>{
+            const key = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const cached = cache.get(key);
+            (0, _globals.expect)(cached).toBeNull();
+        });
+        (0, _globals.it)('TTL経過後はキャッシュが無効になる', async ()=>{
+            const key = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const value = {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            };
+            cache = new _cache.TranslationCache({
+                maxSize: 1000,
+                ttl: 1
+            }); // TTLを1秒に設定
+            cache.set(key, value);
+            // TTLが経過するまで待機
+            await new Promise((resolve)=>setTimeout(resolve, 1100));
+            const cached = cache.get(key);
+            (0, _globals.expect)(cached).toBeNull();
+        });
+    });
+    (0, _globals.describe)('キャッシュサイズ制限', ()=>{
+        (0, _globals.it)('最大サイズを超えた場合は古いエントリを削除する', ()=>{
+            cache = new _cache.TranslationCache({
+                maxSize: 2,
+                ttl: 3600
+            });
+            const keys = [
+                {
+                    text: 'Hello',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                },
+                {
+                    text: 'World',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                },
+                {
+                    text: 'Test',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                }
+            ];
+            keys.forEach((key, index)=>{
+                cache.set(key, {
+                    translated: `Value ${index}`,
+                    timestamp: Date.now()
+                });
+            });
+            // 最も古いエントリが削除されていることを確認
+            (0, _globals.expect)(cache.get(keys[0])).toBeNull();
+            (0, _globals.expect)(cache.get(keys[1])).not.toBeNull();
+            (0, _globals.expect)(cache.get(keys[2])).not.toBeNull();
+        });
+        (0, _globals.it)('キャッシュサイズを取得する', ()=>{
+            const keys = [
+                {
+                    text: 'Hello',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                },
+                {
+                    text: 'World',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                }
+            ];
+            keys.forEach((key, index)=>{
+                cache.set(key, {
+                    translated: `Value ${index}`,
+                    timestamp: Date.now()
+                });
+            });
+            (0, _globals.expect)(cache.size()).toBe(2);
+        });
+    });
+    (0, _globals.describe)('キャッシュ操作', ()=>{
+        (0, _globals.it)('キャッシュをクリアする', ()=>{
+            const key = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const value = {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            };
+            cache.set(key, value);
+            (0, _globals.expect)(cache.size()).toBe(1);
+            cache.clear();
+            (0, _globals.expect)(cache.size()).toBe(0);
+            (0, _globals.expect)(cache.get(key)).toBeNull();
+        });
+        (0, _globals.it)('キャッシュから特定のエントリを削除する', ()=>{
+            const key = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const value = {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            };
+            cache.set(key, value);
+            (0, _globals.expect)(cache.get(key)).not.toBeNull();
+            cache.delete(key);
+            (0, _globals.expect)(cache.get(key)).toBeNull();
+        });
+        (0, _globals.it)('キャッシュの統計情報を取得する', ()=>{
+            const keys = [
+                {
+                    text: 'Hello',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                },
+                {
+                    text: 'World',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                }
+            ];
+            keys.forEach((key, index)=>{
+                cache.set(key, {
+                    translated: `Value ${index}`,
+                    timestamp: Date.now()
+                });
+                cache.get(key); // ヒットカウントを増やす
+            });
+            const stats = cache.getStats();
+            (0, _globals.expect)(stats.size).toBe(2);
+            (0, _globals.expect)(stats.hits).toBe(2);
+            (0, _globals.expect)(stats.misses).toBe(0);
+        });
+    });
+    (0, _globals.describe)('キャッシュキーの生成', ()=>{
+        (0, _globals.it)('異なるテキストで異なるキーを生成する', ()=>{
+            const key1 = {
+                text: 'Hello',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const key2 = {
+                text: 'World',
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            cache.set(key1, {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            });
+            cache.set(key2, {
+                translated: '世界',
+                timestamp: Date.now()
+            });
+            (0, _globals.expect)(cache.get(key1)?.translated).toBe('こんにちは');
+            (0, _globals.expect)(cache.get(key2)?.translated).toBe('世界');
+        });
+        (0, _globals.it)('異なる言語ペアで異なるキーを生成する', ()=>{
+            const text = 'Hello';
+            const key1 = {
+                text,
+                sourceLang: 'en',
+                targetLang: 'ja'
+            };
+            const key2 = {
+                text,
+                sourceLang: 'en',
+                targetLang: 'fr'
+            };
+            cache.set(key1, {
+                translated: 'こんにちは',
+                timestamp: Date.now()
+            });
+            cache.set(key2, {
+                translated: 'Bonjour',
+                timestamp: Date.now()
+            });
+            (0, _globals.expect)(cache.get(key1)?.translated).toBe('こんにちは');
+            (0, _globals.expect)(cache.get(key2)?.translated).toBe('Bonjour');
+        });
+    });
+    (0, _globals.describe)('エラー処理', ()=>{
+        (0, _globals.it)('無効なTTL値でエラーをスローする', ()=>{
+            (0, _globals.expect)(()=>{
+                new _cache.TranslationCache({
+                    maxSize: 1000,
+                    ttl: -1
+                });
+            }).toThrow('TTL must be a positive number');
+        });
+        (0, _globals.it)('無効なキャッシュサイズでエラーをスローする', ()=>{
+            (0, _globals.expect)(()=>{
+                new _cache.TranslationCache({
+                    maxSize: 0,
+                    ttl: 3600
+                });
+            }).toThrow('Cache size must be a positive number');
+        });
+        (0, _globals.it)('無効なキャッシュキーでエラーをスローする', ()=>{
+            (0, _globals.expect)(()=>{
+                cache.set({
+                    text: '',
+                    sourceLang: 'en',
+                    targetLang: 'ja'
+                }, {
+                    translated: 'test',
+                    timestamp: Date.now()
+                });
+            }).toThrow('Invalid cache key');
+        });
+    });
+});

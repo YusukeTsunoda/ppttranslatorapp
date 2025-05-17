@@ -1,0 +1,142 @@
+323b3bac0a664db51083a70c839169e6
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _concurrent = require("@/lib/translation/concurrent");
+(0, _globals.describe)('Translation Concurrent Processing', ()=>{
+    (0, _globals.describe)('translateConcurrently', ()=>{
+        (0, _globals.it)('複数のテキストを並行して翻訳する', async ()=>{
+            const texts = Array.from({
+                length: 10
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage);
+            (0, _globals.expect)(result).toHaveLength(texts.length);
+            result.forEach((translation, index)=>{
+                (0, _globals.expect)(translation).toHaveProperty('original', texts[index]);
+                (0, _globals.expect)(translation).toHaveProperty('translated');
+            });
+        });
+        (0, _globals.it)('バッチサイズを指定して翻訳する', async ()=>{
+            const texts = Array.from({
+                length: 20
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const batchSize = 5;
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                batchSize
+            });
+            (0, _globals.expect)(result).toHaveLength(texts.length);
+        });
+        (0, _globals.it)('同時実行数を制限して翻訳する', async ()=>{
+            const texts = Array.from({
+                length: 15
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const concurrency = 3;
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                concurrency
+            });
+            (0, _globals.expect)(result).toHaveLength(texts.length);
+        });
+        (0, _globals.it)('エラー発生時にリトライする', async ()=>{
+            const texts = [
+                'Text 1',
+                'Text 2',
+                'Text 3'
+            ];
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            // 最初の呼び出しでエラー、2回目で成功するモックを作成
+            let attempts = new Map();
+            const mockTranslate = _globals.jest.fn().mockImplementation((text)=>{
+                const currentAttempt = (attempts.get(text) || 0) + 1;
+                attempts.set(text, currentAttempt);
+                if (currentAttempt === 1) {
+                    throw new Error('Temporary error');
+                }
+                return Promise.resolve({
+                    original: text,
+                    translated: `Translated ${text}`
+                });
+            });
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                translate: mockTranslate,
+                maxRetries: 3
+            });
+            (0, _globals.expect)(result).toHaveLength(texts.length);
+            texts.forEach((text)=>{
+                (0, _globals.expect)(attempts.get(text)).toBe(2); // 各テキストが2回試行されたことを確認
+            });
+        });
+        (0, _globals.it)('部分的な失敗を処理する', async ()=>{
+            const texts = [
+                'Text 1',
+                'Text 2',
+                'Text 3'
+            ];
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            // Text 2の翻訳が常に失敗するモックを作成
+            const mockTranslate = _globals.jest.fn().mockImplementation((text)=>{
+                if (text === 'Text 2') {
+                    throw new Error('Persistent error');
+                }
+                return Promise.resolve({
+                    original: text,
+                    translated: `Translated ${text}`
+                });
+            });
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                translate: mockTranslate,
+                maxRetries: 2
+            });
+            (0, _globals.expect)(result).toHaveLength(2); // 失敗したテキストを除外
+            (0, _globals.expect)(result.map((r)=>r.original)).not.toContain('Text 2');
+        });
+        (0, _globals.it)('進捗コールバックを呼び出す', async ()=>{
+            const texts = Array.from({
+                length: 5
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const onProgress = _globals.jest.fn();
+            await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                onProgress
+            });
+            (0, _globals.expect)(onProgress).toHaveBeenCalledTimes(texts.length);
+            (0, _globals.expect)(onProgress).toHaveBeenLastCalledWith(1); // 最後は100%
+        });
+        (0, _globals.it)('キャンセル時に実行中の翻訳を中止する', async ()=>{
+            const texts = Array.from({
+                length: 10
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const abortController = new AbortController();
+            // 翻訳を開始して即座にキャンセル
+            setTimeout(()=>abortController.abort(), 100);
+            await (0, _globals.expect)((0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                signal: abortController.signal
+            })).rejects.toThrow('Translation cancelled');
+        });
+        (0, _globals.it)('メモリ使用量を監視する', async ()=>{
+            const texts = Array.from({
+                length: 100
+            }, (_, i)=>`Text ${i + 1}`);
+            const sourceLanguage = 'en';
+            const targetLanguage = 'ja';
+            const memoryLimit = 100 * 1024 * 1024; // 100MB
+            const result = await (0, _concurrent.translateConcurrently)(texts, sourceLanguage, targetLanguage, {
+                memoryLimit,
+                onMemoryExceeded: _globals.jest.fn()
+            });
+            (0, _globals.expect)(result).toHaveLength(texts.length);
+        });
+    });
+});

@@ -1,0 +1,59 @@
+39d784fd41f11a46f48487f7d6d50d9e
+// next-authのモック化
+"use strict";
+jest.mock('next-auth', ()=>({
+        getServerSession: jest.fn()
+    }));
+// auth-optionsのモック化
+jest.mock('@/lib/auth/auth-options', ()=>({
+        authOptions: {}
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _route = require("@/app/api/auth/session/route");
+const _nextauth = require("next-auth");
+const _authoptions = require("@/lib/auth/auth-options");
+const _mockSetup = require("@/tests/helpers/mockSetup");
+// getServerSessionのモックを直接使用
+const getServerSessionMock = _nextauth.getServerSession;
+describe('GET /api/auth/session', ()=>{
+    beforeEach(()=>{
+        (0, _mockSetup.clearAllMocks)();
+    });
+    it('should return user information if session exists', async ()=>{
+        const mockUser = (0, _mockSetup.createMockUser)({
+            id: 'user123',
+            name: 'Test User',
+            email: 'test@example.com'
+        });
+        // モックの返値を設定
+        getServerSessionMock.mockResolvedValueOnce({
+            user: mockUser,
+            expires: 'some-date'
+        });
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.user).toEqual(mockUser);
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+    it('should return null for user if session does not exist', async ()=>{
+        getServerSessionMock.mockResolvedValueOnce(null);
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.user).toBeNull();
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+    it('should return null for user if getServerSession throws an error', async ()=>{
+        getServerSessionMock.mockRejectedValueOnce(new Error('Session fetch error'));
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200); // APIはエラーをキャッチしてnullを返す
+        expect(responseBody.user).toBeNull();
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+});
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC90ZXN0cy9hcGkvYXV0aC9zZXNzaW9uLnRlc3QudHMiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gbmV4dC1hdXRo44Gu44Oi44OD44Kv5YyWXG5qZXN0Lm1vY2soJ25leHQtYXV0aCcsICgpID0+ICh7XG4gIGdldFNlcnZlclNlc3Npb246IGplc3QuZm4oKSxcbn0pKTtcblxuLy8gYXV0aC1vcHRpb25z44Gu44Oi44OD44Kv5YyWXG5qZXN0Lm1vY2soJ0AvbGliL2F1dGgvYXV0aC1vcHRpb25zJywgKCkgPT4gKHtcbiAgYXV0aE9wdGlvbnM6IHt9XG59KSk7XG5cbi8vIOODouOCuOODpeODvOODq+OBruOCpOODs+ODneODvOODiOOBr+ODouODg+OCr+WMluW+jOOBq+ihjOOBhlxuaW1wb3J0IHsgR0VUIH0gZnJvbSAnQC9hcHAvYXBpL2F1dGgvc2Vzc2lvbi9yb3V0ZSc7XG5pbXBvcnQgeyBOZXh0UmVzcG9uc2UgfSBmcm9tICduZXh0L3NlcnZlcic7XG5pbXBvcnQgeyBnZXRTZXJ2ZXJTZXNzaW9uIH0gZnJvbSAnbmV4dC1hdXRoJztcbmltcG9ydCB7IGF1dGhPcHRpb25zIH0gZnJvbSAnQC9saWIvYXV0aC9hdXRoLW9wdGlvbnMnO1xuaW1wb3J0IHsgY3JlYXRlTW9ja1VzZXIsIGNsZWFyQWxsTW9ja3MgfSBmcm9tICdAL3Rlc3RzL2hlbHBlcnMvbW9ja1NldHVwJztcblxuLy8gZ2V0U2VydmVyU2Vzc2lvbuOBruODouODg+OCr+OCkuebtOaOpeS9v+eUqFxuY29uc3QgZ2V0U2VydmVyU2Vzc2lvbk1vY2sgPSBnZXRTZXJ2ZXJTZXNzaW9uIGFzIGplc3QuTW9jaztcblxuZGVzY3JpYmUoJ0dFVCAvYXBpL2F1dGgvc2Vzc2lvbicsICgpID0+IHtcbiAgYmVmb3JlRWFjaCgoKSA9PiB7XG4gICAgY2xlYXJBbGxNb2NrcygpO1xuICB9KTtcblxuICBpdCgnc2hvdWxkIHJldHVybiB1c2VyIGluZm9ybWF0aW9uIGlmIHNlc3Npb24gZXhpc3RzJywgYXN5bmMgKCkgPT4ge1xuICAgIGNvbnN0IG1vY2tVc2VyID0gY3JlYXRlTW9ja1VzZXIoe1xuICAgICAgaWQ6ICd1c2VyMTIzJyxcbiAgICAgIG5hbWU6ICdUZXN0IFVzZXInLFxuICAgICAgZW1haWw6ICd0ZXN0QGV4YW1wbGUuY29tJyxcbiAgICB9KTtcbiAgICAvLyDjg6Ljg4Pjgq/jga7ov5TlgKTjgpLoqK3lrppcbiAgICBnZXRTZXJ2ZXJTZXNzaW9uTW9jay5tb2NrUmVzb2x2ZWRWYWx1ZU9uY2Uoe1xuICAgICAgdXNlcjogbW9ja1VzZXIsXG4gICAgICBleHBpcmVzOiAnc29tZS1kYXRlJyxcbiAgICB9KTtcblxuICAgIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgR0VUKCk7XG4gICAgY29uc3QgcmVzcG9uc2VCb2R5ID0gYXdhaXQgcmVzcG9uc2UuanNvbigpO1xuXG4gICAgZXhwZWN0KHJlc3BvbnNlLnN0YXR1cykudG9CZSgyMDApO1xuICAgIGV4cGVjdChyZXNwb25zZUJvZHkudXNlcikudG9FcXVhbChtb2NrVXNlcik7XG4gICAgZXhwZWN0KGdldFNlcnZlclNlc3Npb25Nb2NrKS50b0hhdmVCZWVuQ2FsbGVkV2l0aChhdXRoT3B0aW9ucyk7XG4gIH0pO1xuXG4gIGl0KCdzaG91bGQgcmV0dXJuIG51bGwgZm9yIHVzZXIgaWYgc2Vzc2lvbiBkb2VzIG5vdCBleGlzdCcsIGFzeW5jICgpID0+IHtcbiAgICBnZXRTZXJ2ZXJTZXNzaW9uTW9jay5tb2NrUmVzb2x2ZWRWYWx1ZU9uY2UobnVsbCk7XG5cbiAgICBjb25zdCByZXNwb25zZSA9IGF3YWl0IEdFVCgpO1xuICAgIGNvbnN0IHJlc3BvbnNlQm9keSA9IGF3YWl0IHJlc3BvbnNlLmpzb24oKTtcblxuICAgIGV4cGVjdChyZXNwb25zZS5zdGF0dXMpLnRvQmUoMjAwKTtcbiAgICBleHBlY3QocmVzcG9uc2VCb2R5LnVzZXIpLnRvQmVOdWxsKCk7XG4gICAgZXhwZWN0KGdldFNlcnZlclNlc3Npb25Nb2NrKS50b0hhdmVCZWVuQ2FsbGVkV2l0aChhdXRoT3B0aW9ucyk7XG4gIH0pO1xuXG4gIGl0KCdzaG91bGQgcmV0dXJuIG51bGwgZm9yIHVzZXIgaWYgZ2V0U2VydmVyU2Vzc2lvbiB0aHJvd3MgYW4gZXJyb3InLCBhc3luYyAoKSA9PiB7XG4gICAgZ2V0U2VydmVyU2Vzc2lvbk1vY2subW9ja1JlamVjdGVkVmFsdWVPbmNlKG5ldyBFcnJvcignU2Vzc2lvbiBmZXRjaCBlcnJvcicpKTtcblxuICAgIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgR0VUKCk7XG4gICAgY29uc3QgcmVzcG9uc2VCb2R5ID0gYXdhaXQgcmVzcG9uc2UuanNvbigpO1xuXG4gICAgZXhwZWN0KHJlc3BvbnNlLnN0YXR1cykudG9CZSgyMDApOyAvLyBBUEnjga/jgqjjg6njg7zjgpLjgq3jg6Pjg4Pjg4HjgZfjgaZudWxs44KS6L+U44GZXG4gICAgZXhwZWN0KHJlc3BvbnNlQm9keS51c2VyKS50b0JlTnVsbCgpO1xuICAgIGV4cGVjdChnZXRTZXJ2ZXJTZXNzaW9uTW9jaykudG9IYXZlQmVlbkNhbGxlZFdpdGgoYXV0aE9wdGlvbnMpO1xuICB9KTtcbn0pOyAiXSwibmFtZXMiOlsiamVzdCIsIm1vY2siLCJnZXRTZXJ2ZXJTZXNzaW9uIiwiZm4iLCJhdXRoT3B0aW9ucyIsImdldFNlcnZlclNlc3Npb25Nb2NrIiwiZGVzY3JpYmUiLCJiZWZvcmVFYWNoIiwiY2xlYXJBbGxNb2NrcyIsIml0IiwibW9ja1VzZXIiLCJjcmVhdGVNb2NrVXNlciIsImlkIiwibmFtZSIsImVtYWlsIiwibW9ja1Jlc29sdmVkVmFsdWVPbmNlIiwidXNlciIsImV4cGlyZXMiLCJyZXNwb25zZSIsIkdFVCIsInJlc3BvbnNlQm9keSIsImpzb24iLCJleHBlY3QiLCJzdGF0dXMiLCJ0b0JlIiwidG9FcXVhbCIsInRvSGF2ZUJlZW5DYWxsZWRXaXRoIiwidG9CZU51bGwiLCJtb2NrUmVqZWN0ZWRWYWx1ZU9uY2UiLCJFcnJvciJdLCJtYXBwaW5ncyI6IkFBQUEsaUJBQWlCOztBQUNqQkEsS0FBS0MsSUFBSSxDQUFDLGFBQWEsSUFBTyxDQUFBO1FBQzVCQyxrQkFBa0JGLEtBQUtHLEVBQUU7SUFDM0IsQ0FBQTtBQUVBLG9CQUFvQjtBQUNwQkgsS0FBS0MsSUFBSSxDQUFDLDJCQUEyQixJQUFPLENBQUE7UUFDMUNHLGFBQWEsQ0FBQztJQUNoQixDQUFBOzs7O3VCQUdvQjswQkFFYTs2QkFDTDsyQkFDa0I7QUFFOUMsNEJBQTRCO0FBQzVCLE1BQU1DLHVCQUF1QkgsMEJBQWdCO0FBRTdDSSxTQUFTLHlCQUF5QjtJQUNoQ0MsV0FBVztRQUNUQyxJQUFBQSx3QkFBYTtJQUNmO0lBRUFDLEdBQUcsb0RBQW9EO1FBQ3JELE1BQU1DLFdBQVdDLElBQUFBLHlCQUFjLEVBQUM7WUFDOUJDLElBQUk7WUFDSkMsTUFBTTtZQUNOQyxPQUFPO1FBQ1Q7UUFDQSxZQUFZO1FBQ1pULHFCQUFxQlUscUJBQXFCLENBQUM7WUFDekNDLE1BQU1OO1lBQ05PLFNBQVM7UUFDWDtRQUVBLE1BQU1DLFdBQVcsTUFBTUMsSUFBQUEsVUFBRztRQUMxQixNQUFNQyxlQUFlLE1BQU1GLFNBQVNHLElBQUk7UUFFeENDLE9BQU9KLFNBQVNLLE1BQU0sRUFBRUMsSUFBSSxDQUFDO1FBQzdCRixPQUFPRixhQUFhSixJQUFJLEVBQUVTLE9BQU8sQ0FBQ2Y7UUFDbENZLE9BQU9qQixzQkFBc0JxQixvQkFBb0IsQ0FBQ3RCLHdCQUFXO0lBQy9EO0lBRUFLLEdBQUcseURBQXlEO1FBQzFESixxQkFBcUJVLHFCQUFxQixDQUFDO1FBRTNDLE1BQU1HLFdBQVcsTUFBTUMsSUFBQUEsVUFBRztRQUMxQixNQUFNQyxlQUFlLE1BQU1GLFNBQVNHLElBQUk7UUFFeENDLE9BQU9KLFNBQVNLLE1BQU0sRUFBRUMsSUFBSSxDQUFDO1FBQzdCRixPQUFPRixhQUFhSixJQUFJLEVBQUVXLFFBQVE7UUFDbENMLE9BQU9qQixzQkFBc0JxQixvQkFBb0IsQ0FBQ3RCLHdCQUFXO0lBQy9EO0lBRUFLLEdBQUcsbUVBQW1FO1FBQ3BFSixxQkFBcUJ1QixxQkFBcUIsQ0FBQyxJQUFJQyxNQUFNO1FBRXJELE1BQU1YLFdBQVcsTUFBTUMsSUFBQUEsVUFBRztRQUMxQixNQUFNQyxlQUFlLE1BQU1GLFNBQVNHLElBQUk7UUFFeENDLE9BQU9KLFNBQVNLLE1BQU0sRUFBRUMsSUFBSSxDQUFDLE1BQU0sd0JBQXdCO1FBQzNERixPQUFPRixhQUFhSixJQUFJLEVBQUVXLFFBQVE7UUFDbENMLE9BQU9qQixzQkFBc0JxQixvQkFBb0IsQ0FBQ3RCLHdCQUFXO0lBQy9EO0FBQ0YifQ==

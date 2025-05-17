@@ -1,0 +1,160 @@
+f02bfb9d329ab3e6e4ae3d9ec874a8b5
+"use strict";
+// Prismaのモック
+jest.mock('@prisma/client', ()=>({
+        PrismaClient: jest.fn().mockImplementation(()=>({
+                batchJob: {
+                    create: jest.fn().mockResolvedValue({
+                        id: 'test-job-id',
+                        userId: 'test-user',
+                        status: 'PENDING',
+                        totalFiles: 2,
+                        processedFiles: 0,
+                        options: {},
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    }),
+                    findUnique: jest.fn().mockResolvedValue({
+                        id: 'test-job-id',
+                        userId: 'test-user',
+                        status: 'PENDING',
+                        totalFiles: 2,
+                        processedFiles: 0,
+                        options: {},
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    })
+                }
+            }))
+    }));
+// next-auth/jwtのモック
+jest.mock('next-auth/jwt', ()=>({
+        getToken: jest.fn().mockResolvedValue({
+            sub: 'test-user',
+            email: 'test@example.com'
+        })
+    }));
+// APIロギングのモック
+jest.mock('@/lib/utils/api-logging', ()=>({
+        withAPILogging: (handler)=>handler
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _client = require("@prisma/client");
+const _route = require("@/app/api/batch-upload/route");
+describe('Batch Upload API', ()=>{
+    beforeEach(()=>{
+        jest.clearAllMocks();
+    });
+    describe('POST /api/batch-upload', ()=>{
+        it('認証されていない場合はエラーを返す', async ()=>{
+            // getTokenをnullを返すようにモック
+            const { getToken } = require('next-auth/jwt');
+            getToken.mockResolvedValueOnce(null);
+            const mockReq = new Request('http://localhost:3000/api/batch-upload', {
+                method: 'POST',
+                body: JSON.stringify({
+                    files: [
+                        'file1.pptx',
+                        'file2.pptx'
+                    ]
+                })
+            });
+            const response = await (0, _route.POST)(mockReq);
+            (0, _globals.expect)(response.status).toBe(401);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('認証が必要です');
+        });
+        it('ファイルリストが空の場合はエラーを返す', async ()=>{
+            const mockReq = new Request('http://localhost:3000/api/batch-upload', {
+                method: 'POST',
+                body: JSON.stringify({
+                    files: []
+                })
+            });
+            const response = await (0, _route.POST)(mockReq);
+            (0, _globals.expect)(response.status).toBe(400);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('ファイルが指定されていません');
+        });
+        it('バッチジョブを正常に作成する', async ()=>{
+            const mockReq = new Request('http://localhost:3000/api/batch-upload', {
+                method: 'POST',
+                body: JSON.stringify({
+                    files: [
+                        'file1.pptx',
+                        'file2.pptx'
+                    ],
+                    options: {
+                        targetLang: 'en'
+                    }
+                })
+            });
+            const response = await (0, _route.POST)(mockReq);
+            (0, _globals.expect)(response.status).toBe(200);
+            const data = await response.json();
+            (0, _globals.expect)(data.jobId).toBe('test-job-id');
+            (0, _globals.expect)(data.message).toBe('バッチジョブが登録されました');
+            (0, _globals.expect)(data.estimatedTime).toBe(4); // 2ファイル × 2分
+        });
+        it('バッチジョブ作成時にエラーが発生した場合は500エラーを返す', async ()=>{
+            // Prismaのcreateメソッドをエラーを投げるようにモック
+            const prisma = new _client.PrismaClient();
+            prisma.batchJob.create = jest.fn().mockRejectedValueOnce(new Error('DB error'));
+            const mockReq = new Request('http://localhost:3000/api/batch-upload', {
+                method: 'POST',
+                body: JSON.stringify({
+                    files: [
+                        'file1.pptx'
+                    ]
+                })
+            });
+            const response = await (0, _route.POST)(mockReq);
+            (0, _globals.expect)(response.status).toBe(500);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('サーバーエラーが発生しました');
+        });
+    });
+    describe('GET /api/batch-upload', ()=>{
+        it('ジョブIDが指定されていない場合はエラーを返す', async ()=>{
+            const mockReq = new Request('http://localhost:3000/api/batch-upload');
+            const response = await (0, _route.GET)(mockReq);
+            (0, _globals.expect)(response.status).toBe(400);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('ジョブIDが指定されていません');
+        });
+        it('存在しないジョブIDの場合は404エラーを返す', async ()=>{
+            // findUniqueメソッドをnullを返すようにモック
+            const prisma = new _client.PrismaClient();
+            prisma.batchJob.findUnique = jest.fn().mockResolvedValueOnce(null);
+            const mockReq = new Request('http://localhost:3000/api/batch-upload?jobId=non-existent');
+            const response = await (0, _route.GET)(mockReq);
+            (0, _globals.expect)(response.status).toBe(404);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('指定されたジョブが見つかりません');
+        });
+        it('ジョブの状態を正常に取得する', async ()=>{
+            const mockReq = new Request('http://localhost:3000/api/batch-upload?jobId=test-job-id');
+            const response = await (0, _route.GET)(mockReq);
+            (0, _globals.expect)(response.status).toBe(200);
+            const data = await response.json();
+            (0, _globals.expect)(data.jobId).toBe('test-job-id');
+            (0, _globals.expect)(data.status).toBe('PENDING');
+            (0, _globals.expect)(data.progress).toBe(0);
+            (0, _globals.expect)(data.totalFiles).toBe(2);
+            (0, _globals.expect)(data.processedFiles).toBe(0);
+        });
+        it('ジョブ取得時にエラーが発生した場合は500エラーを返す', async ()=>{
+            // findUniqueメソッドをエラーを投げるようにモック
+            const prisma = new _client.PrismaClient();
+            prisma.batchJob.findUnique = jest.fn().mockRejectedValueOnce(new Error('DB error'));
+            const mockReq = new Request('http://localhost:3000/api/batch-upload?jobId=test-job-id');
+            const response = await (0, _route.GET)(mockReq);
+            (0, _globals.expect)(response.status).toBe(500);
+            const data = await response.json();
+            (0, _globals.expect)(data.error).toBe('サーバーエラーが発生しました');
+        });
+    });
+});

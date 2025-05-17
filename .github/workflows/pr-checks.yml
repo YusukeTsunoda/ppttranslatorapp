@@ -1,0 +1,75 @@
+name: プルリクエストチェック
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  pr-validation:
+    name: PR検証
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Node.jsセットアップ
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 依存関係インストール
+        run: npm ci
+      
+      - name: 変更ファイルの検出
+        id: changed-files
+        uses: tj-actions/changed-files@v35
+        with:
+          files: |
+            **/*.ts
+            **/*.tsx
+            **/*.js
+            **/*.jsx
+            **/*.json
+            **/*.prisma
+      
+      - name: ESLintによる静的解析
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          npx eslint ${{ steps.changed-files.outputs.all_changed_files }}
+      
+      - name: TypeScriptの型チェック
+        run: npm run type-check
+      
+      - name: テスト実行
+        run: npm run test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      
+      - name: テストカバレッジレポート生成
+        run: npm run test:coverage
+      
+      - name: テストカバレッジコメント
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: false
+      
+      - name: 依存関係の脆弱性チェック
+        run: npm audit --production
+        continue-on-error: true
+      
+      - name: E2Eテスト実行
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: test
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+      
+      - name: ビルド検証
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}

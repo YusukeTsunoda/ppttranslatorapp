@@ -1,0 +1,88 @@
+8a7aa329b6658fe729f2d0a559f9226e
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    seedTestData: function() {
+        return seedTestData;
+    },
+    setupTestDatabase: function() {
+        return setupTestDatabase;
+    },
+    teardownTestDatabase: function() {
+        return teardownTestDatabase;
+    },
+    withTestTransaction: function() {
+        return withTestTransaction;
+    }
+});
+const _client = require("@prisma/client");
+const _child_process = require("child_process");
+const prisma = new _client.PrismaClient();
+const setupTestDatabase = async ()=>{
+    try {
+        // DockerコンテナのステータスチェックとDB接続テスト
+        (0, _child_process.execSync)('docker-compose -f docker-compose.test.yml ps test-db | grep "Up"');
+        await prisma.$connect();
+        // テストデータベースのリセット
+        await prisma.$executeRaw`DROP SCHEMA IF EXISTS public CASCADE`;
+        await prisma.$executeRaw`CREATE SCHEMA public`;
+        // マイグレーションの実行
+        (0, _child_process.execSync)('npx prisma migrate deploy');
+        // テスト用の初期データ投入
+        await seedTestData();
+    } catch (error) {
+        console.error('テストデータベースのセットアップに失敗しました:', error);
+        throw error;
+    }
+};
+const teardownTestDatabase = async ()=>{
+    try {
+        await prisma.$disconnect();
+    } catch (error) {
+        console.error('テストデータベースの切断に失敗しました:', error);
+        throw error;
+    }
+};
+const seedTestData = async ()=>{
+    try {
+        // テスト用管理者アカウントの作成
+        await prisma.user.create({
+            data: {
+                email: 'admin@example.com',
+                name: 'Test Admin',
+                role: 'ADMIN'
+            }
+        });
+        // テスト用一般ユーザーアカウントの作成
+        await prisma.user.create({
+            data: {
+                email: 'user@example.com',
+                name: 'Test User',
+                role: 'USER'
+            }
+        });
+    } catch (error) {
+        console.error('テストデータの投入に失敗しました:', error);
+        throw error;
+    }
+};
+const withTestTransaction = async (callback)=>{
+    try {
+        await prisma.$transaction(async (tx)=>{
+            await callback(tx);
+        });
+    } catch (error) {
+        console.error('トランザクションの実行に失敗しました:', error);
+        throw error;
+    }
+};
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC90ZXN0cy91dGlscy9kYi50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBQcmlzbWFDbGllbnQgfSBmcm9tICdAcHJpc21hL2NsaWVudCc7XG5pbXBvcnQgeyBleGVjU3luYyB9IGZyb20gJ2NoaWxkX3Byb2Nlc3MnO1xuaW1wb3J0IHsgbW9ja1ByaXNtYSB9IGZyb20gJy4vdGVzdC11dGlscyc7XG5cbmNvbnN0IHByaXNtYSA9IG5ldyBQcmlzbWFDbGllbnQoKTtcblxuZXhwb3J0IGNvbnN0IHNldHVwVGVzdERhdGFiYXNlID0gYXN5bmMgKCkgPT4ge1xuICB0cnkge1xuICAgIC8vIERvY2tlcuOCs+ODs+ODhuODiuOBruOCueODhuODvOOCv+OCueODgeOCp+ODg+OCr+OBqERC5o6l57aa44OG44K544OIXG4gICAgZXhlY1N5bmMoJ2RvY2tlci1jb21wb3NlIC1mIGRvY2tlci1jb21wb3NlLnRlc3QueW1sIHBzIHRlc3QtZGIgfCBncmVwIFwiVXBcIicpO1xuICAgIGF3YWl0IHByaXNtYS4kY29ubmVjdCgpO1xuXG4gICAgLy8g44OG44K544OI44OH44O844K/44OZ44O844K544Gu44Oq44K744OD44OIXG4gICAgYXdhaXQgcHJpc21hLiRleGVjdXRlUmF3YERST1AgU0NIRU1BIElGIEVYSVNUUyBwdWJsaWMgQ0FTQ0FERWA7XG4gICAgYXdhaXQgcHJpc21hLiRleGVjdXRlUmF3YENSRUFURSBTQ0hFTUEgcHVibGljYDtcblxuICAgIC8vIOODnuOCpOOCsOODrOODvOOCt+ODp+ODs+OBruWun+ihjFxuICAgIGV4ZWNTeW5jKCducHggcHJpc21hIG1pZ3JhdGUgZGVwbG95Jyk7XG5cbiAgICAvLyDjg4bjgrnjg4jnlKjjga7liJ3mnJ/jg4fjg7zjgr/mipXlhaVcbiAgICBhd2FpdCBzZWVkVGVzdERhdGEoKTtcblxuICB9IGNhdGNoIChlcnJvcikge1xuICAgIGNvbnNvbGUuZXJyb3IoJ+ODhuOCueODiOODh+ODvOOCv+ODmeODvOOCueOBruOCu+ODg+ODiOOCouODg+ODl+OBq+WkseaVl+OBl+OBvuOBl+OBnzonLCBlcnJvcik7XG4gICAgdGhyb3cgZXJyb3I7XG4gIH1cbn07XG5cbmV4cG9ydCBjb25zdCB0ZWFyZG93blRlc3REYXRhYmFzZSA9IGFzeW5jICgpID0+IHtcbiAgdHJ5IHtcbiAgICBhd2FpdCBwcmlzbWEuJGRpc2Nvbm5lY3QoKTtcbiAgfSBjYXRjaCAoZXJyb3IpIHtcbiAgICBjb25zb2xlLmVycm9yKCfjg4bjgrnjg4jjg4fjg7zjgr/jg5njg7zjgrnjga7liIfmlq3jgavlpLHmlZfjgZfjgb7jgZfjgZ86JywgZXJyb3IpO1xuICAgIHRocm93IGVycm9yO1xuICB9XG59O1xuXG5leHBvcnQgY29uc3Qgc2VlZFRlc3REYXRhID0gYXN5bmMgKCkgPT4ge1xuICB0cnkge1xuICAgIC8vIOODhuOCueODiOeUqOeuoeeQhuiAheOCouOCq+OCpuODs+ODiOOBruS9nOaIkFxuICAgIGF3YWl0IHByaXNtYS51c2VyLmNyZWF0ZSh7XG4gICAgICBkYXRhOiB7XG4gICAgICAgIGVtYWlsOiAnYWRtaW5AZXhhbXBsZS5jb20nLFxuICAgICAgICBuYW1lOiAnVGVzdCBBZG1pbicsXG4gICAgICAgIHJvbGU6ICdBRE1JTicsXG4gICAgICB9LFxuICAgIH0pO1xuXG4gICAgLy8g44OG44K544OI55So5LiA6Iis44Om44O844K244O844Ki44Kr44Km44Oz44OI44Gu5L2c5oiQXG4gICAgYXdhaXQgcHJpc21hLnVzZXIuY3JlYXRlKHtcbiAgICAgIGRhdGE6IHtcbiAgICAgICAgZW1haWw6ICd1c2VyQGV4YW1wbGUuY29tJyxcbiAgICAgICAgbmFtZTogJ1Rlc3QgVXNlcicsXG4gICAgICAgIHJvbGU6ICdVU0VSJyxcbiAgICAgIH0sXG4gICAgfSk7XG5cbiAgfSBjYXRjaCAoZXJyb3IpIHtcbiAgICBjb25zb2xlLmVycm9yKCfjg4bjgrnjg4jjg4fjg7zjgr/jga7mipXlhaXjgavlpLHmlZfjgZfjgb7jgZfjgZ86JywgZXJyb3IpO1xuICAgIHRocm93IGVycm9yO1xuICB9XG59O1xuXG4vLyDjg4jjg6njg7Pjgrbjgq/jgrfjg6fjg7Pjg5jjg6vjg5Hjg7xcbmV4cG9ydCBjb25zdCB3aXRoVGVzdFRyYW5zYWN0aW9uID0gYXN5bmMgKGNhbGxiYWNrOiAodHg6IFByaXNtYUNsaWVudCkgPT4gUHJvbWlzZTx2b2lkPikgPT4ge1xuICB0cnkge1xuICAgIGF3YWl0IHByaXNtYS4kdHJhbnNhY3Rpb24oYXN5bmMgKHR4KSA9PiB7XG4gICAgICBhd2FpdCBjYWxsYmFjayh0eCBhcyB1bmtub3duIGFzIFByaXNtYUNsaWVudCk7XG4gICAgfSk7XG4gIH0gY2F0Y2ggKGVycm9yKSB7XG4gICAgY29uc29sZS5lcnJvcign44OI44Op44Oz44K244Kv44K344On44Oz44Gu5a6f6KGM44Gr5aSx5pWX44GX44G+44GX44GfOicsIGVycm9yKTtcbiAgICB0aHJvdyBlcnJvcjtcbiAgfVxufTsgIl0sIm5hbWVzIjpbInNlZWRUZXN0RGF0YSIsInNldHVwVGVzdERhdGFiYXNlIiwidGVhcmRvd25UZXN0RGF0YWJhc2UiLCJ3aXRoVGVzdFRyYW5zYWN0aW9uIiwicHJpc21hIiwiUHJpc21hQ2xpZW50IiwiZXhlY1N5bmMiLCIkY29ubmVjdCIsIiRleGVjdXRlUmF3IiwiZXJyb3IiLCJjb25zb2xlIiwiJGRpc2Nvbm5lY3QiLCJ1c2VyIiwiY3JlYXRlIiwiZGF0YSIsImVtYWlsIiwibmFtZSIsInJvbGUiLCJjYWxsYmFjayIsIiR0cmFuc2FjdGlvbiIsInR4Il0sIm1hcHBpbmdzIjoiOzs7Ozs7Ozs7OztJQXFDYUEsWUFBWTtlQUFaQTs7SUEvQkFDLGlCQUFpQjtlQUFqQkE7O0lBc0JBQyxvQkFBb0I7ZUFBcEJBOztJQW9DQUMsbUJBQW1CO2VBQW5CQTs7O3dCQWhFZ0I7K0JBQ0o7QUFHekIsTUFBTUMsU0FBUyxJQUFJQyxvQkFBWTtBQUV4QixNQUFNSixvQkFBb0I7SUFDL0IsSUFBSTtRQUNGLCtCQUErQjtRQUMvQkssSUFBQUEsdUJBQVEsRUFBQztRQUNULE1BQU1GLE9BQU9HLFFBQVE7UUFFckIsaUJBQWlCO1FBQ2pCLE1BQU1ILE9BQU9JLFdBQVcsQ0FBQyxvQ0FBb0MsQ0FBQztRQUM5RCxNQUFNSixPQUFPSSxXQUFXLENBQUMsb0JBQW9CLENBQUM7UUFFOUMsY0FBYztRQUNkRixJQUFBQSx1QkFBUSxFQUFDO1FBRVQsZUFBZTtRQUNmLE1BQU1OO0lBRVIsRUFBRSxPQUFPUyxPQUFPO1FBQ2RDLFFBQVFELEtBQUssQ0FBQyw0QkFBNEJBO1FBQzFDLE1BQU1BO0lBQ1I7QUFDRjtBQUVPLE1BQU1QLHVCQUF1QjtJQUNsQyxJQUFJO1FBQ0YsTUFBTUUsT0FBT08sV0FBVztJQUMxQixFQUFFLE9BQU9GLE9BQU87UUFDZEMsUUFBUUQsS0FBSyxDQUFDLHdCQUF3QkE7UUFDdEMsTUFBTUE7SUFDUjtBQUNGO0FBRU8sTUFBTVQsZUFBZTtJQUMxQixJQUFJO1FBQ0Ysa0JBQWtCO1FBQ2xCLE1BQU1JLE9BQU9RLElBQUksQ0FBQ0MsTUFBTSxDQUFDO1lBQ3ZCQyxNQUFNO2dCQUNKQyxPQUFPO2dCQUNQQyxNQUFNO2dCQUNOQyxNQUFNO1lBQ1I7UUFDRjtRQUVBLHFCQUFxQjtRQUNyQixNQUFNYixPQUFPUSxJQUFJLENBQUNDLE1BQU0sQ0FBQztZQUN2QkMsTUFBTTtnQkFDSkMsT0FBTztnQkFDUEMsTUFBTTtnQkFDTkMsTUFBTTtZQUNSO1FBQ0Y7SUFFRixFQUFFLE9BQU9SLE9BQU87UUFDZEMsUUFBUUQsS0FBSyxDQUFDLHFCQUFxQkE7UUFDbkMsTUFBTUE7SUFDUjtBQUNGO0FBR08sTUFBTU4sc0JBQXNCLE9BQU9lO0lBQ3hDLElBQUk7UUFDRixNQUFNZCxPQUFPZSxZQUFZLENBQUMsT0FBT0M7WUFDL0IsTUFBTUYsU0FBU0U7UUFDakI7SUFDRixFQUFFLE9BQU9YLE9BQU87UUFDZEMsUUFBUUQsS0FBSyxDQUFDLHVCQUF1QkE7UUFDckMsTUFBTUE7SUFDUjtBQUNGIn0=

@@ -1,0 +1,183 @@
+46a30efc753ee98215e294b37f9772f9
+/// <reference path="../../../jest.d.ts" />
+"use strict";
+// テスト対象のコンポーネントをモック化
+jest.mock('@/app/(dashboard)/translate/components/PreviewSection', ()=>({
+        PreviewSection: ({ slides, currentSlide, onSlideChange, onTextSelect, selectedTextIndex, onTextHover })=>/*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                className: "flex flex-col h-full",
+                children: [
+                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                        className: "flex justify-between items-center mb-4",
+                        children: [
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("h2", {
+                                className: "text-lg font-semibold",
+                                children: "プレビュー"
+                            }),
+                            /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                                className: "flex items-center space-x-2",
+                                children: [
+                                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                                        disabled: currentSlide === 0,
+                                        onClick: ()=>onSlideChange && onSlideChange(currentSlide - 1),
+                                        "aria-label": "前のスライド",
+                                        children: "←"
+                                    }),
+                                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("span", {
+                                        className: "text-sm",
+                                        children: [
+                                            currentSlide + 1,
+                                            " / ",
+                                            slides.length
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                                        disabled: currentSlide === slides.length - 1,
+                                        onClick: ()=>onSlideChange && onSlideChange(currentSlide + 1),
+                                        "aria-label": "次のスライド",
+                                        children: "→"
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                        "data-testid": "slide-preview",
+                        children: [
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("img", {
+                                "data-testid": "slide-image",
+                                src: slides[currentSlide].imageUrl,
+                                alt: `Slide ${currentSlide + 1}`
+                            }),
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                                children: slides[currentSlide].texts.map((text, i)=>/*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                                        "data-testid": `text-highlight-${i}`,
+                                        onClick: ()=>onTextSelect && onTextSelect(i),
+                                        onMouseEnter: ()=>onTextHover && onTextHover(i),
+                                        onMouseLeave: ()=>onTextHover && onTextHover(null),
+                                        className: selectedTextIndex === i ? 'selected' : ''
+                                    }, text.id))
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                        "data-testid": "translation-text"
+                    })
+                ]
+            })
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+require("@testing-library/jest-dom");
+// モックデータ
+const mockSlides = [
+    {
+        imageUrl: '/test-image.png',
+        texts: [
+            {
+                id: 'text1',
+                text: 'サンプルテキスト1',
+                position: {
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 50
+                },
+                translations: [
+                    {
+                        language: 'en',
+                        text: 'Sample Text 1'
+                    }
+                ]
+            },
+            {
+                id: 'text2',
+                text: 'サンプルテキスト2',
+                position: {
+                    x: 100,
+                    y: 200,
+                    width: 200,
+                    height: 50
+                },
+                translations: [
+                    {
+                        language: 'en',
+                        text: 'Sample Text 2'
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        imageUrl: '/test-image2.png',
+        texts: [
+            {
+                id: 'text3',
+                text: 'サンプルテキスト3',
+                position: {
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 50
+                },
+                translations: []
+            }
+        ]
+    }
+];
+// コンポーネントの型定義
+const { PreviewSection } = jest.requireMock('@/app/(dashboard)/translate/components/PreviewSection');
+describe('PreviewSection', ()=>{
+    it('スライドプレビューを表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0
+        }));
+        expect(_react1.screen.getByText('プレビュー')).toBeInTheDocument();
+        expect(_react1.screen.getByTestId('slide-image')).toHaveAttribute('src', '/test-image.png');
+        expect(_react1.screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+    it('スライド切り替えボタンが機能する', ()=>{
+        const mockOnSlideChange = jest.fn();
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0,
+            onSlideChange: mockOnSlideChange
+        }));
+        // 次へボタンをクリック
+        const nextButton = _react1.screen.getByLabelText('次のスライド');
+        _react1.fireEvent.click(nextButton);
+        expect(mockOnSlideChange).toHaveBeenCalledWith(1);
+    });
+    it('最初のスライドで前へボタンが無効化される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0
+        }));
+        const prevButton = _react1.screen.getByLabelText('前のスライド');
+        expect(prevButton).toBeDisabled();
+    });
+    it('最後のスライドで次へボタンが無効化される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 1
+        }));
+        const nextButton = _react1.screen.getByLabelText('次のスライド');
+        expect(nextButton).toBeDisabled();
+    });
+    it('テキスト要素がハイライト表示される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0,
+            selectedTextIndex: 0
+        }));
+        const textHighlight = _react1.screen.getByTestId('text-highlight-0');
+        expect(textHighlight).toHaveClass('selected');
+    });
+});
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC90ZXN0cy9hcHAvdHJhbnNsYXRlL2NvbXBvbmVudHMvUHJldmlld1NlY3Rpb24udGVzdC50c3giXSwic291cmNlc0NvbnRlbnQiOlsiLy8vIDxyZWZlcmVuY2UgcGF0aD1cIi4uLy4uLy4uL2plc3QuZC50c1wiIC8+XG5cbmltcG9ydCBSZWFjdCBmcm9tICdyZWFjdCc7XG5pbXBvcnQgeyByZW5kZXIsIHNjcmVlbiwgZmlyZUV2ZW50IH0gZnJvbSAnQHRlc3RpbmctbGlicmFyeS9yZWFjdCc7XG5pbXBvcnQgJ0B0ZXN0aW5nLWxpYnJhcnkvamVzdC1kb20nO1xuXG4vLyDjg4bjgrnjg4jnlKjjga7lnovlrprnvqlcbmludGVyZmFjZSBUZXh0SXRlbSB7XG4gIGlkOiBzdHJpbmc7XG4gIHRleHQ6IHN0cmluZztcbiAgcG9zaXRpb246IHtcbiAgICB4OiBudW1iZXI7XG4gICAgeTogbnVtYmVyO1xuICAgIHdpZHRoOiBudW1iZXI7XG4gICAgaGVpZ2h0OiBudW1iZXI7XG4gIH07XG4gIHRyYW5zbGF0aW9uczoge1xuICAgIGxhbmd1YWdlOiBzdHJpbmc7XG4gICAgdGV4dDogc3RyaW5nO1xuICB9W107XG59XG5cbmludGVyZmFjZSBQcmV2aWV3U2VjdGlvblByb3BzIHtcbiAgc2xpZGVzOiB7XG4gICAgaW1hZ2VVcmw6IHN0cmluZztcbiAgICB0ZXh0czogVGV4dEl0ZW1bXTtcbiAgfVtdO1xuICBjdXJyZW50U2xpZGU6IG51bWJlcjtcbiAgb25TbGlkZUNoYW5nZT86IChpbmRleDogbnVtYmVyKSA9PiB2b2lkO1xuICBvblRleHRTZWxlY3Q/OiAoaW5kZXg6IG51bWJlcikgPT4gdm9pZDtcbiAgc2VsZWN0ZWRUZXh0SW5kZXg/OiBudW1iZXIgfCBudWxsO1xuICBvblRleHRIb3Zlcj86IChpbmRleDogbnVtYmVyIHwgbnVsbCkgPT4gdm9pZDtcbn1cblxuLy8g44Oi44OD44Kv44OH44O844K/XG5jb25zdCBtb2NrU2xpZGVzID0gW1xuICB7XG4gICAgaW1hZ2VVcmw6ICcvdGVzdC1pbWFnZS5wbmcnLFxuICAgIHRleHRzOiBbXG4gICAgICB7XG4gICAgICAgIGlkOiAndGV4dDEnLFxuICAgICAgICB0ZXh0OiAn44K144Oz44OX44Or44OG44Kt44K544OIMScsXG4gICAgICAgIHBvc2l0aW9uOiB7IHg6IDEwMCwgeTogMTAwLCB3aWR0aDogMjAwLCBoZWlnaHQ6IDUwIH0sXG4gICAgICAgIHRyYW5zbGF0aW9uczogW3sgbGFuZ3VhZ2U6ICdlbicsIHRleHQ6ICdTYW1wbGUgVGV4dCAxJyB9XSxcbiAgICAgIH0sXG4gICAgICB7XG4gICAgICAgIGlkOiAndGV4dDInLFxuICAgICAgICB0ZXh0OiAn44K144Oz44OX44Or44OG44Kt44K544OIMicsXG4gICAgICAgIHBvc2l0aW9uOiB7IHg6IDEwMCwgeTogMjAwLCB3aWR0aDogMjAwLCBoZWlnaHQ6IDUwIH0sXG4gICAgICAgIHRyYW5zbGF0aW9uczogW3sgbGFuZ3VhZ2U6ICdlbicsIHRleHQ6ICdTYW1wbGUgVGV4dCAyJyB9XSxcbiAgICAgIH0sXG4gICAgXSxcbiAgfSxcbiAge1xuICAgIGltYWdlVXJsOiAnL3Rlc3QtaW1hZ2UyLnBuZycsXG4gICAgdGV4dHM6IFtcbiAgICAgIHtcbiAgICAgICAgaWQ6ICd0ZXh0MycsXG4gICAgICAgIHRleHQ6ICfjgrXjg7Pjg5fjg6vjg4bjgq3jgrnjg4gzJyxcbiAgICAgICAgcG9zaXRpb246IHsgeDogMTAwLCB5OiAxMDAsIHdpZHRoOiAyMDAsIGhlaWdodDogNTAgfSxcbiAgICAgICAgdHJhbnNsYXRpb25zOiBbXSxcbiAgICAgIH0sXG4gICAgXSxcbiAgfSxcbl07XG5cbi8vIOODhuOCueODiOWvvuixoeOBruOCs+ODs+ODneODvOODjeODs+ODiOOCkuODouODg+OCr+WMllxuamVzdC5tb2NrKCdAL2FwcC8oZGFzaGJvYXJkKS90cmFuc2xhdGUvY29tcG9uZW50cy9QcmV2aWV3U2VjdGlvbicsICgpID0+ICh7XG4gIFByZXZpZXdTZWN0aW9uOiAoe1xuICAgIHNsaWRlcyxcbiAgICBjdXJyZW50U2xpZGUsXG4gICAgb25TbGlkZUNoYW5nZSxcbiAgICBvblRleHRTZWxlY3QsXG4gICAgc2VsZWN0ZWRUZXh0SW5kZXgsXG4gICAgb25UZXh0SG92ZXIsXG4gIH06IFByZXZpZXdTZWN0aW9uUHJvcHMpID0+IChcbiAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggZmxleC1jb2wgaC1mdWxsXCI+XG4gICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXgganVzdGlmeS1iZXR3ZWVuIGl0ZW1zLWNlbnRlciBtYi00XCI+XG4gICAgICAgIDxoMiBjbGFzc05hbWU9XCJ0ZXh0LWxnIGZvbnQtc2VtaWJvbGRcIj7jg5fjg6zjg5Pjg6Xjg7w8L2gyPlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIHNwYWNlLXgtMlwiPlxuICAgICAgICAgIDxidXR0b25cbiAgICAgICAgICAgIGRpc2FibGVkPXtjdXJyZW50U2xpZGUgPT09IDB9XG4gICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBvblNsaWRlQ2hhbmdlICYmIG9uU2xpZGVDaGFuZ2UoY3VycmVudFNsaWRlIC0gMSl9XG4gICAgICAgICAgICBhcmlhLWxhYmVsPVwi5YmN44Gu44K544Op44Kk44OJXCJcbiAgICAgICAgICA+XG4gICAgICAgICAgICDihpBcbiAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ0ZXh0LXNtXCI+XG4gICAgICAgICAgICB7Y3VycmVudFNsaWRlICsgMX0gLyB7c2xpZGVzLmxlbmd0aH1cbiAgICAgICAgICA8L3NwYW4+XG4gICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgZGlzYWJsZWQ9e2N1cnJlbnRTbGlkZSA9PT0gc2xpZGVzLmxlbmd0aCAtIDF9XG4gICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBvblNsaWRlQ2hhbmdlICYmIG9uU2xpZGVDaGFuZ2UoY3VycmVudFNsaWRlICsgMSl9XG4gICAgICAgICAgICBhcmlhLWxhYmVsPVwi5qyh44Gu44K544Op44Kk44OJXCJcbiAgICAgICAgICA+XG4gICAgICAgICAgICDihpJcbiAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgPC9kaXY+XG4gICAgICA8L2Rpdj5cbiAgICAgIDxkaXYgZGF0YS10ZXN0aWQ9XCJzbGlkZS1wcmV2aWV3XCI+XG4gICAgICAgIDxpbWcgZGF0YS10ZXN0aWQ9XCJzbGlkZS1pbWFnZVwiIHNyYz17c2xpZGVzW2N1cnJlbnRTbGlkZV0uaW1hZ2VVcmx9IGFsdD17YFNsaWRlICR7Y3VycmVudFNsaWRlICsgMX1gfSAvPlxuICAgICAgICA8ZGl2PlxuICAgICAgICAgIHtzbGlkZXNbY3VycmVudFNsaWRlXS50ZXh0cy5tYXAoKHRleHQsIGkpID0+IChcbiAgICAgICAgICAgIDxkaXZcbiAgICAgICAgICAgICAga2V5PXt0ZXh0LmlkfVxuICAgICAgICAgICAgICBkYXRhLXRlc3RpZD17YHRleHQtaGlnaGxpZ2h0LSR7aX1gfVxuICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBvblRleHRTZWxlY3QgJiYgb25UZXh0U2VsZWN0KGkpfVxuICAgICAgICAgICAgICBvbk1vdXNlRW50ZXI9eygpID0+IG9uVGV4dEhvdmVyICYmIG9uVGV4dEhvdmVyKGkpfVxuICAgICAgICAgICAgICBvbk1vdXNlTGVhdmU9eygpID0+IG9uVGV4dEhvdmVyICYmIG9uVGV4dEhvdmVyKG51bGwpfVxuICAgICAgICAgICAgICBjbGFzc05hbWU9e3NlbGVjdGVkVGV4dEluZGV4ID09PSBpID8gJ3NlbGVjdGVkJyA6ICcnfVxuICAgICAgICAgICAgLz5cbiAgICAgICAgICApKX1cbiAgICAgICAgPC9kaXY+XG4gICAgICA8L2Rpdj5cbiAgICAgIDxkaXYgZGF0YS10ZXN0aWQ9XCJ0cmFuc2xhdGlvbi10ZXh0XCI+PC9kaXY+XG4gICAgPC9kaXY+XG4gICksXG59KSk7XG5cbi8vIOOCs+ODs+ODneODvOODjeODs+ODiOOBruWei+Wumue+qVxuY29uc3QgeyBQcmV2aWV3U2VjdGlvbiB9ID0gamVzdC5yZXF1aXJlTW9jaygnQC9hcHAvKGRhc2hib2FyZCkvdHJhbnNsYXRlL2NvbXBvbmVudHMvUHJldmlld1NlY3Rpb24nKTtcblxuZGVzY3JpYmUoJ1ByZXZpZXdTZWN0aW9uJywgKCkgPT4ge1xuICBpdCgn44K544Op44Kk44OJ44OX44Os44OT44Ol44O844KS6KGo56S644GZ44KLJywgKCkgPT4ge1xuICAgIHJlbmRlcig8UHJldmlld1NlY3Rpb24gc2xpZGVzPXttb2NrU2xpZGVzfSBjdXJyZW50U2xpZGU9ezB9IC8+KTtcblxuICAgIGV4cGVjdChzY3JlZW4uZ2V0QnlUZXh0KCfjg5fjg6zjg5Pjg6Xjg7wnKSkudG9CZUluVGhlRG9jdW1lbnQoKTtcbiAgICBleHBlY3Qoc2NyZWVuLmdldEJ5VGVzdElkKCdzbGlkZS1pbWFnZScpKS50b0hhdmVBdHRyaWJ1dGUoJ3NyYycsICcvdGVzdC1pbWFnZS5wbmcnKTtcbiAgICBleHBlY3Qoc2NyZWVuLmdldEJ5VGV4dCgnMSAvIDInKSkudG9CZUluVGhlRG9jdW1lbnQoKTtcbiAgfSk7XG5cbiAgaXQoJ+OCueODqeOCpOODieWIh+OCiuabv+OBiOODnOOCv+ODs+OBjOapn+iDveOBmeOCiycsICgpID0+IHtcbiAgICBjb25zdCBtb2NrT25TbGlkZUNoYW5nZSA9IGplc3QuZm4oKTtcblxuICAgIHJlbmRlcig8UHJldmlld1NlY3Rpb24gc2xpZGVzPXttb2NrU2xpZGVzfSBjdXJyZW50U2xpZGU9ezB9IG9uU2xpZGVDaGFuZ2U9e21vY2tPblNsaWRlQ2hhbmdlfSAvPik7XG5cbiAgICAvLyDmrKHjgbjjg5zjgr/jg7PjgpLjgq/jg6rjg4Pjgq9cbiAgICBjb25zdCBuZXh0QnV0dG9uID0gc2NyZWVuLmdldEJ5TGFiZWxUZXh0KCfmrKHjga7jgrnjg6njgqTjg4knKTtcbiAgICBmaXJlRXZlbnQuY2xpY2sobmV4dEJ1dHRvbik7XG4gICAgZXhwZWN0KG1vY2tPblNsaWRlQ2hhbmdlKS50b0hhdmVCZWVuQ2FsbGVkV2l0aCgxKTtcbiAgfSk7XG5cbiAgaXQoJ+acgOWIneOBruOCueODqeOCpOODieOBp+WJjeOBuOODnOOCv+ODs+OBjOeEoeWKueWMluOBleOCjOOCiycsICgpID0+IHtcbiAgICByZW5kZXIoPFByZXZpZXdTZWN0aW9uIHNsaWRlcz17bW9ja1NsaWRlc30gY3VycmVudFNsaWRlPXswfSAvPik7XG5cbiAgICBjb25zdCBwcmV2QnV0dG9uID0gc2NyZWVuLmdldEJ5TGFiZWxUZXh0KCfliY3jga7jgrnjg6njgqTjg4knKTtcbiAgICBleHBlY3QocHJldkJ1dHRvbikudG9CZURpc2FibGVkKCk7XG4gIH0pO1xuXG4gIGl0KCfmnIDlvozjga7jgrnjg6njgqTjg4njgafmrKHjgbjjg5zjgr/jg7PjgYznhKHlirnljJbjgZXjgozjgosnLCAoKSA9PiB7XG4gICAgcmVuZGVyKDxQcmV2aWV3U2VjdGlvbiBzbGlkZXM9e21vY2tTbGlkZXN9IGN1cnJlbnRTbGlkZT17MX0gLz4pO1xuXG4gICAgY29uc3QgbmV4dEJ1dHRvbiA9IHNjcmVlbi5nZXRCeUxhYmVsVGV4dCgn5qyh44Gu44K544Op44Kk44OJJyk7XG4gICAgZXhwZWN0KG5leHRCdXR0b24pLnRvQmVEaXNhYmxlZCgpO1xuICB9KTtcblxuICBpdCgn44OG44Kt44K544OI6KaB57Sg44GM44OP44Kk44Op44Kk44OI6KGo56S644GV44KM44KLJywgKCkgPT4ge1xuICAgIHJlbmRlcig8UHJldmlld1NlY3Rpb24gc2xpZGVzPXttb2NrU2xpZGVzfSBjdXJyZW50U2xpZGU9ezB9IHNlbGVjdGVkVGV4dEluZGV4PXswfSAvPik7XG5cbiAgICBjb25zdCB0ZXh0SGlnaGxpZ2h0ID0gc2NyZWVuLmdldEJ5VGVzdElkKCd0ZXh0LWhpZ2hsaWdodC0wJyk7XG4gICAgZXhwZWN0KHRleHRIaWdobGlnaHQpLnRvSGF2ZUNsYXNzKCdzZWxlY3RlZCcpO1xuICB9KTtcbn0pO1xuIl0sIm5hbWVzIjpbImplc3QiLCJtb2NrIiwiUHJldmlld1NlY3Rpb24iLCJzbGlkZXMiLCJjdXJyZW50U2xpZGUiLCJvblNsaWRlQ2hhbmdlIiwib25UZXh0U2VsZWN0Iiwic2VsZWN0ZWRUZXh0SW5kZXgiLCJvblRleHRIb3ZlciIsImRpdiIsImNsYXNzTmFtZSIsImgyIiwiYnV0dG9uIiwiZGlzYWJsZWQiLCJvbkNsaWNrIiwiYXJpYS1sYWJlbCIsInNwYW4iLCJsZW5ndGgiLCJkYXRhLXRlc3RpZCIsImltZyIsInNyYyIsImltYWdlVXJsIiwiYWx0IiwidGV4dHMiLCJtYXAiLCJ0ZXh0IiwiaSIsIm9uTW91c2VFbnRlciIsIm9uTW91c2VMZWF2ZSIsImlkIiwibW9ja1NsaWRlcyIsInBvc2l0aW9uIiwieCIsInkiLCJ3aWR0aCIsImhlaWdodCIsInRyYW5zbGF0aW9ucyIsImxhbmd1YWdlIiwicmVxdWlyZU1vY2siLCJkZXNjcmliZSIsIml0IiwicmVuZGVyIiwiZXhwZWN0Iiwic2NyZWVuIiwiZ2V0QnlUZXh0IiwidG9CZUluVGhlRG9jdW1lbnQiLCJnZXRCeVRlc3RJZCIsInRvSGF2ZUF0dHJpYnV0ZSIsIm1vY2tPblNsaWRlQ2hhbmdlIiwiZm4iLCJuZXh0QnV0dG9uIiwiZ2V0QnlMYWJlbFRleHQiLCJmaXJlRXZlbnQiLCJjbGljayIsInRvSGF2ZUJlZW5DYWxsZWRXaXRoIiwicHJldkJ1dHRvbiIsInRvQmVEaXNhYmxlZCIsInRleHRIaWdobGlnaHQiLCJ0b0hhdmVDbGFzcyJdLCJtYXBwaW5ncyI6IkFBQUEsMkNBQTJDOztBQWtFM0MscUJBQXFCO0FBQ3JCQSxLQUFLQyxJQUFJLENBQUMseURBQXlELElBQU8sQ0FBQTtRQUN4RUMsZ0JBQWdCLENBQUMsRUFDZkMsTUFBTSxFQUNOQyxZQUFZLEVBQ1pDLGFBQWEsRUFDYkMsWUFBWSxFQUNaQyxpQkFBaUIsRUFDakJDLFdBQVcsRUFDUyxpQkFDcEIsc0JBQUNDO2dCQUFJQyxXQUFVOztrQ0FDYixzQkFBQ0Q7d0JBQUlDLFdBQVU7OzBDQUNiLHFCQUFDQztnQ0FBR0QsV0FBVTswQ0FBd0I7OzBDQUN0QyxzQkFBQ0Q7Z0NBQUlDLFdBQVU7O2tEQUNiLHFCQUFDRTt3Q0FDQ0MsVUFBVVQsaUJBQWlCO3dDQUMzQlUsU0FBUyxJQUFNVCxpQkFBaUJBLGNBQWNELGVBQWU7d0NBQzdEVyxjQUFXO2tEQUNaOztrREFHRCxzQkFBQ0M7d0NBQUtOLFdBQVU7OzRDQUNiTixlQUFlOzRDQUFFOzRDQUFJRCxPQUFPYyxNQUFNOzs7a0RBRXJDLHFCQUFDTDt3Q0FDQ0MsVUFBVVQsaUJBQWlCRCxPQUFPYyxNQUFNLEdBQUc7d0NBQzNDSCxTQUFTLElBQU1ULGlCQUFpQkEsY0FBY0QsZUFBZTt3Q0FDN0RXLGNBQVc7a0RBQ1o7Ozs7OztrQ0FLTCxzQkFBQ047d0JBQUlTLGVBQVk7OzBDQUNmLHFCQUFDQztnQ0FBSUQsZUFBWTtnQ0FBY0UsS0FBS2pCLE1BQU0sQ0FBQ0MsYUFBYSxDQUFDaUIsUUFBUTtnQ0FBRUMsS0FBSyxDQUFDLE1BQU0sRUFBRWxCLGVBQWUsR0FBRzs7MENBQ25HLHFCQUFDSzswQ0FDRU4sTUFBTSxDQUFDQyxhQUFhLENBQUNtQixLQUFLLENBQUNDLEdBQUcsQ0FBQyxDQUFDQyxNQUFNQyxrQkFDckMscUJBQUNqQjt3Q0FFQ1MsZUFBYSxDQUFDLGVBQWUsRUFBRVEsR0FBRzt3Q0FDbENaLFNBQVMsSUFBTVIsZ0JBQWdCQSxhQUFhb0I7d0NBQzVDQyxjQUFjLElBQU1uQixlQUFlQSxZQUFZa0I7d0NBQy9DRSxjQUFjLElBQU1wQixlQUFlQSxZQUFZO3dDQUMvQ0UsV0FBV0gsc0JBQXNCbUIsSUFBSSxhQUFhO3VDQUw3Q0QsS0FBS0ksRUFBRTs7OztrQ0FVcEIscUJBQUNwQjt3QkFBSVMsZUFBWTs7OztJQUd2QixDQUFBOzs7Ozs7Z0VBbkhrQjt3QkFDd0I7UUFDbkM7QUE4QlAsU0FBUztBQUNULE1BQU1ZLGFBQWE7SUFDakI7UUFDRVQsVUFBVTtRQUNWRSxPQUFPO1lBQ0w7Z0JBQ0VNLElBQUk7Z0JBQ0pKLE1BQU07Z0JBQ05NLFVBQVU7b0JBQUVDLEdBQUc7b0JBQUtDLEdBQUc7b0JBQUtDLE9BQU87b0JBQUtDLFFBQVE7Z0JBQUc7Z0JBQ25EQyxjQUFjO29CQUFDO3dCQUFFQyxVQUFVO3dCQUFNWixNQUFNO29CQUFnQjtpQkFBRTtZQUMzRDtZQUNBO2dCQUNFSSxJQUFJO2dCQUNKSixNQUFNO2dCQUNOTSxVQUFVO29CQUFFQyxHQUFHO29CQUFLQyxHQUFHO29CQUFLQyxPQUFPO29CQUFLQyxRQUFRO2dCQUFHO2dCQUNuREMsY0FBYztvQkFBQzt3QkFBRUMsVUFBVTt3QkFBTVosTUFBTTtvQkFBZ0I7aUJBQUU7WUFDM0Q7U0FDRDtJQUNIO0lBQ0E7UUFDRUosVUFBVTtRQUNWRSxPQUFPO1lBQ0w7Z0JBQ0VNLElBQUk7Z0JBQ0pKLE1BQU07Z0JBQ05NLFVBQVU7b0JBQUVDLEdBQUc7b0JBQUtDLEdBQUc7b0JBQUtDLE9BQU87b0JBQUtDLFFBQVE7Z0JBQUc7Z0JBQ25EQyxjQUFjLEVBQUU7WUFDbEI7U0FDRDtJQUNIO0NBQ0Q7QUF1REQsY0FBYztBQUNkLE1BQU0sRUFBRWxDLGNBQWMsRUFBRSxHQUFHRixLQUFLc0MsV0FBVyxDQUFDO0FBRTVDQyxTQUFTLGtCQUFrQjtJQUN6QkMsR0FBRyxrQkFBa0I7UUFDbkJDLElBQUFBLGNBQU0sZ0JBQUMscUJBQUN2QztZQUFlQyxRQUFRMkI7WUFBWTFCLGNBQWM7O1FBRXpEc0MsT0FBT0MsY0FBTSxDQUFDQyxTQUFTLENBQUMsVUFBVUMsaUJBQWlCO1FBQ25ESCxPQUFPQyxjQUFNLENBQUNHLFdBQVcsQ0FBQyxnQkFBZ0JDLGVBQWUsQ0FBQyxPQUFPO1FBQ2pFTCxPQUFPQyxjQUFNLENBQUNDLFNBQVMsQ0FBQyxVQUFVQyxpQkFBaUI7SUFDckQ7SUFFQUwsR0FBRyxvQkFBb0I7UUFDckIsTUFBTVEsb0JBQW9CaEQsS0FBS2lELEVBQUU7UUFFakNSLElBQUFBLGNBQU0sZ0JBQUMscUJBQUN2QztZQUFlQyxRQUFRMkI7WUFBWTFCLGNBQWM7WUFBR0MsZUFBZTJDOztRQUUzRSxhQUFhO1FBQ2IsTUFBTUUsYUFBYVAsY0FBTSxDQUFDUSxjQUFjLENBQUM7UUFDekNDLGlCQUFTLENBQUNDLEtBQUssQ0FBQ0g7UUFDaEJSLE9BQU9NLG1CQUFtQk0sb0JBQW9CLENBQUM7SUFDakQ7SUFFQWQsR0FBRyx3QkFBd0I7UUFDekJDLElBQUFBLGNBQU0sZ0JBQUMscUJBQUN2QztZQUFlQyxRQUFRMkI7WUFBWTFCLGNBQWM7O1FBRXpELE1BQU1tRCxhQUFhWixjQUFNLENBQUNRLGNBQWMsQ0FBQztRQUN6Q1QsT0FBT2EsWUFBWUMsWUFBWTtJQUNqQztJQUVBaEIsR0FBRyx3QkFBd0I7UUFDekJDLElBQUFBLGNBQU0sZ0JBQUMscUJBQUN2QztZQUFlQyxRQUFRMkI7WUFBWTFCLGNBQWM7O1FBRXpELE1BQU04QyxhQUFhUCxjQUFNLENBQUNRLGNBQWMsQ0FBQztRQUN6Q1QsT0FBT1EsWUFBWU0sWUFBWTtJQUNqQztJQUVBaEIsR0FBRyxxQkFBcUI7UUFDdEJDLElBQUFBLGNBQU0sZ0JBQUMscUJBQUN2QztZQUFlQyxRQUFRMkI7WUFBWTFCLGNBQWM7WUFBR0csbUJBQW1COztRQUUvRSxNQUFNa0QsZ0JBQWdCZCxjQUFNLENBQUNHLFdBQVcsQ0FBQztRQUN6Q0osT0FBT2UsZUFBZUMsV0FBVyxDQUFDO0lBQ3BDO0FBQ0YifQ==

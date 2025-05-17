@@ -1,0 +1,91 @@
+5c5eaadc7382187242b34cd2a695abce
+/// <reference path="../../../jest.d.ts" />
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+const _FileUpload = require("@/app/(dashboard)/translate/components/FileUpload");
+require("@testing-library/jest-dom");
+describe('FileUploadComponent', ()=>{
+    const mockOnUploadComplete = jest.fn();
+    beforeEach(()=>{
+        jest.clearAllMocks();
+    });
+    it('正しくレンダリングされること', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_FileUpload.FileUploadComponent, {
+            onUploadComplete: mockOnUploadComplete
+        }));
+        expect(_react1.screen.getByTestId('upload-area')).toBeInTheDocument();
+        expect(_react1.screen.getByTestId('file-input')).toBeInTheDocument();
+        expect(_react1.screen.getByTestId('upload-text')).toHaveTextContent('ファイルをアップロード');
+        expect(_react1.screen.getByTestId('file-select-button')).toHaveTextContent('ファイルを選択');
+    });
+    it('ファイル選択ボタンをクリックするとファイル選択ダイアログが開くこと', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_FileUpload.FileUploadComponent, {
+            onUploadComplete: mockOnUploadComplete
+        }));
+        const fileInput = _react1.screen.getByTestId('file-input');
+        const clickSpy = jest.spyOn(fileInput, 'click');
+        _react1.fireEvent.click(_react1.screen.getByTestId('file-select-button'));
+        expect(clickSpy).toHaveBeenCalled();
+    });
+    it('ファイルが選択されたときにonUploadCompleteが呼ばれること', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_FileUpload.FileUploadComponent, {
+            onUploadComplete: mockOnUploadComplete
+        }));
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('file-input');
+        _react1.fireEvent.change(fileInput, {
+            target: {
+                files: [
+                    file
+                ]
+            }
+        });
+        expect(mockOnUploadComplete).toHaveBeenCalledWith(file);
+    });
+    it('ドラッグ&ドロップでファイルをアップロードできること', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_FileUpload.FileUploadComponent, {
+            onUploadComplete: mockOnUploadComplete
+        }));
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const uploadArea = _react1.screen.getByTestId('upload-area');
+        // ドラッグオーバーイベントをシミュレート
+        _react1.fireEvent.dragOver(uploadArea);
+        // ドロップイベントをシミュレート
+        _react1.fireEvent.drop(uploadArea, {
+            dataTransfer: {
+                files: [
+                    file
+                ]
+            }
+        });
+        expect(mockOnUploadComplete).toHaveBeenCalledWith(file);
+    });
+    it('ドラッグ&ドロップ中にスタイルが変わること', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_FileUpload.FileUploadComponent, {
+            onUploadComplete: mockOnUploadComplete
+        }));
+        const uploadArea = _react1.screen.getByTestId('upload-area');
+        // 初期状態ではドラッグオーバースタイルが適用されていないこと
+        expect(uploadArea.className).toContain('border-gray-300');
+        // ドラッグオーバー時にスタイルが変わること
+        _react1.fireEvent.dragOver(uploadArea);
+        expect(uploadArea.className).toContain('border-primary');
+        // ドラッグリーブ時に元のスタイルに戻ること
+        _react1.fireEvent.dragLeave(uploadArea);
+        expect(uploadArea.className).toContain('border-gray-300');
+    });
+});

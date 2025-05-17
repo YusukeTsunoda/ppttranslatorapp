@@ -1,0 +1,109 @@
+b8c60f536e38ade3fa8a0a0aac0be9c1
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _route = require("@/app/api/profile/update/route");
+const _server = require("next/server");
+const _authoptions = require("@/lib/auth/auth-options");
+const _mockSetup = require("@/tests/helpers/mockSetup");
+const prismaMock = (0, _mockSetup.createPrismaMock)();
+const getServerSessionMock = (0, _mockSetup.createSessionMock)();
+describe('POST /api/profile/update', ()=>{
+    const mockUserId = 'user-123-profile';
+    const mockUserEmail = 'testuser@example.com';
+    beforeEach(()=>{
+        (0, _mockSetup.clearAllMocks)();
+    });
+    it('should update user profile successfully', async ()=>{
+        const newName = 'Updated Test User';
+        const req = new _server.NextRequest('http://localhost/api/profile/update', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: newName
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId,
+                email: mockUserEmail,
+                name: 'Old Name'
+            },
+            expires: 'some-date'
+        });
+        const updatedUserDbResult = (0, _mockSetup.createMockUser)({
+            id: mockUserId,
+            name: newName,
+            email: mockUserEmail
+        });
+        prismaMock.user.update.mockResolvedValue(updatedUserDbResult);
+        const response = await (0, _route.POST)(req);
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.success).toBe(true);
+        expect(responseBody.user.id).toBe(mockUserId);
+        expect(responseBody.user.name).toBe(newName);
+        expect(responseBody.user.email).toBe(mockUserEmail);
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+        expect(prismaMock.user.update).toHaveBeenCalledWith({
+            where: {
+                id: mockUserId
+            },
+            data: {
+                name: newName,
+                updatedAt: expect.any(Date)
+            }
+        });
+    });
+    it('should return 401 if user is not authenticated', async ()=>{
+        const req = new _server.NextRequest('http://localhost/api/profile/update', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: 'Any Name'
+            })
+        });
+        getServerSessionMock.mockResolvedValue(null);
+        const response = await (0, _route.POST)(req);
+        const responseBody = await response.json();
+        expect(response.status).toBe(401);
+        expect(responseBody.error).toBe('認証が必要です');
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+    });
+    it('should return 400 if name is not provided', async ()=>{
+        const req = new _server.NextRequest('http://localhost/api/profile/update', {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId
+            }
+        });
+        const response = await (0, _route.POST)(req);
+        const responseBody = await response.json();
+        expect(response.status).toBe(400);
+        expect(responseBody.error).toBe('名前は必須です');
+        expect(prismaMock.user.update).not.toHaveBeenCalled();
+    });
+    it('should return 500 if prisma.user.update fails', async ()=>{
+        const req = new _server.NextRequest('http://localhost/api/profile/update', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: 'Valid Name'
+            })
+        });
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId
+            }
+        });
+        prismaMock.user.update.mockRejectedValue(new Error('DB update failed'));
+        const response = await (0, _route.POST)(req);
+        const responseBody = await response.json();
+        expect(response.status).toBe(500);
+        expect(responseBody.error).toBe('プロフィールの更新に失敗しました');
+    });
+});

@@ -1,0 +1,145 @@
+59c2762f52f2bb21d63d49334fe99404
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _fileutils = require("@/lib/utils/file-utils");
+const _path = require("path");
+const _fs = require("fs");
+// fsモジュールのモック
+_globals.jest.mock('fs/promises', ()=>({
+        mkdir: _globals.jest.fn().mockResolvedValue(undefined),
+        readdir: _globals.jest.fn().mockResolvedValue([
+            'test-file.pptx'
+        ]),
+        copyFile: _globals.jest.fn().mockResolvedValue(undefined),
+        stat: _globals.jest.fn().mockResolvedValue({
+            mtimeMs: Date.now()
+        }),
+        unlink: _globals.jest.fn().mockResolvedValue(undefined)
+    }));
+_globals.jest.mock('fs', ()=>({
+        existsSync: _globals.jest.fn().mockReturnValue(true)
+    }));
+(0, _globals.describe)('FilePathManager', ()=>{
+    let filePathManager;
+    const userId = 'test-user';
+    const fileId = 'test-file';
+    (0, _globals.beforeEach)(()=>{
+        _globals.jest.clearAllMocks();
+        filePathManager = new _fileutils.FilePathManager();
+    });
+    (0, _globals.describe)('パス生成メソッド', ()=>{
+        (0, _globals.it)('getTempPathが正しいパスを返す', ()=>{
+            const originalPath = filePathManager.getTempPath(userId, fileId, 'original');
+            const translatedPath = filePathManager.getTempPath(userId, fileId, 'translated');
+            (0, _globals.expect)(originalPath).toBe((0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_original.pptx`));
+            (0, _globals.expect)(translatedPath).toBe((0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`));
+        });
+        (0, _globals.it)('getPublicPathが正しいパスを返す', ()=>{
+            const originalPath = filePathManager.getPublicPath(userId, fileId, 'original');
+            const translatedPath = filePathManager.getPublicPath(userId, fileId, 'translated');
+            (0, _globals.expect)(originalPath).toBe((0, _path.join)('uploads', userId, `${fileId}_original.pptx`));
+            (0, _globals.expect)(translatedPath).toBe((0, _path.join)('uploads', userId, `${fileId}_translated.pptx`));
+        });
+        (0, _globals.it)('getProcessingPathが正しいパスを返す', ()=>{
+            const path = filePathManager.getProcessingPath(userId, fileId);
+            (0, _globals.expect)(path).toBe((0, _path.join)(_fileutils.FILE_CONFIG.processingDir, userId, fileId));
+        });
+        (0, _globals.it)('getSlidesPathが正しいパスを返す', ()=>{
+            const path = filePathManager.getSlidesPath(userId, fileId);
+            (0, _globals.expect)(path).toBe((0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, fileId, 'slides'));
+        });
+    });
+    (0, _globals.describe)('パス変換メソッド', ()=>{
+        (0, _globals.it)('getAbsolutePathが相対パスを絶対パスに変換する', ()=>{
+            const relativePath = 'uploads/test-file.pptx';
+            const absolutePath = filePathManager.getAbsolutePath(relativePath);
+            (0, _globals.expect)(absolutePath).toBe((0, _path.join)(process.cwd(), relativePath));
+        });
+        (0, _globals.it)('getAbsolutePathが絶対パスをそのまま返す', ()=>{
+            const absolutePath = '/absolute/path/to/file.pptx';
+            const result = filePathManager.getAbsolutePath(absolutePath);
+            (0, _globals.expect)(result).toBe(absolutePath);
+        });
+    });
+    (0, _globals.describe)('ファイル操作メソッド', ()=>{
+        (0, _globals.it)('findActualFilePathが正しいファイルを見つける', async ()=>{
+            const mockFiles = [
+                `${fileId}.pptx`,
+                `${fileId}_translated.pptx`
+            ];
+            _fs.promises.readdir.mockResolvedValue(mockFiles);
+            const originalPath = await filePathManager.findActualFilePath(userId, fileId, 'original');
+            const translatedPath = await filePathManager.findActualFilePath(userId, fileId, 'translated');
+            (0, _globals.expect)(originalPath).toBe((0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}.pptx`));
+            (0, _globals.expect)(translatedPath).toBe((0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`));
+        });
+        (0, _globals.it)('findActualFilePathがファイルが見つからない場合nullを返す', async ()=>{
+            _fs.promises.readdir.mockResolvedValue([
+                'other-file.pptx'
+            ]);
+            const result = await filePathManager.findActualFilePath(userId, fileId, 'original');
+            (0, _globals.expect)(result).toBeNull();
+        });
+        (0, _globals.it)('ensurePathがディレクトリを作成する', async ()=>{
+            const filePath = (0, _path.join)('uploads', userId, 'test-file.pptx');
+            await filePathManager.ensurePath(filePath);
+            (0, _globals.expect)(_fs.promises.mkdir).toHaveBeenCalledWith((0, _path.join)(process.cwd(), 'uploads', userId), {
+                recursive: true
+            });
+        });
+        (0, _globals.it)('moveToPublicがファイルを公開ディレクトリに移動する', async ()=>{
+            const sourcePath = (0, _path.join)(_fileutils.FILE_CONFIG.tempDir, userId, 'uploads', `${fileId}_translated.pptx`);
+            const destPath = (0, _path.join)(_fileutils.FILE_CONFIG.publicDir, userId, `${fileId}_translated.pptx`);
+            _fs.promises.readdir.mockResolvedValue([
+                `${fileId}_translated.pptx`
+            ]);
+            const result = await filePathManager.moveToPublic(userId, fileId);
+            (0, _globals.expect)(_fs.promises.mkdir).toHaveBeenCalledWith((0, _path.join)(process.cwd(), _fileutils.FILE_CONFIG.publicDir, userId), {
+                recursive: true
+            });
+            (0, _globals.expect)(_fs.promises.copyFile).toHaveBeenCalledWith((0, _path.join)(process.cwd(), sourcePath), (0, _path.join)(process.cwd(), destPath));
+            (0, _globals.expect)(result).toBe((0, _path.join)('uploads', userId, `${fileId}_translated.pptx`));
+        });
+    });
+});
+(0, _globals.describe)('ユーティリティ関数', ()=>{
+    (0, _globals.describe)('generateFileId', ()=>{
+        (0, _globals.it)('一意のファイルIDを生成する', ()=>{
+            const id1 = (0, _fileutils.generateFileId)();
+            const id2 = (0, _fileutils.generateFileId)();
+            (0, _globals.expect)(id1).not.toBe(id2);
+            (0, _globals.expect)(id1).toMatch(/^[a-f0-9-]+$/);
+        });
+    });
+    (0, _globals.describe)('withRetry', ()=>{
+        (0, _globals.it)('成功時に結果を返す', async ()=>{
+            const operation = _globals.jest.fn().mockResolvedValue('success');
+            const result = await (0, _fileutils.withRetry)(operation, {
+                maxRetries: 3,
+                delay: 100
+            });
+            (0, _globals.expect)(result).toBe('success');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(1);
+        });
+        (0, _globals.it)('失敗時にリトライする', async ()=>{
+            const operation = _globals.jest.fn().mockRejectedValueOnce(new Error('fail')).mockRejectedValueOnce(new Error('fail')).mockResolvedValue('success');
+            const result = await (0, _fileutils.withRetry)(operation, {
+                maxRetries: 3,
+                delay: 100
+            });
+            (0, _globals.expect)(result).toBe('success');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(3);
+        });
+        (0, _globals.it)('最大リトライ回数を超えた場合にエラーを投げる', async ()=>{
+            const operation = _globals.jest.fn().mockRejectedValue(new Error('fail'));
+            await (0, _globals.expect)((0, _fileutils.withRetry)(operation, {
+                maxRetries: 3,
+                delay: 100
+            })).rejects.toThrow('fail');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(3);
+        });
+    });
+});

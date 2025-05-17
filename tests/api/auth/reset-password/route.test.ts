@@ -1,8 +1,11 @@
 import { POST } from '@/app/api/auth/reset-password/route';
 import { generateResetToken } from '@/lib/auth/token';
 import { sendPasswordResetEmail } from '@/lib/email/send';
-import { NextRequest } from 'next/server';
 import { createPrismaMock, createMockUser, clearAllMocks } from '@/tests/helpers/mockSetup';
+import { UserRole } from '@prisma/client';
+
+// Jestのexpect関数をモック化しないようにする
+const actualExpect = global.expect;
 
 // Token 生成関数のモック
 jest.mock('@/lib/auth/token', () => ({
@@ -36,7 +39,7 @@ describe('POST /api/auth/reset-password', () => {
 
   it('should return success true when user exists and email is sent', async () => {
     const requestBody = { email: 'user@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -47,6 +50,7 @@ describe('POST /api/auth/reset-password', () => {
       email: requestBody.email,
       name: 'Test User',
       credits: 10,
+      role: UserRole.USER,
     });
     prismaMock.user.findUnique.mockResolvedValue(mockUser);
     prismaMock.user.update.mockResolvedValue(mockUser);
@@ -54,22 +58,22 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(responseBody.success).toBe(true);
-    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({ where: { email: requestBody.email } });
-    expect(generateResetTokenMock).toHaveBeenCalled();
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
+    actualExpect(response.status).toBe(200);
+    actualExpect(responseBody.success).toBe(true);
+    actualExpect(prismaMock.user.findUnique).toHaveBeenCalledWith({ where: { email: requestBody.email } });
+    actualExpect(generateResetTokenMock).toHaveBeenCalled();
+    actualExpect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: {
-        updatedAt: expect.any(Date),
+        updatedAt: actualExpect.any(Date),
       },
     });
-    expect(sendPasswordResetEmailMock).toHaveBeenCalledWith(requestBody.email, 'mocked-reset-token');
+    actualExpect(sendPasswordResetEmailMock).toHaveBeenCalledWith(requestBody.email, 'mocked-reset-token');
   });
 
   it('should return success true even if user does not exist (security measure)', async () => {
     const requestBody = { email: 'nonexistent@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -80,16 +84,16 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(responseBody.success).toBe(true);
-    expect(generateResetTokenMock).not.toHaveBeenCalled();
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
-    expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
+    actualExpect(response.status).toBe(200);
+    actualExpect(responseBody.success).toBe(true);
+    actualExpect(generateResetTokenMock).not.toHaveBeenCalled();
+    actualExpect(prismaMock.user.update).not.toHaveBeenCalled();
+    actualExpect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
   });
 
   it('should return 400 for invalid email format', async () => {
     const requestBody = { email: 'invalid-email' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -98,15 +102,15 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500); // zodのparseエラーは現状500になるが、将来的には400にしたい
+    actualExpect(response.status).toBe(500); // zodのparseエラーは現状500になるが、将来的には400にしたい
     // expect(responseBody.error).toContain('Invalid email'); // zodのエラーメッセージを確認
-    expect(responseBody.error).toBe('パスワードリセットの要求に失敗しました'); // 現状は汎用エラー
+    actualExpect(responseBody.error).toBe('パスワードリセットの要求に失敗しました'); // 現状は汎用エラー
   });
 
   it('should return 500 if RESEND_API_KEY is not set', async () => {
     delete process.env.RESEND_API_KEY; // 環境変数を削除
     const requestBody = { email: 'user@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -115,13 +119,13 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('Email service configuration error');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('Email service configuration error');
   });
 
   it('should return 500 if generateResetToken fails', async () => {
     const requestBody = { email: 'user@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -133,13 +137,13 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
   });
 
   it('should return 500 if sendPasswordResetEmail fails', async () => {
     const requestBody = { email: 'user@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -152,13 +156,13 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
   });
 
   it('should return 500 if prisma.user.update fails', async () => {
     const requestBody = { email: 'user@example.com' };
-    const req = new NextRequest('http://localhost/api/auth/reset-password', {
+    const req = new Request('http://localhost/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -170,7 +174,7 @@ describe('POST /api/auth/reset-password', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
+    actualExpect(response.status).toBe(500);
+    actualExpect(responseBody.error).toBe('パスワードリセットの要求に失敗しました');
   });
 }); 

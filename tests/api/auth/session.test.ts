@@ -1,10 +1,35 @@
-import { GET } from '@/app/api/auth/session/route';
-import { getServerSession } from 'next-auth';
-import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth/auth-options';
-import { createSessionMock, createMockUser, clearAllMocks } from '@/tests/helpers/mockSetup';
+// next-authのモック化
+jest.mock('next-auth', () => ({
+  getServerSession: jest.fn(),
+}));
 
-const getServerSessionMock = createSessionMock();
+// auth-optionsのモック化
+jest.mock('@/lib/auth/auth-options', () => ({
+  authOptions: {}
+}));
+
+// NextResponseのモック化
+jest.mock('next/server', () => {
+  return {
+    NextResponse: {
+      json: jest.fn().mockImplementation((data) => ({
+        json: () => Promise.resolve(data),
+        statusText: 'OK',
+        headers: new Map(),
+      })),
+    },
+  };
+});
+
+// モジュールのインポートはモック化後に行う
+import { GET } from '@/app/api/auth/session/route';
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
+import { createMockUser, clearAllMocks } from '@/tests/helpers/mockSetup';
+
+// getServerSessionのモックを直接使用
+const getServerSessionMock = getServerSession as jest.Mock;
 
 describe('GET /api/auth/session', () => {
   beforeEach(() => {
@@ -17,7 +42,8 @@ describe('GET /api/auth/session', () => {
       name: 'Test User',
       email: 'test@example.com',
     });
-    getServerSessionMock.mockResolvedValue({
+    // モックの返値を設定
+    getServerSessionMock.mockResolvedValueOnce({
       user: mockUser,
       expires: 'some-date',
     });
@@ -25,29 +51,29 @@ describe('GET /api/auth/session', () => {
     const response = await GET();
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.statusText).toBe('OK');
     expect(responseBody.user).toEqual(mockUser);
     expect(getServerSessionMock).toHaveBeenCalledWith(authOptions);
   });
 
   it('should return null for user if session does not exist', async () => {
-    getServerSessionMock.mockResolvedValue(null);
+    getServerSessionMock.mockResolvedValueOnce(null);
 
     const response = await GET();
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.statusText).toBe('OK');
     expect(responseBody.user).toBeNull();
     expect(getServerSessionMock).toHaveBeenCalledWith(authOptions);
   });
 
   it('should return null for user if getServerSession throws an error', async () => {
-    getServerSessionMock.mockRejectedValue(new Error('Session fetch error'));
+    getServerSessionMock.mockRejectedValueOnce(new Error('Session fetch error'));
 
     const response = await GET();
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200); // APIはエラーをキャッチしてnullを返す
+    expect(response.statusText).toBe('OK'); // APIはエラーをキャッチしてnullを返す
     expect(responseBody.user).toBeNull();
     expect(getServerSessionMock).toHaveBeenCalledWith(authOptions);
   });

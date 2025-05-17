@@ -1,94 +1,148 @@
 import React from 'react';
-import { renderHook } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { useIntersectionObserver } from '@/lib/hooks/useIntersectionObserver';
+import { useRef } from 'react';
 
-// IntersectionObserverとそのコールバック型の定義
-type IntersectionObserverCallback = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => void;
-
-// IntersectionObserverのモック
+// IntersectionObserverメソッドのモック
 const mockObserve = jest.fn();
 const mockDisconnect = jest.fn();
-const mockIntersectionObserver = jest.fn<
-  IntersectionObserver,
-  [IntersectionObserverCallback, IntersectionObserverInit?]
->(() => ({
-  observe: mockObserve,
-  disconnect: mockDisconnect,
-  unobserve: jest.fn(),
-  takeRecords: jest.fn(() => []),
-  root: null,
-  rootMargin: '',
-  thresholds: [],
-}));
+const mockUnobserve = jest.fn();
 
-// グローバルにIntersectionObserverをモック
-global.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
-
-describe('useIntersectionObserver', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+// グローバルIntersectionObserverのモック実装
+beforeEach(() => {
+  // jest.setup.jsで定義されているIntersectionObserverを上書き
+  global.IntersectionObserver = jest.fn().mockImplementation(function(this: any, callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+    this.observe = mockObserve;
+    this.disconnect = mockDisconnect;
+    this.unobserve = mockUnobserve;
+    this.callback = callback;
+    this.options = options;
   });
 
+  // モック関数をリセット
+  mockObserve.mockClear();
+  mockDisconnect.mockClear();
+  mockUnobserve.mockClear();
+});
+
+// テスト後にモックをリセット
+afterEach(() => {
+  jest.clearAllMocks();
+});
+
+describe('useIntersectionObserver', () => {
   it('要素が存在する場合、IntersectionObserverを初期化して監視する', () => {
-    // モック要素の作成
-    const mockRef = { current: document.createElement('div') };
-    const mockCallback = jest.fn();
-    const mockOptions = { rootMargin: '10px' };
+    // モックDOM要素を作成
+    const mockElement = document.createElement('div');
+    
+    // テスト用のコンポーネント
+    const TestComponent = () => {
+      const mockRef = useRef<HTMLDivElement>(null);
+      const mockCallback = jest.fn();
+      
+      // useRefのcurrentを手動で設定
+      Object.defineProperty(mockRef, 'current', {
+        value: mockElement,
+        writable: true
+      });
 
-    // フックをレンダリング
-    renderHook(() => useIntersectionObserver(mockRef as React.RefObject<Element>, mockCallback, mockOptions));
+      useIntersectionObserver(mockRef, mockCallback);
 
-    // IntersectionObserverが正しく初期化されたか確認
-    expect(mockIntersectionObserver).toHaveBeenCalledWith(mockCallback, mockOptions);
+      return <div data-testid="test-element" />;
+    };
+
+    render(<TestComponent />);
 
     // 要素が監視対象に追加されたか確認
-    expect(mockObserve).toHaveBeenCalledWith(mockRef.current);
+    expect(mockObserve).toHaveBeenCalledWith(mockElement);
   });
 
   it('要素が存在しない場合、IntersectionObserverを初期化しない', () => {
-    // nullの参照を作成
-    const mockRef = { current: null };
-    const mockCallback = jest.fn();
+    // テスト用のコンポーネント - refがnullのケース
+    const TestComponent = () => {
+      const mockRef = useRef<HTMLDivElement>(null);
+      const mockCallback = jest.fn();
 
-    // フックをレンダリング
-    renderHook(() => useIntersectionObserver(mockRef as React.RefObject<Element>, mockCallback));
+      useIntersectionObserver(mockRef, mockCallback);
 
-    // IntersectionObserverが初期化されていないことを確認
-    expect(mockIntersectionObserver).not.toHaveBeenCalled();
+      return <div data-testid="test-element" />;
+    };
+
+    render(<TestComponent />);
+
+    // observeが呼ばれていないことを確認
     expect(mockObserve).not.toHaveBeenCalled();
+    // IntersectionObserverが初期化されていないことを確認
+    expect(global.IntersectionObserver).not.toHaveBeenCalled();
   });
 
   it('アンマウント時にIntersectionObserverを切断する', () => {
-    // モック要素の作成
-    const mockRef = { current: document.createElement('div') };
-    const mockCallback = jest.fn();
+    // モックDOM要素を作成
+    const mockElement = document.createElement('div');
+    
+    // テスト用のコンポーネント
+    const TestComponent = () => {
+      const mockRef = useRef<HTMLDivElement>(null);
+      const mockCallback = jest.fn();
+      
+      // useRefのcurrentを手動で設定
+      Object.defineProperty(mockRef, 'current', {
+        value: mockElement,
+        writable: true
+      });
 
-    // フックをレンダリングして解除
-    const { unmount } = renderHook(() => useIntersectionObserver(mockRef as React.RefObject<Element>, mockCallback));
-    unmount();
+      useIntersectionObserver(mockRef, mockCallback);
+
+      return <div data-testid="test-element" />;
+    };
+
+    const { unmount } = render(<TestComponent />);
+
+    // コンポーネントをアンマウント
+    act(() => {
+      unmount();
+    });
 
     // disconnectが呼ばれたことを確認
     expect(mockDisconnect).toHaveBeenCalled();
   });
 
   it('依存配列の値が変更された場合、IntersectionObserverを再初期化する', () => {
-    // モック要素の作成
-    const mockRef = { current: document.createElement('div') };
-    const mockCallback1 = jest.fn();
-    const mockCallback2 = jest.fn();
+    // モックDOM要素を作成
+    const mockElement = document.createElement('div');
+    
+    // テスト用のコンポーネント
+    function TestComponent({ threshold }: { threshold: number }) {
+      const mockRef = useRef<HTMLDivElement>(null);
+      const mockCallback = jest.fn();
+      
+      // useRefのcurrentを手動で設定
+      Object.defineProperty(mockRef, 'current', {
+        value: mockElement,
+        writable: true
+      });
 
-    // 初回レンダリング
-    const { rerender } = renderHook(
-      ({ callback }) => useIntersectionObserver(mockRef as React.RefObject<Element>, callback),
-      { initialProps: { callback: mockCallback1 } },
-    );
+      useIntersectionObserver(mockRef, mockCallback, { threshold });
 
-    // 再レンダリング（コールバックを変更）
-    rerender({ callback: mockCallback2 });
+      return <div data-testid="test-element" />;
+    }
 
-    // IntersectionObserverが2回初期化されたことを確認
-    expect(mockIntersectionObserver).toHaveBeenCalledTimes(2);
+    const { rerender } = render(<TestComponent threshold={0} />);
+    
+    // 最初のレンダリングでobserveが呼ばれたことを確認
+    expect(mockObserve).toHaveBeenCalledTimes(1);
+    
+    // モックをリセット
+    mockObserve.mockClear();
+    mockDisconnect.mockClear();
+
+    // 依存配列の値を変更して再レンダリング
+    act(() => {
+      rerender(<TestComponent threshold={1} />);
+    });
+
+    // disconnectとobserveが呼ばれたことを確認
     expect(mockDisconnect).toHaveBeenCalledTimes(1);
-    expect(mockObserve).toHaveBeenCalledTimes(2);
+    expect(mockObserve).toHaveBeenCalledTimes(1);
   });
 });

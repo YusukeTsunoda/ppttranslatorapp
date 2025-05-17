@@ -1,0 +1,186 @@
+{
+  "title": "アプリケーション状態ダッシュボード",
+  "description": "PPTXTranslatorアプリケーションの健全性とパフォーマンスを監視するためのダッシュボード",
+  "timezone": "Asia/Tokyo",
+  "refresh": "5m",
+  "panels": [
+    {
+      "title": "エラー発生率",
+      "type": "timeseries",
+      "datasource": "Sentry",
+      "targets": [
+        {
+          "query": "sum(count_over_time(sentry_events{environment=\"production\"}[5m])) by (event_type)",
+          "legendFormat": "{{event_type}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "title": "API応答時間",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "query": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"ppttranslator\", handler=~\"/api/.*\"}[5m])) by (le, handler))",
+          "legendFormat": "{{handler}} (p95)"
+        },
+        {
+          "query": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"ppttranslator\", handler=~\"/api/.*\"}[5m])) by (le, handler))",
+          "legendFormat": "{{handler}} (p50)"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "title": "リクエスト数",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "query": "sum(rate(http_requests_total{job=\"ppttranslator\"}[5m])) by (status_code)",
+          "legendFormat": "HTTP {{status_code}}"
+        }
+      ]
+    },
+    {
+      "title": "メモリ使用量",
+      "type": "gauge",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "query": "process_resident_memory_bytes{job=\"ppttranslator\"} / 1024 / 1024",
+          "legendFormat": "Memory Usage (MB)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 512 },
+            { "color": "red", "value": 1024 }
+          ]
+        }
+      }
+    },
+    {
+      "title": "CPU使用率",
+      "type": "gauge",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "query": "rate(process_cpu_seconds_total{job=\"ppttranslator\"}[1m]) * 100",
+          "legendFormat": "CPU Usage (%)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50 },
+            { "color": "red", "value": 80 }
+          ]
+        }
+      }
+    },
+    {
+      "title": "最近のエラー",
+      "type": "table",
+      "datasource": "Sentry",
+      "targets": [
+        {
+          "query": "sentry_events{environment=\"production\", event_type=\"error\"}"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "timestamp"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "ユーザーアクティビティ",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "query": "sum(rate(http_requests_total{job=\"ppttranslator\", handler=~\"/api/translate.*\"}[5m]))",
+          "legendFormat": "翻訳リクエスト"
+        },
+        {
+          "query": "sum(rate(http_requests_total{job=\"ppttranslator\", handler=~\"/api/upload.*\"}[5m]))",
+          "legendFormat": "アップロード"
+        },
+        {
+          "query": "sum(rate(http_requests_total{job=\"ppttranslator\", handler=~\"/api/download.*\"}[5m]))",
+          "legendFormat": "ダウンロード"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "title": "Sentryダッシュボード",
+      "url": "https://sentry.io/organizations/${SENTRY_ORG}/projects/${SENTRY_PROJECT}/"
+    },
+    {
+      "title": "Vercelデプロイメント",
+      "url": "https://vercel.com/${VERCEL_ORG_ID}/${VERCEL_PROJECT_ID}/deployments"
+    }
+  ]
+}

@@ -2,18 +2,22 @@ import { logActivity } from '@/lib/utils/activity-logger';
 import { prisma } from '@/lib/db/prisma';
 
 // モック
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: jest.fn(() => ({
-        id: 'test-user-123',
-      })),
+jest.mock('@/lib/db/prisma', () => {
+  const originalModule = jest.requireActual('@/lib/db/prisma');
+  return {
+    __esModule: true,
+    prisma: {
+      user: {
+        findUnique: jest.fn().mockImplementation(() => ({
+          id: 'test-user-123',
+        })),
+      },
+      activityLog: {
+        create: jest.fn().mockImplementation(() => Promise.resolve({})),
+      },
     },
-    activityLog: {
-      create: jest.fn(),
-    },
-  },
-}));
+  };
+});
 
 // 実際の実装がコンソールログを出力するだけの場合のテスト
 describe('ActivityLogger', () => {

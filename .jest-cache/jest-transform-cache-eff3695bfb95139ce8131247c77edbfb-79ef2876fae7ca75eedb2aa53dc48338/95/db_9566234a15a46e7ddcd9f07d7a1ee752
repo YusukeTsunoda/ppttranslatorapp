@@ -1,0 +1,86 @@
+c17edfdddfeb47a98f770f5dfe11d6a5
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    seedTestData: function() {
+        return seedTestData;
+    },
+    setupTestDatabase: function() {
+        return setupTestDatabase;
+    },
+    teardownTestDatabase: function() {
+        return teardownTestDatabase;
+    },
+    withTestTransaction: function() {
+        return withTestTransaction;
+    }
+});
+const _client = require("@prisma/client");
+const _child_process = require("child_process");
+const prisma = new _client.PrismaClient();
+const setupTestDatabase = async ()=>{
+    try {
+        // DockerコンテナのステータスチェックとDB接続テスト
+        (0, _child_process.execSync)('docker-compose -f docker-compose.test.yml ps test-db | grep "Up"');
+        await prisma.$connect();
+        // テストデータベースのリセット
+        await prisma.$executeRaw`DROP SCHEMA IF EXISTS public CASCADE`;
+        await prisma.$executeRaw`CREATE SCHEMA public`;
+        // マイグレーションの実行
+        (0, _child_process.execSync)('npx prisma migrate deploy');
+        // テスト用の初期データ投入
+        await seedTestData();
+    } catch (error) {
+        console.error('テストデータベースのセットアップに失敗しました:', error);
+        throw error;
+    }
+};
+const teardownTestDatabase = async ()=>{
+    try {
+        await prisma.$disconnect();
+    } catch (error) {
+        console.error('テストデータベースの切断に失敗しました:', error);
+        throw error;
+    }
+};
+const seedTestData = async ()=>{
+    try {
+        // テスト用管理者アカウントの作成
+        await prisma.user.create({
+            data: {
+                email: 'admin@example.com',
+                name: 'Test Admin',
+                role: 'ADMIN'
+            }
+        });
+        // テスト用一般ユーザーアカウントの作成
+        await prisma.user.create({
+            data: {
+                email: 'user@example.com',
+                name: 'Test User',
+                role: 'USER'
+            }
+        });
+    } catch (error) {
+        console.error('テストデータの投入に失敗しました:', error);
+        throw error;
+    }
+};
+const withTestTransaction = async (callback)=>{
+    try {
+        await prisma.$transaction(async (tx)=>{
+            await callback(tx);
+        });
+    } catch (error) {
+        console.error('トランザクションの実行に失敗しました:', error);
+        throw error;
+    }
+};
