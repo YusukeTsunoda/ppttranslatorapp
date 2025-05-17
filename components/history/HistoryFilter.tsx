@@ -265,13 +265,107 @@ export function HistoryFilter({ filter }: HistoryFilterProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>ページ数範囲</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="最小"
+                  value={filter.minPageCount || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setPageCountRange(value, filter.maxPageCount);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+                <span>～</span>
+                <Input
+                  type="number"
+                  placeholder="最大"
+                  value={filter.maxPageCount || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setPageCountRange(filter.minPageCount, value);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>使用クレジット範囲</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="最小"
+                  value={filter.minCreditsUsed || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setCreditsRange(value, filter.maxCreditsUsed);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+                <span>～</span>
+                <Input
+                  type="number"
+                  placeholder="最大"
+                  value={filter.maxCreditsUsed || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setCreditsRange(filter.minCreditsUsed, value);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>ファイルサイズ範囲（バイト）</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="最小"
+                  value={filter.minFileSize || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setFileSizeRange(value, filter.maxFileSize);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+                <span>～</span>
+                <Input
+                  type="number"
+                  placeholder="最大"
+                  value={filter.maxFileSize || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : null;
+                    filter.setFileSizeRange(filter.minFileSize, value);
+                  }}
+                  className="w-full"
+                  min={0}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={filter.resetFilters}>
+          <div className="flex justify-between mt-4">
+            <Button
+              variant="outline"
+              onClick={() => filter.reset()}
+              disabled={!filter.isFiltered}
+            >
               リセット
             </Button>
-            <Button onClick={() => setIsOpen(false)}>
+            <Button
+              variant="default"
+              onClick={() => setIsOpen(false)}
+            >
               適用
             </Button>
           </div>

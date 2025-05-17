@@ -64,12 +64,24 @@ export default function HistoryPage() {
     params.set('limit', filter.limit.toString());
     params.set('sort', filter.sort);
     params.set('order', filter.order);
+    
+    // 基本的なフィルター
     if (filter.search) params.set('search', filter.search);
     if (filter.startDate) params.set('startDate', filter.startDate);
     if (filter.endDate) params.set('endDate', filter.endDate);
     if (filter.status) params.set('status', filter.status);
     if (filter.sourceLang) params.set('sourceLang', filter.sourceLang);
     if (filter.targetLang) params.set('targetLang', filter.targetLang);
+    
+    // 拡張フィルター
+    if (filter.minPageCount) params.set('minPageCount', filter.minPageCount.toString());
+    if (filter.maxPageCount) params.set('maxPageCount', filter.maxPageCount.toString());
+    if (filter.minCreditsUsed) params.set('minCreditsUsed', filter.minCreditsUsed.toString());
+    if (filter.maxCreditsUsed) params.set('maxCreditsUsed', filter.maxCreditsUsed.toString());
+    if (filter.minFileSize) params.set('minFileSize', filter.minFileSize.toString());
+    if (filter.maxFileSize) params.set('maxFileSize', filter.maxFileSize.toString());
+    if (filter.tags && filter.tags.length > 0) params.set('tags', filter.tags.join(','));
+    
     return `/api/history?${params.toString()}`;
   }, [filter]);
 
