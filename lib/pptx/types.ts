@@ -38,6 +38,11 @@ export interface TextStyle {
     format?: string;
     startAt?: number;
   };
+  indentLevel?: number;
+  bulletType?: string;
+  bulletChar?: string;
+  bulletSize?: number;
+  bulletColor?: string;
 }
 
 // ハイパーリンク情報
@@ -59,16 +64,23 @@ export interface TextElement {
   id: string;
   text: string;
   position: Position;
-<<<<<<< HEAD
-  type: 'title' | 'subtitle' | 'body' | 'header' | 'footer' | 'text';
+  type?: 'title' | 'subtitle' | 'body' | 'header' | 'footer' | 'text';
   font: Font;
   style?: TextStyle;
   hyperlink?: Hyperlink;
   animation?: Animation;
+  shapeId?: string;
+  paragraphIndex?: number;
+  runIndex?: number;
+  isTitle?: boolean;
+  isPlaceholder?: boolean;
+  placeholderType?: string;
+  languageId?: string;
 }
 
 // シェイプ情報
 export interface Shape {
+  id?: string;
   type: string;
   x: number;
   y: number;
@@ -81,18 +93,22 @@ export interface Shape {
   opacity: number;
   radius?: number; // 円の場合
   points?: { x: number; y: number }[]; // 多角形の場合
+  position?: Position;
+  lineColor?: string;
+  lineWidth?: number;
+  zOrder?: number;
 }
 
 // 背景情報
 export interface Background {
   color: string;
-  image: string | null;
-  pattern: {
+  image?: string | null;
+  pattern?: {
     type: string;
     foreColor: string;
     backColor: string;
   } | null;
-  gradient: {
+  gradient?: {
     type: 'linear' | 'radial';
     stops: Array<{
       position: number;
@@ -100,7 +116,8 @@ export interface Background {
     }>;
     angle?: number;
   } | null;
-  transparency: number;
+  transparency?: number;
+  type?: string;
 }
 
 // メタデータ情報
@@ -109,22 +126,23 @@ export interface Metadata {
   author: string;
   created: string;
   modified: string;
-  company: string;
-  version: string;
+  company?: string;
+  version?: string;
   lastModifiedBy: string;
   revision: number;
-  subject: string;
-  keywords: string[];
-  category: string;
-  description: string;
-  language: string;
+  subject?: string;
+  keywords?: string[];
+  category?: string;
+  description?: string;
+  language?: string;
   presentationFormat: string;
-  createdApplication: string;
-=======
-  fontInfo?: any; // フォント情報（サイズ、種類、スタイルなど）
-  id?: string; // 要素のID
-  type?: string; // テキストタイプ
->>>>>>> c58ec68 (実装途中)
+  createdApplication?: string;
+  application?: string;
+  slides?: number;
+  notes?: number;
+  hidden?: number;
+  multimedia?: number;
+  words?: number;
 }
 
 // レイアウト要素（シェイプ、プレースホルダーなど）
@@ -158,11 +176,21 @@ export interface SlideContentFrontend {
 }
 
 // PPTXファイル全体の解析結果
+// エラー情報の型定義
+export interface ParseError {
+  message: string;
+  recoveryAttempted: boolean;
+  recoverySuccessful: boolean;
+  details?: string;
+  timestamp?: number;
+}
+
 export interface PPTXParseResult {
   filename: string;
   totalSlides: number;
   metadata: Metadata;
   slides: SlideContent[];
+  error?: ParseError;
 }
 
 // APIレスポンスの型
