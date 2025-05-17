@@ -14,6 +14,13 @@ const nextConfig = {
     // サーバーコンポーネントの最適化
     serverMinification: true,
     serverSourceMaps: false,
+    // サーバーコンポーネントのバンドルサイズ削減
+    serverComponentsExternalPackages: [
+      'prisma',
+      '@prisma/client',
+      '@prisma/engines',
+      'sharp',
+    ],
   },
   onDemandEntries: {
     maxInactiveAge: 1000 * 60 * 60, // 1時間キャッシュ
@@ -44,6 +51,15 @@ const nextConfig = {
       // Prismaのエンジンバイナリはライブラリモードで使用するため除外
       'prisma',
       '@prisma/engines',
+      '@prisma/client',
+      // テスト関連の依存関係を除外
+      'jest',
+      'jest-environment-jsdom',
+      '@testing-library/react',
+      'cypress',
+      // 開発環境のみの依存関係を除外
+      'eslint',
+      'typescript',
     ],
     // バンドルから除外するファイルパスパターン
     ignoredModuleFiles: [
