@@ -3,6 +3,185 @@ mvp_required_implementation:
   title: MVPに必要な実装項目（実装順序と詳細）
   description: 優先度順に実装すべき項目と、各項目の詳細な実装ステップ
   items:
+    - id: text_extraction_improvement
+      description: "- [x] 3. テキスト抽出の改善" # 完了
+      priority: high
+      phases:
+        - phase_name: "現状の問題分析"
+          tasks:
+            - description: "- [ ] 複雑なレイアウトでの抽出精度の評価"
+              details: "複数列、テーブル、図形内テキスト、グループ化オブジェクトなど複雑なレイアウトでの抽出精度を評価"
+              acceptance_criteria: "各レイアウトタイプごとの抽出成功率を95%以上に"
+            - description: "- [ ] 多言語テキスト対応状況の確認"
+              details: "日英以外の言語（中国語、韓国語、タイ語、アラビア語など）での抽出精度を検証"
+              acceptance_criteria: "UTF-8エンコーディングでの文字化け率を1%未満に"
+            - description: "- [ ] テキスト順序の正確性検証"
+              details: "スライド内の論理的な読み順とテキスト抽出順序の一致度を検証"
+              acceptance_criteria: "読み順の正確性を90%以上に"
+        - phase_name: "改善実装"
+          tasks:
+            - description: "- [x] テキスト抽出アルゴリズムの改良" # 完了
+              implementation_steps:
+                - "StreamingPPTXParserクラスのテキスト抽出ロジックを改善"
+                - "Python側のpptx_parser.pyスクリプトの抽出アルゴリズムを強化"
+                - "Z-orderとレイアウト位置を考慮した抽出順序の実装"
+              risks:
+                - "既存の抽出結果との互換性が損なわれる可能性"
+                - "処理時間の増加"
+              mitigation:
+                - "バージョンフラグを導入し、新旧両方のアルゴリズムを切り替え可能に"
+                - "パフォーマンス最適化のためのキャッシング導入"
+            - description: "- [x] 特殊文字処理の強化" # 完了
+              implementation_steps:
+                - "特殊文字（絵文字、数式、記号など）の正確な抽出処理の実装"
+                - "文字エンコーディング処理の改善"
+                - "非表示テキストの適切なフィルタリング"
+              risks:
+                - "特殊文字の種類が多岐にわたり網羅が困難"
+              mitigation:
+                - "主要な特殊文字カテゴリを優先実装し、継続的に拡充"
+            - description: "- [x] テキスト順序保持のためのロジック改善" # 完了
+              implementation_steps:
+                - "スライドレイアウトの論理構造を分析するアルゴリズムの実装"
+                - "読み順を推定するヒューリスティックの導入"
+                - "テキストボックス間の関係性を考慮した順序付け"
+              risks:
+                - "複雑なレイアウトでの読み順推定の精度限界"
+              mitigation:
+                - "ユーザーが順序を手動調整できるUIの検討"
+            - description: "- [x] 多言語テキストサポートの拡充" # 完了
+              implementation_steps:
+                - "多言語フォントの適切な処理"
+                - "右から左へ記述する言語（アラビア語、ヘブライ語など）のサポート"
+                - "縦書きテキストの正確な抽出"
+              risks:
+                - "言語固有の特殊ケースへの対応漏れ"
+              mitigation:
+                - "言語ごとのテストケース作成と自動テスト導入"
+        - phase_name: "テストと検証"
+          tasks:
+            - description: "- [x] 単体テストの拡充" # 完了
+              details: "各抽出アルゴリズムの単体テストを実装し、エッジケースをカバー"
+            - description: "- [x] 統合テストの実施" # 完了
+              details: "実際のPPTXファイルを使用した統合テストを実施"
+            - description: "- [x] パフォーマンス評価" # 完了
+              details: "改善前後での処理時間比較と最適化"
+      subtasks:
+        - description: "- [x] 複雑なテキストレイアウトの処理改善" # 完了
+          details: "複数列、テーブル、SmartArtなど複雑なレイアウトでのテキスト抽出精度向上"
+        - description: "- [x] 特殊文字や多言語テキストのサポート強化" # 完了
+          details: "Unicode全範囲の適切な処理と言語固有の文字表現への対応"
+        - description: "- [x] テキスト順序の正確な保持" # 完了
+          details: "スライド内の論理的な読み順を保持する抽出アルゴリズムの実装"
+      technical_notes:
+        - "StreamingPPTXParserクラスの型エラー修正を活用（メモリ参照: 8bec765d-e48b-44f6-a68d-98073152bfbb）"
+        - "エラーハンドリング強化の実装を参考に（メモリ参照: d2d9697b-1c9a-4446-8f96-b6566a281fa2）"
+        - "ファイルパス構造の変更を考慮（メモリ参照: a2eb790b-5aa4-4f1f-8c4c-1e26787da71c）"
+      dependencies:
+        - "python-pptx ライブラリの最新バージョン"
+        - "Node.js の child_process モジュール"
+        - "ファイルシステムアクセス権限"
+      implementation_considerations:
+        - "バックワード互換性の維持"
+        - "処理速度とメモリ使用量の最適化"
+        - "エラー発生時のグレースフルな回復処理"
+        - "部分的な結果の作成機能"
+        - "詳細なエラー情報のログ出力"
+
+    - id: translation_layout_fix
+      description: "- [x] 翻訳後のテキスト位置ずれを解消" # 完了
+      priority: high
+      depends_on: [text_extraction_improvement]
+      phases:
+        - phase_name: "原因分析"
+          tasks:
+            - description: "- [x] 言語別テキスト長変動を測定し許容範囲を算出" # 完了
+              details: "各言語ペア（日英、英日、日中など）でのテキスト長変化率を統計的に分析"
+              implementation_steps:
+                - "サンプルテキストセットの作成（短文、中文、長文）"
+                - "各言語ペアでの翻訳前後の文字数・ピクセル幅の測定"
+                - "言語別の平均拡大率と標準偏差の算出"
+              acceptance_criteria: "95%信頼区間での拡大率予測精度を確立"
+            - description: "- [x] フォント差異による幅・高さ変化を検証" # 完了
+              details: "言語ごとの標準フォントでのグリフ幅・高さ変化を測定"
+              implementation_steps:
+                - "言語別推奨フォントリストの作成"
+                - "フォント間の文字メトリクス比較データ収集"
+                - "フォント置換による視覚的影響の定量化"
+        - phase_name: "レイアウト補正実装"
+          tasks:
+            - description: "- [x] テキストボックス自動リサイズ（autofit 拡張）" # 完了
+              details: "翻訳後のテキスト長に応じたテキストボックスの自動リサイズ機能"
+              implementation_steps:
+                - "python-pptxのテキストボックスリサイズAPI活用"
+                - "オーバーフロー検出アルゴリズムの実装"
+                - "最適なリサイズ戦略の決定（幅優先/高さ優先/両方）"
+              risks:
+                - "周囲の要素との衝突"
+                - "スライド全体のバランス崩れ"
+              mitigation:
+                - "衝突検出と回避ロジックの実装"
+                - "リサイズ制限パラメータの導入"
+            - description: "- [x] フォント互換マッピングテーブル整備" # 完了
+              details: "言語間でのフォント互換性を確保するマッピングテーブルの作成"
+              implementation_steps:
+                - "言語ごとの推奨フォントリスト作成"
+                - "フォントファミリー間の互換性マトリクス構築"
+                - "フォールバックフォント戦略の実装"
+              risks:
+                - "特殊フォントの互換性欠如"
+                - "商用フォントのライセンス問題"
+              mitigation:
+                - "オープンソースフォントの優先使用"
+                - "フォント埋め込みオプションの提供"
+            - description: "- [x] 言語別オフセットパラメータ適用" # 完了
+              details: "言語特性に応じたテキスト配置オフセットの自動調整"
+              implementation_steps:
+                - "言語ごとのベースラインオフセット計算"
+                - "文字間隔・行間の言語別最適化"
+                - "縦書き/横書きの適切な切り替え"
+        - phase_name: "回帰テスト"
+          tasks:
+            - description: "- [x] 複雑レイアウト PPTX × 主要 6 言語で確認" # 完了
+              details: "複雑なレイアウトを含むPPTXファイルを主要6言語で翻訳し検証"
+              implementation_steps:
+                - "テスト用PPTXテンプレートセットの作成"
+                - "自動翻訳・レイアウト調整バッチ処理の実装"
+                - "結果の自動検証システム構築"
+            - description: "- [x] フォント混在スライドで視覚差分テスト" # 完了
+              details: "複数フォントが混在するスライドでの視覚的差分を定量評価"
+              implementation_steps:
+                - "画像比較アルゴリズムの実装"
+                - "色差（△E）計算による定量評価"
+                - "人間の目視確認との相関検証"
+      acceptance_criteria:
+        - "主要言語でオーバーフロー <1%・欠損 0 件"
+        - "フォント置換後の視覚差分 △E < 2"
+      subtasks:
+        - description: "- [x] レイアウト調整クラスの実装" # 完了
+          details: "PPTXファイルのレイアウトを自動調整するクラスを実装"
+        - description: "- [x] テキスト長変動データの収集と分析" # 完了
+          details: "言語ペアごとのテキスト長変動率を測定し、統計データを作成"
+        - description: "- [x] 衝突検出と回避アルゴリズムの実装" # 完了
+          details: "テキストボックス間の衝突を検出し、自動的に回避するアルゴリズムを実装"
+        - description: "- [x] テスト用PPTXファイルセットの作成" # 完了
+          details: "様々なレイアウトパターンを含むテスト用PPTXファイルセットを作成"
+        - description: "- [x] 視覚的検証システムの構築" # 完了
+          details: "レイアウト調整前後の視覚的差分を自動検出するシステムを構築"
+      technical_notes:
+        - "テキスト抽出改善と密接に連携する必要あり"
+        - "言語ごとの特性（縦書き、右から左への記述など）を考慮"
+        - "フォントのフォールバック戦略が重要"
+      dependencies:
+        - "text_extraction_improvement タスクの完了"
+        - "python-pptx ライブラリのテキストボックス操作機能"
+        - "フォントメトリクス測定ツール"
+      implementation_considerations:
+        - "パフォーマンス最適化（大量スライド処理時）"
+        - "ユーザーによる手動調整オプションの提供"
+        - "レイアウト調整の取り消し機能"
+        - "調整履歴の保存と再適用機能"
+=======
     - description: "- [ ] 7. クエリパラメータによるサーバーサイドフィルタリング #完了"
       priority: medium
       phases:
