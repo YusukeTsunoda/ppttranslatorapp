@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: false, // SWCによるミニファイを無効化
+  swcMinify: true, // SWCによるミニファイを有効化
   // SSR運用のためoutput: 'standalone' のみを指定
   output: 'standalone',
   experimental: {
@@ -27,6 +27,21 @@ const nextConfig = {
   },
   // ビルドから除外するディレクトリやファイル
   transpilePackages: [],
+  // サーバーレス関数のサイズを削減するための設定
+  outputFileTracing: {
+    // バンドルから除外するパス
+    ignoredModules: [
+      'sharp', // 使っていない場合は不要
+      // 他のJavaScriptビルドに含まれない大きなライブラリなど
+    ],
+    // バンドルから除外するファイルパスパターン
+    ignoredModuleFiles: [
+      '**/.next/cache/**',
+      '**/node_modules/.prisma/client/libquery_engine-*',
+      '!**/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node',
+      '**/node_modules/sharp/**/*.node', // 使っていない場合は不要
+    ],
+  },
   // ビルド時の詳細なエラー出力
   webpack: (config, { isServer, buildId, dev }) => {
     if (!config.infrastructureLogging) config.infrastructureLogging = {};
@@ -45,7 +60,12 @@ const nextConfig = {
     // 一時ディレクトリとscripts/tempディレクトリを除外
     config.watchOptions = {
       ...config.watchOptions,
-      ignored: ['**/temp/**', '**/scripts/temp/**', ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : [])],
+      ignored: [
+        '**/temp/**', 
+        '**/scripts/temp/**', 
+        '**/.next/cache/**',
+        ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : [])
+      ],
     };
     
     // APIルートファイルの検出

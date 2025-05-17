@@ -1,7 +1,20 @@
 import { POST } from '@/app/api/auth/reset-password/confirm/route';
 import { hashPassword } from '@/lib/auth/password';
-import { NextRequest } from 'next/server';
 import { createPrismaMock, createMockUser, clearAllMocks } from '@/tests/helpers/mockSetup';
+
+// Jestのexpect関数をモック化しないようにする
+const actualExpect = global.expect;
+
+// next/serverのモック化
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: jest.fn().mockImplementation((data, options = {}) => ({
+      json: () => Promise.resolve(data),
+      status: options.status || 200,
+      headers: new Map(),
+    })),
+  },
+}));
 
 // hashPasswordのモック
 jest.mock('@/lib/auth/password', () => ({
@@ -9,6 +22,7 @@ jest.mock('@/lib/auth/password', () => ({
 }));
 
 // console.logのモック
+// consoleのモック化
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
 const mockConsoleError = jest.spyOn(console, 'error').mockImplementation();
 
@@ -31,7 +45,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'any-token', // Currently ignored by the API
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -49,17 +63,17 @@ describe('POST /api/auth/reset-password/confirm', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(responseBody.success).toBe(true);
-    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+    actualExpect(response.status).toBe(200);
+    actualExpect(responseBody.success).toBe(true);
+    actualExpect(prismaMock.user.findFirst).toHaveBeenCalledWith({
       where: { email: 'dummy@example.com' },
     });
-    expect(hashPasswordMock).toHaveBeenCalledWith(requestBody.password);
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
+    actualExpect(hashPasswordMock).toHaveBeenCalledWith(requestBody.password);
+    actualExpect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: mockUser.id },
       data: {
         password: 'new_hashed_password',
-        updatedAt: expect.any(Date),
+        updatedAt: actualExpect.any(Date),
       },
     });
   });
@@ -69,7 +83,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'invalid-token',
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -80,10 +94,10 @@ describe('POST /api/auth/reset-password/confirm', () => {
     const response = await POST(req as Request);
     const responseBody = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(responseBody.error).toBe('トークンが無効か有効期限が切れています');
-    expect(hashPasswordMock).not.toHaveBeenCalled();
-    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    actualExpect(response.status).toBe(400);
+    actualExpect(responseBody.error).toBe('トークンが無効か有効期限が切れています');
+    actualExpect(hashPasswordMock).not.toHaveBeenCalled();
+    actualExpect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
   it('should return error for invalid input (e.g., short password)', async () => {
@@ -91,7 +105,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'any-token',
       password: 'short',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +123,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'any-token',
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -132,7 +146,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'any-token',
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -158,7 +172,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
     ];
 
     for (const body of invalidRequests) {
-      const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+      const req = new Request('http://localhost/api/auth/reset-password/confirm', {
         method: 'POST',
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +196,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
     ];
 
     for (const password of invalidPasswords) {
-      const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+      const req = new Request('http://localhost/api/auth/reset-password/confirm', {
         method: 'POST',
         body: JSON.stringify({ token: 'valid-token', password }),
         headers: { 'Content-Type': 'application/json' },
@@ -193,14 +207,15 @@ describe('POST /api/auth/reset-password/confirm', () => {
 
       expect(response.status).toBe(500);
       expect(responseBody.error).toBe('パスワードのリセットに失敗しました');
-    });
+    }
+  });
 
   it('should log password reset activity', async () => {
     const requestBody = {
       token: 'valid-token',
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
@@ -216,10 +231,10 @@ describe('POST /api/auth/reset-password/confirm', () => {
 
     await POST(req as Request);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('Password reset:', expect.objectContaining({
+    actualExpect(mockConsoleLog).toHaveBeenCalledWith('Password reset:', actualExpect.objectContaining({
       userId: mockUser.id,
       action: 'update_password',
-      timestamp: expect.any(String),
+      timestamp: actualExpect.any(String),
     }));
   });
 
@@ -228,7 +243,7 @@ describe('POST /api/auth/reset-password/confirm', () => {
       token: 'valid-token',
       password: 'newValidPassword123',
     };
-    const req = new NextRequest('http://localhost/api/auth/reset-password/confirm', {
+    const req = new Request('http://localhost/api/auth/reset-password/confirm', {
       method: 'POST',
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },

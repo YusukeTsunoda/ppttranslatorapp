@@ -1,0 +1,107 @@
+6c48192b68af9a8d4cbae46b45817271
+"use strict";
+// getServerSession のモック
+jest.mock('next-auth', ()=>({
+        ...jest.requireActual('next-auth'),
+        getServerSession: jest.fn()
+    }));
+// Prisma Client のモック
+jest.mock('@/lib/db/prisma', ()=>({
+        prisma: (0, _jestmockextended.mockDeep)()
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _route = require("@/app/api/user/credits/route");
+const _nextauth = require("next-auth");
+const _prisma = require("@/lib/db/prisma");
+const _jestmockextended = require("jest-mock-extended");
+const _authoptions = require("@/lib/auth/auth-options");
+const getServerSessionMock = _nextauth.getServerSession;
+const prismaMock = _prisma.prisma;
+describe('GET /api/user/credits', ()=>{
+    const mockUserId = 'user-credits-test-id';
+    beforeEach(()=>{
+        jest.clearAllMocks();
+    });
+    it('should return user credits successfully', async ()=>{
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId,
+                name: 'Test User',
+                email: 'test@example.com'
+            },
+            expires: 'some-date'
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            id: mockUserId,
+            credits: 100
+        }); // Pickで型を合わせる
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.credits).toBe(100);
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+        expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+            where: {
+                id: mockUserId
+            },
+            select: {
+                credits: true
+            }
+        });
+    });
+    it('should return 0 credits if user credits are zero or negative', async ()=>{
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId
+            }
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+            credits: -50
+        });
+        let response = await (0, _route.GET)();
+        let responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.credits).toBe(0);
+        prismaMock.user.findUnique.mockResolvedValue({
+            credits: 0
+        });
+        response = await (0, _route.GET)();
+        responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.credits).toBe(0);
+    });
+    it('should return 401 if user is not authenticated', async ()=>{
+        getServerSessionMock.mockResolvedValue(null); // No session
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(401);
+        expect(responseBody.error).toBe('認証が必要です');
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+    it('should return 404 if user is not found in DB', async ()=>{
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId
+            }
+        });
+        prismaMock.user.findUnique.mockResolvedValue(null); // User not found
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(404);
+        expect(responseBody.error).toBe('ユーザーが見つかりません');
+    });
+    it('should return 500 if prisma.user.findUnique fails', async ()=>{
+        getServerSessionMock.mockResolvedValue({
+            user: {
+                id: mockUserId
+            }
+        });
+        prismaMock.user.findUnique.mockRejectedValue(new Error('DB query failed'));
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(500);
+        expect(responseBody.error).toBe('クレジット残高の取得に失敗しました');
+    });
+});

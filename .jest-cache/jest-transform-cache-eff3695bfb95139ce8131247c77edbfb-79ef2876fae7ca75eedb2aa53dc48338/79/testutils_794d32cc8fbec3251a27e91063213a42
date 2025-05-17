@@ -1,0 +1,74 @@
+a783de3f76260b11301661cdab4d728c
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    createMockRequest: function() {
+        return createMockRequest;
+    },
+    createMockResponse: function() {
+        return createMockResponse;
+    },
+    mockFs: function() {
+        return mockFs;
+    },
+    mockPrisma: function() {
+        return mockPrisma;
+    }
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _fs = /*#__PURE__*/ _interop_require_default._(require("fs"));
+const _server = require("next/server");
+const mockPrisma = {
+    user: {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn()
+    },
+    file: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn()
+    },
+    translationHistory: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn()
+    },
+    $executeRaw: jest.fn(),
+    $queryRaw: jest.fn()
+};
+const mockFs = {
+    ..._fs.default,
+    createReadStream: jest.fn(),
+    existsSync: jest.fn(),
+    promises: {
+        ..._fs.default.promises,
+        readFile: jest.fn(),
+        writeFile: jest.fn(),
+        unlink: jest.fn()
+    }
+};
+const createMockRequest = (method, body, headers)=>{
+    const req = new _server.NextRequest(new URL('http://localhost:3000'), {
+        method,
+        body: body ? JSON.stringify(body) : undefined,
+        headers
+    });
+    return req;
+};
+const createMockResponse = ()=>{
+    return {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+    };
+};

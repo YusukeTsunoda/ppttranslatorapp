@@ -1,0 +1,90 @@
+ed8cfaea926d7d87527d265e2d69f07a
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+const _useIntersectionObserver = require("@/lib/hooks/useIntersectionObserver");
+// IntersectionObserverのモック
+const mockObserve = jest.fn();
+const mockDisconnect = jest.fn();
+const mockIntersectionObserver = jest.fn(()=>({
+        observe: mockObserve,
+        disconnect: mockDisconnect,
+        unobserve: jest.fn(),
+        takeRecords: jest.fn(()=>[]),
+        root: null,
+        rootMargin: '',
+        thresholds: []
+    }));
+// グローバルにIntersectionObserverをモック
+global.IntersectionObserver = mockIntersectionObserver;
+describe('useIntersectionObserver', ()=>{
+    beforeEach(()=>{
+        jest.clearAllMocks();
+    });
+    it('要素が存在する場合、IntersectionObserverを初期化して監視する', ()=>{
+        // モック要素の作成
+        const mockRef = {
+            current: document.createElement('div')
+        };
+        const mockCallback = jest.fn();
+        const mockOptions = {
+            rootMargin: '10px'
+        };
+        // フックをレンダリング
+        (0, _react1.renderHook)(()=>(0, _useIntersectionObserver.useIntersectionObserver)(mockRef, mockCallback, mockOptions));
+        // IntersectionObserverが正しく初期化されたか確認
+        expect(mockIntersectionObserver).toHaveBeenCalledWith(mockCallback, mockOptions);
+        // 要素が監視対象に追加されたか確認
+        expect(mockObserve).toHaveBeenCalledWith(mockRef.current);
+    });
+    it('要素が存在しない場合、IntersectionObserverを初期化しない', ()=>{
+        // nullの参照を作成
+        const mockRef = {
+            current: null
+        };
+        const mockCallback = jest.fn();
+        // フックをレンダリング
+        (0, _react1.renderHook)(()=>(0, _useIntersectionObserver.useIntersectionObserver)(mockRef, mockCallback));
+        // IntersectionObserverが初期化されていないことを確認
+        expect(mockIntersectionObserver).not.toHaveBeenCalled();
+        expect(mockObserve).not.toHaveBeenCalled();
+    });
+    it('アンマウント時にIntersectionObserverを切断する', ()=>{
+        // モック要素の作成
+        const mockRef = {
+            current: document.createElement('div')
+        };
+        const mockCallback = jest.fn();
+        // フックをレンダリングして解除
+        const { unmount } = (0, _react1.renderHook)(()=>(0, _useIntersectionObserver.useIntersectionObserver)(mockRef, mockCallback));
+        unmount();
+        // disconnectが呼ばれたことを確認
+        expect(mockDisconnect).toHaveBeenCalled();
+    });
+    it('依存配列の値が変更された場合、IntersectionObserverを再初期化する', ()=>{
+        // モック要素の作成
+        const mockRef = {
+            current: document.createElement('div')
+        };
+        const mockCallback1 = jest.fn();
+        const mockCallback2 = jest.fn();
+        // 初回レンダリング
+        const { rerender } = (0, _react1.renderHook)(({ callback })=>(0, _useIntersectionObserver.useIntersectionObserver)(mockRef, callback), {
+            initialProps: {
+                callback: mockCallback1
+            }
+        });
+        // 再レンダリング（コールバックを変更）
+        rerender({
+            callback: mockCallback2
+        });
+        // IntersectionObserverが2回初期化されたことを確認
+        expect(mockIntersectionObserver).toHaveBeenCalledTimes(2);
+        expect(mockDisconnect).toHaveBeenCalledTimes(1);
+        expect(mockObserve).toHaveBeenCalledTimes(2);
+    });
+});

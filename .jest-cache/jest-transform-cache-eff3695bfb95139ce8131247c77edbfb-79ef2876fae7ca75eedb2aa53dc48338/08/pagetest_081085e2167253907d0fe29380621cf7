@@ -1,0 +1,460 @@
+c419a72f22bc712556e89aede5b1dbe7
+/// <reference path="../../jest.d.ts" />
+"use strict";
+// モック
+jest.mock('next/navigation', ()=>({
+        useRouter: jest.fn(),
+        usePathname: jest.fn().mockReturnValue('/translate'),
+        useSearchParams: jest.fn().mockReturnValue(new URLSearchParams())
+    }));
+jest.mock('next-auth/react', ()=>({
+        useSession: jest.fn()
+    }));
+jest.mock('@/components/ui/use-toast', ()=>{
+    const mockToasts = [];
+    return {
+        useToast: jest.fn().mockReturnValue({
+            toasts: mockToasts,
+            toast: jest.fn(),
+            dismiss: jest.fn()
+        }),
+        toast: jest.fn()
+    };
+});
+// FileUploadComponentのモック
+jest.mock('@/app/(dashboard)/translate/components/FileUpload', ()=>({
+        FileUploadComponent: ({ onUploadComplete })=>/*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                "data-testid": "file-upload-component",
+                children: [
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("input", {
+                        type: "file",
+                        "data-testid": "mock-file-input",
+                        onChange: (e)=>e.target.files && onUploadComplete(e.target.files[0])
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                        onClick: ()=>{
+                            const file = new File([
+                                'dummy content'
+                            ], 'test.pptx', {
+                                type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                            });
+                            onUploadComplete(file);
+                        },
+                        "data-testid": "mock-upload-button",
+                        children: "ファイルをアップロード"
+                    })
+                ]
+            })
+    }));
+// PreviewSectionComponentのモック
+jest.mock('@/app/(dashboard)/translate/components/PreviewSection', ()=>({
+        PreviewSectionComponent: ({ currentSlide, slides, onSlideChange, onTextSelect, onTextHover })=>/*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                "data-testid": "preview-section-component",
+                children: [
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                        "data-testid": "current-slide",
+                        children: currentSlide
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                        "data-testid": "slides-count",
+                        children: slides.length
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                        onClick: ()=>onSlideChange(currentSlide + 1),
+                        "data-testid": "next-slide-button",
+                        children: "次のスライド"
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                        onClick: ()=>onSlideChange(currentSlide - 1),
+                        "data-testid": "prev-slide-button",
+                        children: "前のスライド"
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                        onClick: ()=>onTextSelect(0),
+                        "data-testid": "select-text-button",
+                        children: "テキスト選択"
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                        onClick: ()=>onTextHover(0),
+                        "data-testid": "hover-text-button",
+                        children: "テキストホバー"
+                    })
+                ]
+            })
+    }));
+// swrのモック
+jest.mock('swr', ()=>({
+        __esModule: true,
+        default: jest.fn().mockImplementation(()=>({
+                data: null,
+                error: null,
+                mutate: jest.fn(),
+                isValidating: false,
+                isLoading: false
+            }))
+    }));
+// セッションモック
+jest.mock('@/lib/auth/session', ()=>({
+        getSession: jest.fn().mockResolvedValue({
+            user: {
+                id: '123',
+                email: 'test@example.com'
+            },
+            expires: new Date().toISOString()
+        }),
+        signOut: jest.fn()
+    }));
+// 翻訳サービスのモック
+jest.mock('@/lib/translation/translation-service', ()=>{
+    return {
+        translatePPTXSlides: jest.fn().mockResolvedValue({
+            texts: [
+                {
+                    id: '1',
+                    text: 'サンプルテキスト1',
+                    translation: 'Sample Text 1'
+                },
+                {
+                    id: '2',
+                    text: 'サンプルテキスト2',
+                    translation: 'Sample Text 2'
+                }
+            ]
+        })
+    };
+});
+// 他のモック
+jest.mock('next/image', ()=>({
+        __esModule: true,
+        default: (props)=>/*#__PURE__*/ (0, _jsxruntime.jsx)("img", {
+                ...props
+            })
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _interop_require_wildcard = require("@swc/helpers/_/_interop_require_wildcard");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_wildcard._(require("react"));
+const _react1 = require("@testing-library/react");
+const _page = /*#__PURE__*/ _interop_require_default._(require("@/app/(dashboard)/translate/page"));
+require("@testing-library/jest-dom");
+const _react2 = require("next-auth/react");
+const _navigation = require("next/navigation");
+const _userevent = /*#__PURE__*/ _interop_require_default._(require("@testing-library/user-event"));
+// fetchのモック
+global.fetch = jest.fn().mockImplementation((url)=>{
+    if (typeof url === 'string' && url.includes('/api/slides')) {
+        return Promise.resolve({
+            ok: true,
+            json: ()=>Promise.resolve({
+                    slides: [
+                        {
+                            id: '1',
+                            imageUrl: '/test-image.png',
+                            texts: [
+                                {
+                                    id: '1',
+                                    text: 'サンプルテキスト1',
+                                    rect: {
+                                        x: 100,
+                                        y: 100,
+                                        width: 200,
+                                        height: 50
+                                    }
+                                },
+                                {
+                                    id: '2',
+                                    text: 'サンプルテキスト2',
+                                    rect: {
+                                        x: 100,
+                                        y: 200,
+                                        width: 200,
+                                        height: 50
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            id: '2',
+                            imageUrl: '/test-image2.png',
+                            texts: [
+                                {
+                                    id: '3',
+                                    text: 'サンプルテキスト3',
+                                    rect: {
+                                        x: 100,
+                                        y: 100,
+                                        width: 200,
+                                        height: 50
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                })
+        });
+    }
+    return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: ()=>Promise.resolve({
+                error: 'Not found'
+            })
+    });
+});
+describe('TranslatePage', ()=>{
+    const mockRouter = {
+        push: jest.fn(),
+        prefetch: jest.fn(),
+        replace: jest.fn()
+    };
+    const mockSession = {
+        data: {
+            user: {
+                name: 'Test User',
+                email: 'test@example.com'
+            },
+            expires: '2023-01-01'
+        },
+        status: 'authenticated'
+    };
+    beforeEach(()=>{
+        jest.clearAllMocks();
+        _navigation.useRouter.mockReturnValue(mockRouter);
+        _react2.useSession.mockReturnValue(mockSession);
+    });
+    it.skip('ページが正しくレンダリングされること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        expect(_react1.screen.getByText('PowerPointファイルをアップロード')).toBeInTheDocument();
+        expect(_react1.screen.getByText('または、ここにファイルをドロップ')).toBeInTheDocument();
+    });
+    it.skip('ファイルがアップロードされたときにAPIが呼ばれること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        await (0, _react1.waitFor)(()=>{
+            expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/slides'), expect.any(Object));
+        });
+    });
+    it.skip('アップロード後にスライドが表示されること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        await (0, _react1.waitFor)(()=>{
+            expect(_react1.screen.getByText('プレビュー')).toBeInTheDocument();
+            expect(_react1.screen.getByText('1 / 2')).toBeInTheDocument();
+        });
+    });
+    it.skip('翻訳言語を選択できること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        // 言語選択が表示される
+        const languageSelect = _react1.screen.getByRole('combobox');
+        expect(languageSelect).toBeInTheDocument();
+    });
+    it.skip('翻訳ボタンが表示され、クリックするとAPIが呼ばれること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        await (0, _react1.waitFor)(()=>{
+            const translateButton = _react1.screen.getByRole('button', {
+                name: /翻訳開始/i
+            });
+            expect(translateButton).toBeInTheDocument();
+        });
+    });
+    it('エラー発生時にエラーメッセージが表示されること', async ()=>{
+        // fetchをオーバーライドしてエラーを返すようにする
+        global.fetch = jest.fn().mockImplementation(()=>Promise.resolve({
+                ok: false,
+                status: 500,
+                json: ()=>Promise.resolve({
+                        error: 'サーバーエラー'
+                    })
+            }));
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        // エラー処理はuseToastを使って行われるのでモックが呼ばれたことを確認
+        expect(global.fetch).toHaveBeenCalled();
+    });
+    it.skip('認証が必要な場合にログインページにリダイレクトされること', async ()=>{
+        // セッションをnullに設定
+        require('@/lib/auth/session').getSession.mockResolvedValueOnce(null);
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        // リダイレクトが呼ばれたことを確認
+        expect(mockRouter.replace).toHaveBeenCalledWith('/signin?callbackUrl=/translate');
+    });
+    it.skip('スライドの切り替えができること', async ()=>{
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        await (0, _react1.waitFor)(()=>{
+            expect(_react1.screen.getByText('1 / 2')).toBeInTheDocument();
+        });
+        // 次のスライドボタンをクリック
+        const nextButton = _react1.screen.getByRole('button', {
+            name: ''
+        }); // アイコンのみのボタン
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.click(nextButton);
+        });
+    });
+    it.skip('翻訳中のローディング状態が表示されること', async ()=>{
+        const user = _userevent.default.setup();
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        // 翻訳ボタンを取得
+        const translateButton = await _react1.screen.findByRole('button', {
+            name: /翻訳開始/i
+        });
+        // ボタンをクリック
+        await (0, _react.act)(async ()=>{
+            await user.click(translateButton);
+        });
+    });
+    it.skip('翻訳結果が表示されること', async ()=>{
+        const user = _userevent.default.setup();
+        await (0, _react.act)(async ()=>{
+            (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_page.default, {}));
+        });
+        const file = new File([
+            'dummy content'
+        ], 'test.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        });
+        const fileInput = _react1.screen.getByTestId('mock-file-input');
+        await (0, _react.act)(async ()=>{
+            _react1.fireEvent.change(fileInput, {
+                target: {
+                    files: [
+                        file
+                    ]
+                }
+            });
+        });
+        // 翻訳ボタンを取得
+        const translateButton = await _react1.screen.findByRole('button', {
+            name: /翻訳開始/i
+        });
+        // ボタンをクリック
+        await (0, _react.act)(async ()=>{
+            await user.click(translateButton);
+        });
+        // 翻訳サービスが呼ばれたことを確認
+        expect(require('@/lib/translation/translation-service').translatePPTXSlides).toHaveBeenCalled();
+    });
+});

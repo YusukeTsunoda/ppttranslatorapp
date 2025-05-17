@@ -1,0 +1,201 @@
+7e142e0de44b5da40de3bf8865c35660
+/// <reference path="../../../jest.d.ts" />
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+require("@testing-library/jest-dom");
+const _TextList = /*#__PURE__*/ _interop_require_default._(require("@/app/(dashboard)/translate/components/TextList"));
+// モックデータ
+const mockTexts = [
+    {
+        id: '1',
+        text: 'Hello world',
+        position: {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50
+        }
+    },
+    {
+        id: '2',
+        text: 'Welcome to testing',
+        position: {
+            x: 0,
+            y: 100,
+            width: 100,
+            height: 50
+        }
+    },
+    {
+        id: '3',
+        text: 'Testing is important',
+        position: {
+            x: 0,
+            y: 200,
+            width: 100,
+            height: 50
+        }
+    }
+];
+const mockTranslations = {
+    '1': 'こんにちは世界',
+    '2': 'テストへようこそ'
+};
+describe('TextList', ()=>{
+    it('テキストリストを表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        expect(_react1.screen.getByText('Hello world')).toBeInTheDocument();
+        expect(_react1.screen.getByText('Welcome to testing')).toBeInTheDocument();
+        expect(_react1.screen.getByText('Testing is important')).toBeInTheDocument();
+    });
+    it('テキスト選択コールバックが機能する', ()=>{
+        const handleSelectText = jest.fn();
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: handleSelectText,
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        _react1.fireEvent.click(_react1.screen.getByText('Hello world'));
+        expect(handleSelectText).toHaveBeenCalledWith('1');
+    });
+    it('選択されたテキストにselectedクラスが付与される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: "2",
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        const selectedItem = _react1.screen.getByText('Welcome to testing').closest('li');
+        expect(selectedItem).toHaveClass('selected');
+    });
+    it('テキストホバーコールバックが機能する', ()=>{
+        const handleHoverText = jest.fn();
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: handleHoverText,
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        _react1.fireEvent.mouseEnter(_react1.screen.getByText('Hello world'));
+        expect(handleHoverText).toHaveBeenCalledWith('1');
+        _react1.fireEvent.mouseLeave(_react1.screen.getByText('Hello world'));
+        expect(handleHoverText).toHaveBeenCalledWith(null);
+    });
+    it('検索語に基づいてテキストをフィルタリングする', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "world",
+            hideTranslated: false,
+            translations: {}
+        }));
+        expect(_react1.screen.getByText('Hello world')).toBeInTheDocument();
+        expect(_react1.screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+        expect(_react1.screen.queryByText('Testing is important')).not.toBeInTheDocument();
+    });
+    it('翻訳済みのテキストを非表示にする', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: true,
+            translations: mockTranslations
+        }));
+        expect(_react1.screen.queryByText('Hello world')).not.toBeInTheDocument();
+        expect(_react1.screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+        expect(_react1.screen.getByText('Testing is important')).toBeInTheDocument();
+    });
+    it('翻訳情報を表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: mockTranslations
+        }));
+        expect(_react1.screen.getByText('こんにちは世界')).toBeInTheDocument();
+        expect(_react1.screen.getByText('テストへようこそ')).toBeInTheDocument();
+    });
+    it('空のテキストリストを適切に処理する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: [],
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        expect(_react1.screen.getByText('テキストが見つかりません')).toBeInTheDocument();
+    });
+    it('大文字小文字を区別せずに検索する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "WORLD",
+            hideTranslated: false,
+            translations: {}
+        }));
+        expect(_react1.screen.getByText('Hello world')).toBeInTheDocument();
+        expect(_react1.screen.queryByText('Welcome to testing')).not.toBeInTheDocument();
+    });
+    it('検索結果が空の場合に適切なメッセージを表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "xyz123",
+            hideTranslated: false,
+            translations: {}
+        }));
+        expect(_react1.screen.getByText('検索結果がありません')).toBeInTheDocument();
+    });
+    it('正しい順序でテキストを表示する', ()=>{
+        const { container } = (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(_TextList.default, {
+            texts: mockTexts,
+            onSelectText: ()=>{},
+            onHoverText: ()=>{},
+            selectedTextId: null,
+            searchText: "",
+            hideTranslated: false,
+            translations: {}
+        }));
+        const listItems = container.querySelectorAll('li');
+        expect(listItems[0].textContent).toContain('Hello world');
+        expect(listItems[1].textContent).toContain('Welcome to testing');
+        expect(listItems[2].textContent).toContain('Testing is important');
+    });
+});

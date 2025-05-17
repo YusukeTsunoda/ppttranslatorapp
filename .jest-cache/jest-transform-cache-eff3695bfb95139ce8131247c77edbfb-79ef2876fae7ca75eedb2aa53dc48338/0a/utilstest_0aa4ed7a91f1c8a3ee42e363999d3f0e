@@ -1,0 +1,268 @@
+f8511e41db3daacbac27fe8a6da666b0
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _utils = require("@/lib/translation/utils");
+(0, _globals.describe)('Translation Utilities', ()=>{
+    (0, _globals.describe)('cleanTranslatedText', ()=>{
+        (0, _globals.it)('余分なプレフィックスを削除する', ()=>{
+            const inputs = [
+                'Translation: Hello',
+                'Translated text: Hello',
+                'The translation is: Hello',
+                'In English: Hello',
+                'In Japanese: こんにちは',
+                'The text "Hello" translates to: こんにちは'
+            ];
+            inputs.forEach((input)=>{
+                const cleaned = (0, _utils.cleanTranslatedText)(input);
+                (0, _globals.expect)(cleaned).toBe('Hello');
+            });
+        });
+        (0, _globals.it)('引用符を適切に処理する', ()=>{
+            const inputs = [
+                '"Hello"',
+                '"こんにちは"',
+                'The text "Hello" in English is: "World"'
+            ];
+            const expected = [
+                'Hello',
+                'こんにちは',
+                'World'
+            ];
+            inputs.forEach((input, index)=>{
+                const cleaned = (0, _utils.cleanTranslatedText)(input);
+                (0, _globals.expect)(cleaned).toBe(expected[index]);
+            });
+        });
+        (0, _globals.it)('空白を適切に処理する', ()=>{
+            const inputs = [
+                '  Hello  ',
+                '\nHello\n',
+                '\tHello\t'
+            ];
+            inputs.forEach((input)=>{
+                const cleaned = (0, _utils.cleanTranslatedText)(input);
+                (0, _globals.expect)(cleaned).toBe('Hello');
+            });
+        });
+    });
+    (0, _globals.describe)('validateTranslationRequest', ()=>{
+        (0, _globals.it)('有効なリクエストを検証する', ()=>{
+            const validRequest = {
+                texts: [
+                    'Hello'
+                ],
+                sourceLanguage: 'en',
+                targetLanguage: 'ja',
+                fileId: 'test-file-id',
+                slides: [
+                    {
+                        index: 0,
+                        texts: [
+                            {
+                                text: 'Hello',
+                                index: 0
+                            }
+                        ]
+                    }
+                ]
+            };
+            const result = (0, _utils.validateTranslationRequest)(validRequest);
+            (0, _globals.expect)(result.isValid).toBe(true);
+            (0, _globals.expect)(result.error).toBeNull();
+        });
+        (0, _globals.it)('必須フィールドが欠けている場合はエラーを返す', ()=>{
+            const invalidRequests = [
+                {
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    targetLanguage: 'ja'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja'
+                }
+            ];
+            invalidRequests.forEach((request)=>{
+                const result = (0, _utils.validateTranslationRequest)(request);
+                (0, _globals.expect)(result.isValid).toBe(false);
+                (0, _globals.expect)(result.error).toBeDefined();
+            });
+        });
+        (0, _globals.it)('不正なデータ型の場合はエラーを返す', ()=>{
+            const invalidRequests = [
+                {
+                    texts: 'Hello',
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 123,
+                    targetLanguage: 'ja',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: true,
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja',
+                    fileId: 123
+                }
+            ];
+            invalidRequests.forEach((request)=>{
+                const result = (0, _utils.validateTranslationRequest)(request);
+                (0, _globals.expect)(result.isValid).toBe(false);
+                (0, _globals.expect)(result.error).toBeDefined();
+            });
+        });
+        (0, _globals.it)('空の配列や文字列の場合はエラーを返す', ()=>{
+            const invalidRequests = [
+                {
+                    texts: [],
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        ''
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: '',
+                    targetLanguage: 'ja',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: '',
+                    fileId: 'test'
+                },
+                {
+                    texts: [
+                        'Hello'
+                    ],
+                    sourceLanguage: 'en',
+                    targetLanguage: 'ja',
+                    fileId: ''
+                }
+            ];
+            invalidRequests.forEach((request)=>{
+                const result = (0, _utils.validateTranslationRequest)(request);
+                (0, _globals.expect)(result.isValid).toBe(false);
+                (0, _globals.expect)(result.error).toBeDefined();
+            });
+        });
+    });
+    (0, _globals.describe)('preprocessText', ()=>{
+        (0, _globals.it)('前後の空白を削除する', ()=>{
+            const inputs = [
+                '  Hello  ',
+                '\tHello\t',
+                '\nHello\n'
+            ];
+            inputs.forEach((input)=>{
+                const processed = (0, _utils.preprocessText)(input);
+                (0, _globals.expect)(processed).toBe('Hello');
+            });
+        });
+        (0, _globals.it)('連続する空白を1つにまとめる', ()=>{
+            const input = 'Hello    World   !';
+            const processed = (0, _utils.preprocessText)(input);
+            (0, _globals.expect)(processed).toBe('Hello World !');
+        });
+        (0, _globals.it)('連続する改行を1つにまとめる', ()=>{
+            const input = 'Hello\n\n\nWorld\r\n\r\n!';
+            const processed = (0, _utils.preprocessText)(input);
+            (0, _globals.expect)(processed).toBe('Hello\nWorld\n!');
+        });
+        (0, _globals.it)('複合的な空白と改行を処理する', ()=>{
+            const input = '  Hello  \n\n  World  \r\n\r\n  !  ';
+            const processed = (0, _utils.preprocessText)(input);
+            (0, _globals.expect)(processed).toBe('Hello\nWorld\n!');
+        });
+    });
+    (0, _globals.describe)('generateTranslationPrompt', ()=>{
+        (0, _globals.it)('基本的な翻訳プロンプトを生成する', ()=>{
+            const text = 'Hello World';
+            const sourceLang = 'en';
+            const targetLang = 'ja';
+            const prompt = (0, _utils.generateTranslationPrompt)(text, sourceLang, targetLang);
+            (0, _globals.expect)(prompt).toContain('テキスト: "Hello World"');
+            (0, _globals.expect)(prompt).toContain('enからjaに翻訳');
+            (0, _globals.expect)(prompt).toContain('自然なjaに翻訳');
+        });
+        (0, _globals.it)('特殊文字を含むテキストのプロンプトを生成する', ()=>{
+            const text = 'Hello\nWorld!@#$%';
+            const sourceLang = 'en';
+            const targetLang = 'ja';
+            const prompt = (0, _utils.generateTranslationPrompt)(text, sourceLang, targetLang);
+            (0, _globals.expect)(prompt).toContain('テキスト: "Hello\nWorld!@#$%"');
+            (0, _globals.expect)(prompt).toContain('フォーマットや記号は保持');
+        });
+        (0, _globals.it)('異なる言語ペアのプロンプトを生成する', ()=>{
+            const testCases = [
+                {
+                    text: 'Hello',
+                    source: 'en',
+                    target: 'ja'
+                },
+                {
+                    text: 'Bonjour',
+                    source: 'fr',
+                    target: 'en'
+                },
+                {
+                    text: 'こんにちは',
+                    source: 'ja',
+                    target: 'en'
+                }
+            ];
+            testCases.forEach(({ text, source, target })=>{
+                const prompt = (0, _utils.generateTranslationPrompt)(text, source, target);
+                (0, _globals.expect)(prompt).toContain(`${source}から${target}に翻訳`);
+                (0, _globals.expect)(prompt).toContain(`自然な${target}に翻訳`);
+                (0, _globals.expect)(prompt).toContain(`テキスト: "${text}"`);
+            });
+        });
+    });
+});

@@ -1,0 +1,80 @@
+9fbb47ccc43b1e69509e27255ac74349
+/// <reference path="../../../jest.d.ts" />
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+require("@testing-library/jest-dom");
+// モックデータ
+const mockProgressData = {
+    totalTexts: 10,
+    translatedTexts: {
+        en: 5,
+        fr: 3,
+        de: 0
+    }
+};
+// TranslationProgressコンポーネントを定義
+const TranslationProgress = ({ progressData, selectedLanguage })=>/*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+        "data-testid": "translation-progress",
+        children: [
+            /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                "data-testid": "total-texts",
+                children: progressData.totalTexts
+            }),
+            /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                "data-testid": "translated-texts",
+                children: selectedLanguage ? progressData.translatedTexts[selectedLanguage] || 0 : 0
+            }),
+            /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                "data-testid": "progress-percentage",
+                children: [
+                    selectedLanguage && progressData.totalTexts > 0 ? Math.round((progressData.translatedTexts[selectedLanguage] || 0) / progressData.totalTexts * 100) : 0,
+                    "%"
+                ]
+            })
+        ]
+    });
+describe('TranslationProgress', ()=>{
+    it('翻訳の進捗状況を正しく表示する（英語）', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(TranslationProgress, {
+            progressData: mockProgressData,
+            selectedLanguage: "en"
+        }));
+        expect(_react1.screen.getByTestId('total-texts')).toHaveTextContent('10');
+        expect(_react1.screen.getByTestId('translated-texts')).toHaveTextContent('5');
+        expect(_react1.screen.getByTestId('progress-percentage')).toHaveTextContent('50%');
+    });
+    it('翻訳の進捗状況を正しく表示する（フランス語）', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(TranslationProgress, {
+            progressData: mockProgressData,
+            selectedLanguage: "fr"
+        }));
+        expect(_react1.screen.getByTestId('translated-texts')).toHaveTextContent('3');
+        expect(_react1.screen.getByTestId('progress-percentage')).toHaveTextContent('30%');
+    });
+    it('言語が設定されていない場合は0を表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(TranslationProgress, {
+            progressData: mockProgressData,
+            selectedLanguage: "ja" // 存在しない言語
+        }));
+        expect(_react1.screen.getByTestId('translated-texts')).toHaveTextContent('0');
+        expect(_react1.screen.getByTestId('progress-percentage')).toHaveTextContent('0%');
+    });
+    it('テキストがない場合は0%を表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(TranslationProgress, {
+            progressData: {
+                totalTexts: 0,
+                translatedTexts: {}
+            },
+            selectedLanguage: "en"
+        }));
+        expect(_react1.screen.getByTestId('total-texts')).toHaveTextContent('0');
+        expect(_react1.screen.getByTestId('translated-texts')).toHaveTextContent('0');
+        expect(_react1.screen.getByTestId('progress-percentage')).toHaveTextContent('0%');
+    });
+});

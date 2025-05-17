@@ -1,0 +1,108 @@
+name: 監視・アラート設定
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 6時間ごとに実行
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  health-check:
+    name: アプリケーション健全性チェック
+    runs-on: ubuntu-latest
+    steps:
+      - name: ステージング環境のヘルスチェック
+        uses: jtalk/url-health-check-action@v3
+        with:
+          url: https://ppttranslatorapp-staging.vercel.app/api/health
+          max-attempts: 3
+          retry-delay: 5s
+          retry-all: true
+      
+      - name: 本番環境のヘルスチェック
+        uses: jtalk/url-health-check-action@v3
+        with:
+          url: https://ppttranslatorapp.vercel.app/api/health
+          max-attempts: 3
+          retry-delay: 5s
+          retry-all: true
+      
+      - name: Slackに通知（失敗時のみ）
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: alerts
+          SLACK_COLOR: danger
+          SLACK_TITLE: '🚨 ヘルスチェック失敗'
+          SLACK_MESSAGE: 'アプリケーションのヘルスチェックに失敗しました。緊急対応が必要です。'
+          SLACK_FOOTER: 'PPTXTranslator監視システム'
+
+  performance-check:
+    name: パフォーマンスチェック
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v9
+        with:
+          urls: |
+            https://ppttranslatorapp.vercel.app/
+            https://ppttranslatorapp.vercel.app/translate
+          budgetPath: ./lighthouse-budget.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+        continue-on-error: true
+      
+      - name: パフォーマンスレポート生成
+        run: |
+          echo "## パフォーマンスレポート" > performance-report.md
+          echo "最新のLighthouseスコア:" >> performance-report.md
+          echo "- パフォーマンス: ${{ steps.lighthouse.outputs.performance-score }}" >> performance-report.md
+          echo "- アクセシビリティ: ${{ steps.lighthouse.outputs.accessibility-score }}" >> performance-report.md
+          echo "- ベストプラクティス: ${{ steps.lighthouse.outputs.best-practices-score }}" >> performance-report.md
+          echo "- SEO: ${{ steps.lighthouse.outputs.seo-score }}" >> performance-report.md
+        continue-on-error: true
+      
+      - name: パフォーマンスレポートをSlackに通知
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: performance
+          SLACK_COLOR: good
+          SLACK_TITLE: '📊 パフォーマンスレポート'
+          SLACK_MESSAGE: 'パフォーマンスチェックが完了しました。詳細はGitHub Actionsを確認してください。'
+          SLACK_FOOTER: 'PPTXTranslator監視システム'
+        continue-on-error: true
+
+  error-monitoring:
+    name: エラー監視
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Node.jsセットアップ
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 依存関係インストール
+        run: npm ci
+      
+      - name: Sentryエラーレポート取得
+        run: node scripts/monitoring/get-sentry-errors.js
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        continue-on-error: true
+      
+      - name: エラーレポートをSlackに通知（重大なエラーがある場合のみ）
+        if: env.HAS_CRITICAL_ERRORS == 'true'
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: alerts
+          SLACK_COLOR: danger
+          SLACK_TITLE: '🔥 重大なエラーを検出'
+          SLACK_MESSAGE: '過去24時間に重大なエラーが発生しています。Sentryダッシュボードを確認してください。'
+          SLACK_FOOTER: 'PPTXTranslator監視システム'

@@ -1,0 +1,294 @@
+9004e231c3ba9068d364569885d296f1
+"use strict";
+// モックの設定
+jest.mock('next-auth/react');
+// モック用のルーター
+jest.mock('next/navigation', ()=>({
+        useRouter: ()=>({
+                push: jest.fn()
+            })
+    }));
+// モック用のトースト
+jest.mock('@/components/ui/use-toast', ()=>({
+        toast: jest.fn()
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+const _react2 = require("next-auth/react");
+// モックのセッション管理フック
+const mockUseAuth = ()=>{
+    const [state, setState] = _react.default.useState({
+        isAuthenticated: true,
+        user: {
+            id: 'test-user-id',
+            name: 'Test User',
+            email: 'test@example.com'
+        },
+        loading: false
+    });
+    const login = async (email, password, callbackUrl)=>{
+        try {
+            setState((prev)=>({
+                    ...prev,
+                    loading: true,
+                    error: undefined
+                }));
+            const result = await (0, _react2.signIn)('credentials', {
+                email,
+                password,
+                redirect: false,
+                callbackUrl
+            });
+            if (result?.error) {
+                setState((prev)=>({
+                        ...prev,
+                        loading: false,
+                        error: {
+                            type: 'UNAUTHORIZED',
+                            message: result.error || 'ログインに失敗しました',
+                            timestamp: Date.now()
+                        }
+                    }));
+                return;
+            }
+            setState({
+                isAuthenticated: true,
+                user: {
+                    id: 'test-user-id',
+                    name: 'Test User',
+                    email
+                },
+                loading: false
+            });
+        } catch (error) {
+            setState((prev)=>({
+                    ...prev,
+                    loading: false,
+                    error: {
+                        type: 'NETWORK',
+                        message: error instanceof Error ? error.message : 'ログインに失敗しました',
+                        timestamp: Date.now()
+                    }
+                }));
+        }
+    };
+    const logout = async (callbackUrl)=>{
+        try {
+            setState((prev)=>({
+                    ...prev,
+                    loading: true
+                }));
+            await (0, _react2.signOut)({
+                redirect: false,
+                callbackUrl
+            });
+            setState({
+                isAuthenticated: false,
+                user: null,
+                loading: false
+            });
+        } catch (error) {
+            setState((prev)=>({
+                    ...prev,
+                    loading: false,
+                    error: {
+                        type: 'NETWORK',
+                        message: error instanceof Error ? error.message : 'ログアウトに失敗しました',
+                        timestamp: Date.now()
+                    }
+                }));
+        }
+    };
+    const clearError = ()=>{
+        setState((prev)=>({
+                ...prev,
+                error: undefined
+            }));
+    };
+    return {
+        ...state,
+        login,
+        logout,
+        clearError
+    };
+};
+// モックのセッションプロバイダー
+const MockSessionProvider = ({ children })=>{
+    return /*#__PURE__*/ (0, _jsxruntime.jsx)(_jsxruntime.Fragment, {
+        children: children
+    });
+};
+// セッション有効性チェック関数
+const mockIsSessionValid = (session)=>{
+    if (!session) return false;
+    // セッションの有効期限をチェック
+    if (session.expires) {
+        const expiresDate = new Date(session.expires);
+        if (expiresDate < new Date()) {
+            return false;
+        }
+    }
+    // ユーザー情報の存在をチェック
+    if (!session.user || !session.user.id || !session.user.email) {
+        return false;
+    }
+    return true;
+};
+const mockUseSession = _react2.useSession;
+const mockSignIn = _react2.signIn;
+const mockSignOut = _react2.signOut;
+describe('セッション管理', ()=>{
+    // 各テスト前にモックをリセット
+    beforeEach(()=>{
+        jest.clearAllMocks();
+        mockUseSession.mockReturnValue({
+            data: {
+                user: {
+                    id: 'test-user-id',
+                    name: 'Test User',
+                    email: 'test@example.com'
+                },
+                expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            },
+            status: 'authenticated'
+        });
+        mockSignIn.mockResolvedValue({
+            ok: true,
+            error: null
+        });
+        mockSignOut.mockResolvedValue(true);
+    });
+    describe('useAuth', ()=>{
+        it('認証状態を正しく返す', ()=>{
+            const wrapper = ({ children })=>/*#__PURE__*/ (0, _jsxruntime.jsx)(MockSessionProvider, {
+                    children: children
+                });
+            const { result } = (0, _react1.renderHook)(()=>mockUseAuth(), {
+                wrapper
+            });
+            expect(result.current.isAuthenticated).toBe(true);
+            expect(result.current.user).toEqual({
+                id: 'test-user-id',
+                name: 'Test User',
+                email: 'test@example.com'
+            });
+            expect(result.current.loading).toBe(false);
+            expect(result.current.error).toBeUndefined();
+        });
+        it('ログイン処理を正しく実行する', async ()=>{
+            const wrapper = ({ children })=>/*#__PURE__*/ (0, _jsxruntime.jsx)(MockSessionProvider, {
+                    children: children
+                });
+            const { result } = (0, _react1.renderHook)(()=>mockUseAuth(), {
+                wrapper
+            });
+            await (0, _react1.act)(async ()=>{
+                await result.current.login('test@example.com', 'password123', '/dashboard');
+            });
+            expect(mockSignIn).toHaveBeenCalledWith('credentials', {
+                email: 'test@example.com',
+                password: 'password123',
+                redirect: false,
+                callbackUrl: '/dashboard'
+            });
+            expect(result.current.isAuthenticated).toBe(true);
+            expect(result.current.user).toEqual({
+                id: 'test-user-id',
+                name: 'Test User',
+                email: 'test@example.com'
+            });
+        });
+        it('ログアウト処理を正しく実行する', async ()=>{
+            const wrapper = ({ children })=>/*#__PURE__*/ (0, _jsxruntime.jsx)(MockSessionProvider, {
+                    children: children
+                });
+            const { result } = (0, _react1.renderHook)(()=>mockUseAuth(), {
+                wrapper
+            });
+            await (0, _react1.act)(async ()=>{
+                await result.current.logout('/signin');
+            });
+            expect(mockSignOut).toHaveBeenCalledWith({
+                redirect: false,
+                callbackUrl: '/signin'
+            });
+            expect(result.current.isAuthenticated).toBe(false);
+            expect(result.current.user).toBeNull();
+        });
+        it('ログインエラーを正しく処理する', async ()=>{
+            mockSignIn.mockResolvedValue({
+                ok: false,
+                error: 'Invalid credentials'
+            });
+            const wrapper = ({ children })=>/*#__PURE__*/ (0, _jsxruntime.jsx)(MockSessionProvider, {
+                    children: children
+                });
+            const { result } = (0, _react1.renderHook)(()=>mockUseAuth(), {
+                wrapper
+            });
+            await (0, _react1.act)(async ()=>{
+                await result.current.login('test@example.com', 'wrong-password');
+            });
+            expect(result.current.isAuthenticated).toBe(true);
+            expect(result.current.error).toBeDefined();
+            expect(result.current.error?.type).toBe('UNAUTHORIZED');
+            expect(result.current.error?.message).toBe('Invalid credentials');
+        });
+        it('エラーをクリアする', async ()=>{
+            mockSignIn.mockResolvedValue({
+                ok: false,
+                error: 'Invalid credentials'
+            });
+            const wrapper = ({ children })=>/*#__PURE__*/ (0, _jsxruntime.jsx)(MockSessionProvider, {
+                    children: children
+                });
+            const { result } = (0, _react1.renderHook)(()=>mockUseAuth(), {
+                wrapper
+            });
+            await (0, _react1.act)(async ()=>{
+                await result.current.login('test@example.com', 'wrong-password');
+            });
+            expect(result.current.error).toBeDefined();
+            (0, _react1.act)(()=>{
+                result.current.clearError();
+            });
+            expect(result.current.error).toBeUndefined();
+        });
+    });
+    describe('セッション有効性チェック', ()=>{
+        it('有効なセッションを正しく検証する', ()=>{
+            const validSession = {
+                user: {
+                    id: 'test-user-id',
+                    email: 'test@example.com'
+                },
+                expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            };
+            expect(mockIsSessionValid(validSession)).toBe(true);
+        });
+        it('期限切れのセッションを無効と判定する', ()=>{
+            const expiredSession = {
+                user: {
+                    id: 'test-user-id',
+                    email: 'test@example.com'
+                },
+                expires: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            };
+            expect(mockIsSessionValid(expiredSession)).toBe(false);
+        });
+        it('ユーザー情報がないセッションを無効と判定する', ()=>{
+            const invalidSession = {
+                expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            };
+            expect(mockIsSessionValid(invalidSession)).toBe(false);
+        });
+        it('nullセッションを無効と判定する', ()=>{
+            expect(mockIsSessionValid(null)).toBe(false);
+        });
+    });
+});

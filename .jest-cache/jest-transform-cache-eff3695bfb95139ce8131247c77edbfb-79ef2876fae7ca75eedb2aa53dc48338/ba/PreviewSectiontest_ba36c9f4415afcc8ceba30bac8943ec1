@@ -1,0 +1,181 @@
+e4e588532d2e4e6090f4e31c44f70729
+/// <reference path="../../../jest.d.ts" />
+"use strict";
+// テスト対象のコンポーネントをモック化
+jest.mock('@/app/(dashboard)/translate/components/PreviewSection', ()=>({
+        PreviewSection: ({ slides, currentSlide, onSlideChange, onTextSelect, selectedTextIndex, onTextHover })=>/*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                className: "flex flex-col h-full",
+                children: [
+                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                        className: "flex justify-between items-center mb-4",
+                        children: [
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("h2", {
+                                className: "text-lg font-semibold",
+                                children: "プレビュー"
+                            }),
+                            /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                                className: "flex items-center space-x-2",
+                                children: [
+                                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                                        disabled: currentSlide === 0,
+                                        onClick: ()=>onSlideChange && onSlideChange(currentSlide - 1),
+                                        "aria-label": "前のスライド",
+                                        children: "←"
+                                    }),
+                                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("span", {
+                                        className: "text-sm",
+                                        children: [
+                                            currentSlide + 1,
+                                            " / ",
+                                            slides.length
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0, _jsxruntime.jsx)("button", {
+                                        disabled: currentSlide === slides.length - 1,
+                                        onClick: ()=>onSlideChange && onSlideChange(currentSlide + 1),
+                                        "aria-label": "次のスライド",
+                                        children: "→"
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsxs)("div", {
+                        "data-testid": "slide-preview",
+                        children: [
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("img", {
+                                "data-testid": "slide-image",
+                                src: slides[currentSlide].imageUrl,
+                                alt: `Slide ${currentSlide + 1}`
+                            }),
+                            /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                                children: slides[currentSlide].texts.map((text, i)=>/*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                                        "data-testid": `text-highlight-${i}`,
+                                        onClick: ()=>onTextSelect && onTextSelect(i),
+                                        onMouseEnter: ()=>onTextHover && onTextHover(i),
+                                        onMouseLeave: ()=>onTextHover && onTextHover(null),
+                                        className: selectedTextIndex === i ? 'selected' : ''
+                                    }, text.id))
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0, _jsxruntime.jsx)("div", {
+                        "data-testid": "translation-text"
+                    })
+                ]
+            })
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _interop_require_default = require("@swc/helpers/_/_interop_require_default");
+const _jsxruntime = require("react/jsx-runtime");
+const _react = /*#__PURE__*/ _interop_require_default._(require("react"));
+const _react1 = require("@testing-library/react");
+require("@testing-library/jest-dom");
+// モックデータ
+const mockSlides = [
+    {
+        imageUrl: '/test-image.png',
+        texts: [
+            {
+                id: 'text1',
+                text: 'サンプルテキスト1',
+                position: {
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 50
+                },
+                translations: [
+                    {
+                        language: 'en',
+                        text: 'Sample Text 1'
+                    }
+                ]
+            },
+            {
+                id: 'text2',
+                text: 'サンプルテキスト2',
+                position: {
+                    x: 100,
+                    y: 200,
+                    width: 200,
+                    height: 50
+                },
+                translations: [
+                    {
+                        language: 'en',
+                        text: 'Sample Text 2'
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        imageUrl: '/test-image2.png',
+        texts: [
+            {
+                id: 'text3',
+                text: 'サンプルテキスト3',
+                position: {
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 50
+                },
+                translations: []
+            }
+        ]
+    }
+];
+// コンポーネントの型定義
+const { PreviewSection } = jest.requireMock('@/app/(dashboard)/translate/components/PreviewSection');
+describe('PreviewSection', ()=>{
+    it('スライドプレビューを表示する', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0
+        }));
+        expect(_react1.screen.getByText('プレビュー')).toBeInTheDocument();
+        expect(_react1.screen.getByTestId('slide-image')).toHaveAttribute('src', '/test-image.png');
+        expect(_react1.screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+    it('スライド切り替えボタンが機能する', ()=>{
+        const mockOnSlideChange = jest.fn();
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0,
+            onSlideChange: mockOnSlideChange
+        }));
+        // 次へボタンをクリック
+        const nextButton = _react1.screen.getByLabelText('次のスライド');
+        _react1.fireEvent.click(nextButton);
+        expect(mockOnSlideChange).toHaveBeenCalledWith(1);
+    });
+    it('最初のスライドで前へボタンが無効化される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0
+        }));
+        const prevButton = _react1.screen.getByLabelText('前のスライド');
+        expect(prevButton).toBeDisabled();
+    });
+    it('最後のスライドで次へボタンが無効化される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 1
+        }));
+        const nextButton = _react1.screen.getByLabelText('次のスライド');
+        expect(nextButton).toBeDisabled();
+    });
+    it('テキスト要素がハイライト表示される', ()=>{
+        (0, _react1.render)(/*#__PURE__*/ (0, _jsxruntime.jsx)(PreviewSection, {
+            slides: mockSlides,
+            currentSlide: 0,
+            selectedTextIndex: 0
+        }));
+        const textHighlight = _react1.screen.getByTestId('text-highlight-0');
+        expect(textHighlight).toHaveClass('selected');
+    });
+});

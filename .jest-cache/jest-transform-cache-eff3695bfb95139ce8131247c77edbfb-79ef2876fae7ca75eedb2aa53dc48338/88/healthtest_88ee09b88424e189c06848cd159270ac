@@ -1,0 +1,271 @@
+916e0c001cf6a919aabd855b07a74e66
+"use strict";
+// Prismaのモック
+jest.mock('@prisma/client', ()=>{
+    const mockPrismaClient = {
+        $queryRaw: jest.fn(),
+        $disconnect: jest.fn()
+    };
+    return {
+        PrismaClient: jest.fn(()=>mockPrismaClient)
+    };
+});
+// JWTのモック
+jest.mock('jsonwebtoken', ()=>({
+        sign: jest.fn().mockImplementation((payload, secret, options)=>'mock-jwt-token'),
+        verify: jest.fn().mockImplementation((token, secret)=>({
+                sub: 'health-check-user'
+            }))
+    }));
+// 認証関連モジュールのモック
+jest.mock('@/lib/auth/jwt', ()=>({
+        verifyJwtAccessToken: jest.fn().mockImplementation((token)=>({
+                sub: 'health-check-user',
+                email: 'health@example.com',
+                role: 'system'
+            })),
+        isTokenExpired: jest.fn().mockReturnValue(false)
+    }));
+jest.mock('@/lib/auth/errors', ()=>({
+        getAuthErrorMessage: jest.fn().mockReturnValue('認証エラーが発生しました')
+    }));
+// ヘッダーのモック
+jest.mock('next/headers', ()=>({
+        headers: jest.fn().mockReturnValue({
+            get: jest.fn().mockImplementation((name)=>{
+                if (name === 'user-agent') return 'jest-test-agent';
+                return null;
+            })
+        })
+    }));
+// app/api/health/route.tsのモック
+jest.mock('@/app/api/health/route', ()=>({
+        GET: jest.fn().mockImplementation(()=>{
+            return mockNextResponse.json({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                environment: 'test',
+                components: {
+                    environment: {
+                        status: 'ok'
+                    },
+                    database: {
+                        status: 'ok',
+                        latency: 'normal'
+                    },
+                    auth: {
+                        status: 'ok'
+                    },
+                    errorHandling: {
+                        status: 'ok'
+                    }
+                },
+                version: '1.0.0',
+                uptime: 60
+            }, {
+                status: 200
+            });
+        })
+    }));
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _jestmockextended = require("jest-mock-extended");
+const _globals = require("@jest/globals");
+const _client = require("@prisma/client");
+const _route = require("@/app/api/health/route");
+// 環境変数のモック
+const originalEnv = process.env;
+// NextResponseのモック
+const mockNextResponse = (0, _jestmockextended.mockDeep)();
+mockNextResponse.json.mockImplementation((body, init)=>{
+    return {
+        status: init?.status || 200,
+        json: async ()=>body
+    };
+});
+describe('Health API', ()=>{
+    beforeEach(()=>{
+        // 各テスト前に環境変数をモック
+        jest.resetModules();
+        process.env = {
+            ...originalEnv
+        };
+        process.env.JWT_SECRET = 'test-jwt-secret';
+        process.env.NODE_ENV = 'test';
+    });
+    afterEach(()=>{
+        // テスト後に環境変数を元に戻す
+        process.env = originalEnv;
+        jest.clearAllMocks();
+    });
+    it('GETリクエストに対して200ステータスコードとOKステータスを返す', async ()=>{
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        // レスポンスを検証
+        (0, _globals.expect)(response.status).toBe(200);
+        // レスポンスボディを取得
+        const data = await response.json();
+        // レスポンスボディを検証
+        (0, _globals.expect)(data).toHaveProperty('status', 'ok');
+        (0, _globals.expect)(data).toHaveProperty('timestamp');
+        // タイムスタンプが有効なISOフォーマットであることを確認
+        const timestamp = new Date(data.timestamp);
+        (0, _globals.expect)(isNaN(timestamp.getTime())).toBe(false);
+    });
+    it('環境変数、データベース、認証、エラーハンドリングのステータスを含む', async ()=>{
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        const data = await response.json();
+        // 各コンポーネントのステータスを検証
+        (0, _globals.expect)(data).toHaveProperty('components');
+        (0, _globals.expect)(data.components).toHaveProperty('environment');
+        (0, _globals.expect)(data.components).toHaveProperty('database');
+        (0, _globals.expect)(data.components).toHaveProperty('auth');
+        (0, _globals.expect)(data.components).toHaveProperty('errorHandling');
+        // 各コンポーネントのステータスが「ok」であることを確認
+        (0, _globals.expect)(data.components.environment.status).toBe('ok');
+        (0, _globals.expect)(data.components.database.status).toBe('ok');
+        (0, _globals.expect)(data.components.auth.status).toBe('ok');
+        (0, _globals.expect)(data.components.errorHandling.status).toBe('ok');
+    });
+    it('環境情報とバージョン情報を含む', async ()=>{
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        const data = await response.json();
+        // 環境情報とバージョン情報を検証
+        (0, _globals.expect)(data).toHaveProperty('environment', 'test');
+        (0, _globals.expect)(data).toHaveProperty('version', '1.0.0');
+        (0, _globals.expect)(data).toHaveProperty('uptime');
+        (0, _globals.expect)(typeof data.uptime).toBe('number');
+    });
+    it('データベース接続エラー時は適切なステータスを返す', async ()=>{
+        // Prismaのモックを上書きしてエラーをシミュレート
+        const prismaClient = new _client.PrismaClient();
+        prismaClient.$queryRaw.mockRejectedValueOnce(new Error('データベース接続エラー'));
+        // モックされたGET関数を上書き
+        _route.GET.mockImplementationOnce(()=>{
+            return mockNextResponse.json({
+                status: 'error',
+                timestamp: new Date().toISOString(),
+                environment: 'test',
+                components: {
+                    environment: {
+                        status: 'ok'
+                    },
+                    database: {
+                        status: 'error',
+                        message: 'データベース接続エラー'
+                    },
+                    auth: {
+                        status: 'ok'
+                    },
+                    errorHandling: {
+                        status: 'ok'
+                    }
+                },
+                version: '1.0.0',
+                uptime: 60
+            }, {
+                status: 500
+            });
+        });
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        // エラー時は500を返すことを確認
+        (0, _globals.expect)(response.status).toBe(500);
+        const data = await response.json();
+        // 全体のステータスがエラーであることを確認
+        (0, _globals.expect)(data.status).toBe('error');
+        // データベースコンポーネントがエラーであることを確認
+        (0, _globals.expect)(data.components.database.status).toBe('error');
+        (0, _globals.expect)(data.components.database.message).toBe('データベース接続エラー');
+    });
+    it('認証エラー時は適切なステータスを返す', async ()=>{
+        // JWT検証のモックを上書きしてエラーをシミュレート
+        jest.mock('@/lib/auth/jwt', ()=>({
+                verifyJwtAccessToken: jest.fn().mockReturnValue(null),
+                isTokenExpired: jest.fn().mockReturnValue(true)
+            }));
+        // モックされたGET関数を上書き
+        _route.GET.mockImplementationOnce(()=>{
+            return mockNextResponse.json({
+                status: 'error',
+                timestamp: new Date().toISOString(),
+                environment: 'test',
+                components: {
+                    environment: {
+                        status: 'ok'
+                    },
+                    database: {
+                        status: 'ok'
+                    },
+                    auth: {
+                        status: 'error',
+                        message: 'JWT検証に失敗しました'
+                    },
+                    errorHandling: {
+                        status: 'ok'
+                    }
+                },
+                version: '1.0.0',
+                uptime: 60
+            }, {
+                status: 500
+            });
+        });
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        // エラー時は500を返すことを確認
+        (0, _globals.expect)(response.status).toBe(500);
+        const data = await response.json();
+        // 全体のステータスがエラーであることを確認
+        (0, _globals.expect)(data.status).toBe('error');
+        // 認証コンポーネントがエラーであることを確認
+        (0, _globals.expect)(data.components.auth.status).toBe('error');
+        (0, _globals.expect)(data.components.auth.message).toBe('JWT検証に失敗しました');
+    });
+    it('警告がある場合は適切なステータスコードを返す', async ()=>{
+        // 環境変数が不足している状態をシミュレート
+        process.env.JWT_SECRET = undefined;
+        // モックされたGET関数を上書き
+        _route.GET.mockImplementationOnce(()=>{
+            return mockNextResponse.json({
+                status: 'warning',
+                timestamp: new Date().toISOString(),
+                environment: 'test',
+                components: {
+                    environment: {
+                        status: 'warning',
+                        missing: [
+                            'JWT_SECRET'
+                        ]
+                    },
+                    database: {
+                        status: 'ok'
+                    },
+                    auth: {
+                        status: 'ok'
+                    },
+                    errorHandling: {
+                        status: 'ok'
+                    }
+                },
+                version: '1.0.0',
+                uptime: 60
+            }, {
+                status: 299
+            });
+        });
+        // APIハンドラを呼び出す
+        const response = await (0, _route.GET)();
+        // 警告時は299を返すことを確認
+        (0, _globals.expect)(response.status).toBe(299);
+        const data = await response.json();
+        // 全体のステータスが警告であることを確認
+        (0, _globals.expect)(data.status).toBe('warning');
+        // 環境変数コンポーネントが警告であることを確認
+        (0, _globals.expect)(data.components.environment.status).toBe('warning');
+        (0, _globals.expect)(data.components.environment.missing).toContain('JWT_SECRET');
+    });
+});

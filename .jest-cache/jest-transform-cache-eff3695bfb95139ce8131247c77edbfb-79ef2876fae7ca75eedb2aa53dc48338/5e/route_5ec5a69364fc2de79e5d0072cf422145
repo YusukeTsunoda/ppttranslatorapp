@@ -1,0 +1,113 @@
+d2377b564cb9e18aeafdb04fd2934af4
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    POST: function() {
+        return POST;
+    },
+    runtime: function() {
+        return runtime;
+    }
+});
+const _server = require("next/server");
+const _session = require("@/lib/auth/session");
+const _prisma = require("@/lib/db/prisma");
+const runtime = 'nodejs';
+async function POST(request) {
+    try {
+        // データベース接続確認
+        try {
+            await _prisma.prisma.$connect();
+        } catch (error) {
+            console.error('Database connection error:', error);
+            return _server.NextResponse.json({
+                error: 'データベース接続エラー'
+            }, {
+                status: 500
+            });
+        }
+        const { email, password } = await request.json();
+        if (!email || !password) {
+            return _server.NextResponse.json({
+                error: 'メールアドレスとパスワードは必須です'
+            }, {
+                status: 400
+            });
+        }
+        const user = await _prisma.prisma.user.findUnique({
+            where: {
+                email
+            },
+            select: {
+                id: true,
+                email: true,
+                password: true,
+                name: true
+            }
+        });
+        if (!user || !user.password) {
+            return _server.NextResponse.json({
+                error: 'メールアドレスまたはパスワードが正しくありません'
+            }, {
+                status: 401
+            });
+        }
+        const isValid = await (0, _session.comparePasswords)(password, user.password);
+        if (!isValid) {
+            return _server.NextResponse.json({
+                error: 'メールアドレスまたはパスワードが正しくありません'
+            }, {
+                status: 401
+            });
+        }
+        // ログイン成功時のアクティビティログを記録
+        // ActivityLogモデルが存在しないためコメントアウト
+        /*
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'sign_in',
+        ipAddress: request.ip || 'unknown',
+        metadata: {
+          userAgent: request.headers.get('user-agent'),
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+    */ // 代わりにコンソールにログを出力
+        console.log('User logged in:', {
+            userId: user.id,
+            action: 'sign_in',
+            ipAddress: request.ip || 'unknown',
+            userAgent: request.headers.get('user-agent'),
+            timestamp: new Date().toISOString()
+        });
+        return _server.NextResponse.json({
+            success: true,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        return _server.NextResponse.json({
+            error: 'ログイン処理中にエラーが発生しました'
+        }, {
+            status: 500
+        });
+    } finally{
+        await _prisma.prisma.$disconnect();
+    }
+}
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC9hcHAvYXBpL2F1dGgvbG9naW4vcm91dGUudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTmV4dFJlcXVlc3QsIE5leHRSZXNwb25zZSB9IGZyb20gJ25leHQvc2VydmVyJztcbmltcG9ydCB7IGNvbXBhcmVQYXNzd29yZHMgfSBmcm9tICdAL2xpYi9hdXRoL3Nlc3Npb24nO1xuaW1wb3J0IHsgcHJpc21hIH0gZnJvbSAnQC9saWIvZGIvcHJpc21hJztcbmltcG9ydCB7IFByaXNtYVVzZXIgfSBmcm9tICdAL3R5cGVzL3ByaXNtYSc7XG5cbi8vIE5vZGUuanPjg6njg7Pjgr/jgqTjg6DjgpLmmI7npLrnmoTjgavmjIflrppcbi8vIGJjcnlwdGpz44KS5L2/55So44GZ44KL44Gf44KB44CBRWRnZSBSdW50aW1l44Gn44Gv5YuV5L2c44GX44G+44Gb44KTXG5leHBvcnQgY29uc3QgcnVudGltZSA9ICdub2RlanMnO1xuXG5leHBvcnQgYXN5bmMgZnVuY3Rpb24gUE9TVChyZXF1ZXN0OiBOZXh0UmVxdWVzdCkge1xuICB0cnkge1xuICAgIC8vIOODh+ODvOOCv+ODmeODvOOCueaOpee2mueiuuiqjVxuICAgIHRyeSB7XG4gICAgICBhd2FpdCBwcmlzbWEuJGNvbm5lY3QoKTtcbiAgICB9IGNhdGNoIChlcnJvcikge1xuICAgICAgY29uc29sZS5lcnJvcignRGF0YWJhc2UgY29ubmVjdGlvbiBlcnJvcjonLCBlcnJvcik7XG4gICAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oeyBlcnJvcjogJ+ODh+ODvOOCv+ODmeODvOOCueaOpee2muOCqOODqeODvCcgfSwgeyBzdGF0dXM6IDUwMCB9KTtcbiAgICB9XG5cbiAgICBjb25zdCB7IGVtYWlsLCBwYXNzd29yZCB9ID0gYXdhaXQgcmVxdWVzdC5qc29uKCk7XG5cbiAgICBpZiAoIWVtYWlsIHx8ICFwYXNzd29yZCkge1xuICAgICAgcmV0dXJuIE5leHRSZXNwb25zZS5qc29uKHsgZXJyb3I6ICfjg6Hjg7zjg6vjgqLjg4njg6zjgrnjgajjg5Hjgrnjg6/jg7zjg4njga/lv4XpoIjjgafjgZknIH0sIHsgc3RhdHVzOiA0MDAgfSk7XG4gICAgfVxuXG4gICAgY29uc3QgdXNlciA9IGF3YWl0IHByaXNtYS51c2VyLmZpbmRVbmlxdWUoe1xuICAgICAgd2hlcmU6IHsgZW1haWwgfSxcbiAgICAgIHNlbGVjdDoge1xuICAgICAgICBpZDogdHJ1ZSxcbiAgICAgICAgZW1haWw6IHRydWUsXG4gICAgICAgIHBhc3N3b3JkOiB0cnVlLFxuICAgICAgICBuYW1lOiB0cnVlLFxuICAgICAgfSxcbiAgICB9KTtcblxuICAgIGlmICghdXNlciB8fCAhdXNlci5wYXNzd29yZCkge1xuICAgICAgcmV0dXJuIE5leHRSZXNwb25zZS5qc29uKHsgZXJyb3I6ICfjg6Hjg7zjg6vjgqLjg4njg6zjgrnjgb7jgZ/jga/jg5Hjgrnjg6/jg7zjg4njgYzmraPjgZfjgY/jgYLjgorjgb7jgZvjgpMnIH0sIHsgc3RhdHVzOiA0MDEgfSk7XG4gICAgfVxuXG4gICAgY29uc3QgaXNWYWxpZCA9IGF3YWl0IGNvbXBhcmVQYXNzd29yZHMocGFzc3dvcmQsIHVzZXIucGFzc3dvcmQpO1xuICAgIGlmICghaXNWYWxpZCkge1xuICAgICAgcmV0dXJuIE5leHRSZXNwb25zZS5qc29uKHsgZXJyb3I6ICfjg6Hjg7zjg6vjgqLjg4njg6zjgrnjgb7jgZ/jga/jg5Hjgrnjg6/jg7zjg4njgYzmraPjgZfjgY/jgYLjgorjgb7jgZvjgpMnIH0sIHsgc3RhdHVzOiA0MDEgfSk7XG4gICAgfVxuXG4gICAgLy8g44Ot44Kw44Kk44Oz5oiQ5Yqf5pmC44Gu44Ki44Kv44OG44Kj44OT44OG44Kj44Ot44Kw44KS6KiY6YyyXG4gICAgLy8gQWN0aXZpdHlMb2fjg6Ljg4fjg6vjgYzlrZjlnKjjgZfjgarjgYTjgZ/jgoHjgrPjg6Hjg7Pjg4jjgqLjgqbjg4hcbiAgICAvKlxuICAgIGF3YWl0IHByaXNtYS5hY3Rpdml0eUxvZy5jcmVhdGUoe1xuICAgICAgZGF0YToge1xuICAgICAgICB1c2VySWQ6IHVzZXIuaWQsXG4gICAgICAgIGFjdGlvbjogJ3NpZ25faW4nLFxuICAgICAgICBpcEFkZHJlc3M6IHJlcXVlc3QuaXAgfHwgJ3Vua25vd24nLFxuICAgICAgICBtZXRhZGF0YToge1xuICAgICAgICAgIHVzZXJBZ2VudDogcmVxdWVzdC5oZWFkZXJzLmdldCgndXNlci1hZ2VudCcpLFxuICAgICAgICAgIHRpbWVzdGFtcDogbmV3IERhdGUoKS50b0lTT1N0cmluZygpLFxuICAgICAgICB9LFxuICAgICAgfSxcbiAgICB9KTtcbiAgICAqL1xuXG4gICAgLy8g5Luj44KP44KK44Gr44Kz44Oz44K944O844Or44Gr44Ot44Kw44KS5Ye65YqbXG4gICAgY29uc29sZS5sb2coJ1VzZXIgbG9nZ2VkIGluOicsIHtcbiAgICAgIHVzZXJJZDogdXNlci5pZCxcbiAgICAgIGFjdGlvbjogJ3NpZ25faW4nLFxuICAgICAgaXBBZGRyZXNzOiByZXF1ZXN0LmlwIHx8ICd1bmtub3duJyxcbiAgICAgIHVzZXJBZ2VudDogcmVxdWVzdC5oZWFkZXJzLmdldCgndXNlci1hZ2VudCcpLFxuICAgICAgdGltZXN0YW1wOiBuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCksXG4gICAgfSk7XG5cbiAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oe1xuICAgICAgc3VjY2VzczogdHJ1ZSxcbiAgICAgIHVzZXI6IHtcbiAgICAgICAgaWQ6IHVzZXIuaWQsXG4gICAgICAgIGVtYWlsOiB1c2VyLmVtYWlsLFxuICAgICAgICBuYW1lOiB1c2VyLm5hbWUsXG4gICAgICB9LFxuICAgIH0pO1xuICB9IGNhdGNoIChlcnJvcikge1xuICAgIGNvbnNvbGUuZXJyb3IoJ0xvZ2luIGVycm9yOicsIGVycm9yKTtcbiAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oeyBlcnJvcjogJ+ODreOCsOOCpOODs+WHpueQhuS4reOBq+OCqOODqeODvOOBjOeZuueUn+OBl+OBvuOBl+OBnycgfSwgeyBzdGF0dXM6IDUwMCB9KTtcbiAgfSBmaW5hbGx5IHtcbiAgICBhd2FpdCBwcmlzbWEuJGRpc2Nvbm5lY3QoKTtcbiAgfVxufVxuIl0sIm5hbWVzIjpbIlBPU1QiLCJydW50aW1lIiwicmVxdWVzdCIsInByaXNtYSIsIiRjb25uZWN0IiwiZXJyb3IiLCJjb25zb2xlIiwiTmV4dFJlc3BvbnNlIiwianNvbiIsInN0YXR1cyIsImVtYWlsIiwicGFzc3dvcmQiLCJ1c2VyIiwiZmluZFVuaXF1ZSIsIndoZXJlIiwic2VsZWN0IiwiaWQiLCJuYW1lIiwiaXNWYWxpZCIsImNvbXBhcmVQYXNzd29yZHMiLCJsb2ciLCJ1c2VySWQiLCJhY3Rpb24iLCJpcEFkZHJlc3MiLCJpcCIsInVzZXJBZ2VudCIsImhlYWRlcnMiLCJnZXQiLCJ0aW1lc3RhbXAiLCJEYXRlIiwidG9JU09TdHJpbmciLCJzdWNjZXNzIiwiJGRpc2Nvbm5lY3QiXSwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7O0lBU3NCQSxJQUFJO2VBQUpBOztJQUZUQyxPQUFPO2VBQVBBOzs7d0JBUDZCO3lCQUNUO3dCQUNWO0FBS2hCLE1BQU1BLFVBQVU7QUFFaEIsZUFBZUQsS0FBS0UsT0FBb0I7SUFDN0MsSUFBSTtRQUNGLGFBQWE7UUFDYixJQUFJO1lBQ0YsTUFBTUMsY0FBTSxDQUFDQyxRQUFRO1FBQ3ZCLEVBQUUsT0FBT0MsT0FBTztZQUNkQyxRQUFRRCxLQUFLLENBQUMsOEJBQThCQTtZQUM1QyxPQUFPRSxvQkFBWSxDQUFDQyxJQUFJLENBQUM7Z0JBQUVILE9BQU87WUFBYyxHQUFHO2dCQUFFSSxRQUFRO1lBQUk7UUFDbkU7UUFFQSxNQUFNLEVBQUVDLEtBQUssRUFBRUMsUUFBUSxFQUFFLEdBQUcsTUFBTVQsUUFBUU0sSUFBSTtRQUU5QyxJQUFJLENBQUNFLFNBQVMsQ0FBQ0MsVUFBVTtZQUN2QixPQUFPSixvQkFBWSxDQUFDQyxJQUFJLENBQUM7Z0JBQUVILE9BQU87WUFBcUIsR0FBRztnQkFBRUksUUFBUTtZQUFJO1FBQzFFO1FBRUEsTUFBTUcsT0FBTyxNQUFNVCxjQUFNLENBQUNTLElBQUksQ0FBQ0MsVUFBVSxDQUFDO1lBQ3hDQyxPQUFPO2dCQUFFSjtZQUFNO1lBQ2ZLLFFBQVE7Z0JBQ05DLElBQUk7Z0JBQ0pOLE9BQU87Z0JBQ1BDLFVBQVU7Z0JBQ1ZNLE1BQU07WUFDUjtRQUNGO1FBRUEsSUFBSSxDQUFDTCxRQUFRLENBQUNBLEtBQUtELFFBQVEsRUFBRTtZQUMzQixPQUFPSixvQkFBWSxDQUFDQyxJQUFJLENBQUM7Z0JBQUVILE9BQU87WUFBMkIsR0FBRztnQkFBRUksUUFBUTtZQUFJO1FBQ2hGO1FBRUEsTUFBTVMsVUFBVSxNQUFNQyxJQUFBQSx5QkFBZ0IsRUFBQ1IsVUFBVUMsS0FBS0QsUUFBUTtRQUM5RCxJQUFJLENBQUNPLFNBQVM7WUFDWixPQUFPWCxvQkFBWSxDQUFDQyxJQUFJLENBQUM7Z0JBQUVILE9BQU87WUFBMkIsR0FBRztnQkFBRUksUUFBUTtZQUFJO1FBQ2hGO1FBRUEsdUJBQXVCO1FBQ3ZCLGdDQUFnQztRQUNoQzs7Ozs7Ozs7Ozs7O0lBWUEsR0FFQSxrQkFBa0I7UUFDbEJILFFBQVFjLEdBQUcsQ0FBQyxtQkFBbUI7WUFDN0JDLFFBQVFULEtBQUtJLEVBQUU7WUFDZk0sUUFBUTtZQUNSQyxXQUFXckIsUUFBUXNCLEVBQUUsSUFBSTtZQUN6QkMsV0FBV3ZCLFFBQVF3QixPQUFPLENBQUNDLEdBQUcsQ0FBQztZQUMvQkMsV0FBVyxJQUFJQyxPQUFPQyxXQUFXO1FBQ25DO1FBRUEsT0FBT3ZCLG9CQUFZLENBQUNDLElBQUksQ0FBQztZQUN2QnVCLFNBQVM7WUFDVG5CLE1BQU07Z0JBQ0pJLElBQUlKLEtBQUtJLEVBQUU7Z0JBQ1hOLE9BQU9FLEtBQUtGLEtBQUs7Z0JBQ2pCTyxNQUFNTCxLQUFLSyxJQUFJO1lBQ2pCO1FBQ0Y7SUFDRixFQUFFLE9BQU9aLE9BQU87UUFDZEMsUUFBUUQsS0FBSyxDQUFDLGdCQUFnQkE7UUFDOUIsT0FBT0Usb0JBQVksQ0FBQ0MsSUFBSSxDQUFDO1lBQUVILE9BQU87UUFBcUIsR0FBRztZQUFFSSxRQUFRO1FBQUk7SUFDMUUsU0FBVTtRQUNSLE1BQU1OLGNBQU0sQ0FBQzZCLFdBQVc7SUFDMUI7QUFDRiJ9

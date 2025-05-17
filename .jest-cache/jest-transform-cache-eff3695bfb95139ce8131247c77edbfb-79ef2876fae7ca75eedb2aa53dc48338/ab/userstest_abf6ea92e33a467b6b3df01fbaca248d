@@ -1,0 +1,99 @@
+511185be45237de8efc1866fccbc25a4
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _testutils = require("@/tests/utils/test-utils");
+const _db = require("@/tests/utils/db");
+const _route = require("@/app/api/admin/users/route");
+(0, _globals.describe)('User Management API', ()=>{
+    let testUser;
+    let adminUser;
+    (0, _globals.beforeAll)(async ()=>{
+        await (0, _db.setupTestDatabase)();
+        // モックユーザーデータの設定
+        adminUser = {
+            id: 'admin-id',
+            email: 'admin@example.com',
+            role: 'ADMIN'
+        };
+        testUser = {
+            id: 'user-id',
+            email: 'user@example.com',
+            role: 'USER'
+        };
+        // Prismaモックの設定
+        _testutils.mockPrisma.user.findUnique.mockResolvedValue(adminUser);
+    });
+    (0, _globals.afterAll)(async ()=>{
+        await (0, _db.teardownTestDatabase)();
+    });
+    (0, _globals.describe)('GET /api/admin/users', ()=>{
+        (0, _globals.it)('should return list of users for admin', async ()=>{
+            const req = (0, _testutils.createMockRequest)('GET');
+            _testutils.mockPrisma.user.findMany.mockResolvedValue([
+                testUser,
+                adminUser
+            ]);
+            const response = await (0, _route.GET)(req);
+            (0, _globals.expect)(response.status).toBe(200);
+            const data = await response.json();
+            (0, _globals.expect)(data.users).toHaveLength(2);
+        });
+        (0, _globals.it)('should deny access for non-admin users', async ()=>{
+            const req = (0, _testutils.createMockRequest)('GET');
+            _testutils.mockPrisma.user.findUnique.mockResolvedValue(testUser);
+            const response = await (0, _route.GET)(req);
+            (0, _globals.expect)(response.status).toBe(403);
+        });
+    });
+    (0, _globals.describe)('POST /api/admin/users', ()=>{
+        (0, _globals.it)('should create a new user', async ()=>{
+            const newUser = {
+                email: 'new@example.com',
+                name: 'New User',
+                role: 'USER'
+            };
+            const req = (0, _testutils.createMockRequest)('POST', newUser);
+            _testutils.mockPrisma.user.create.mockResolvedValue({
+                ...newUser,
+                id: 'new-id'
+            });
+            const response = await (0, _route.POST)(req);
+            (0, _globals.expect)(response.status).toBe(201);
+            const data = await response.json();
+            (0, _globals.expect)(data.user.email).toBe(newUser.email);
+        });
+    });
+    (0, _globals.describe)('PUT /api/admin/users/:id', ()=>{
+        (0, _globals.it)('should update user details', async ()=>{
+            const updates = {
+                name: 'Updated Name',
+                role: 'ADMIN'
+            };
+            const req = (0, _testutils.createMockRequest)('PUT', updates);
+            _testutils.mockPrisma.user.update.mockResolvedValue({
+                ...testUser,
+                ...updates
+            });
+            const response = await (0, _route.PUT)(req);
+            (0, _globals.expect)(response.status).toBe(200);
+            const data = await response.json();
+            (0, _globals.expect)(data.user.name).toBe(updates.name);
+        });
+    });
+    (0, _globals.describe)('DELETE /api/admin/users/:id', ()=>{
+        (0, _globals.it)('should soft delete a user', async ()=>{
+            const req = (0, _testutils.createMockRequest)('DELETE');
+            _testutils.mockPrisma.user.update.mockResolvedValue({
+                ...testUser,
+                deletedAt: new Date()
+            });
+            const response = await (0, _route.DELETE)(req);
+            (0, _globals.expect)(response.status).toBe(200);
+            const data = await response.json();
+            (0, _globals.expect)(data.success).toBe(true);
+        });
+    });
+});

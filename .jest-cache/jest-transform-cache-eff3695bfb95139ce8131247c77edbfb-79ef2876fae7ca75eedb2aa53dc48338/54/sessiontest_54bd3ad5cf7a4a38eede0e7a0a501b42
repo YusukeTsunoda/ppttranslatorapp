@@ -1,0 +1,46 @@
+a0eeff7608bf272a9b998e010889e749
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _route = require("@/app/api/auth/session/route");
+const _authoptions = require("@/lib/auth/auth-options");
+const _mockSetup = require("@/tests/helpers/mockSetup");
+const getServerSessionMock = (0, _mockSetup.createSessionMock)();
+describe('GET /api/auth/session', ()=>{
+    beforeEach(()=>{
+        (0, _mockSetup.clearAllMocks)();
+    });
+    it('should return user information if session exists', async ()=>{
+        const mockUser = (0, _mockSetup.createMockUser)({
+            id: 'user123',
+            name: 'Test User',
+            email: 'test@example.com'
+        });
+        getServerSessionMock.mockResolvedValue({
+            user: mockUser,
+            expires: 'some-date'
+        });
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.user).toEqual(mockUser);
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+    it('should return null for user if session does not exist', async ()=>{
+        getServerSessionMock.mockResolvedValue(null);
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200);
+        expect(responseBody.user).toBeNull();
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+    it('should return null for user if getServerSession throws an error', async ()=>{
+        getServerSessionMock.mockRejectedValue(new Error('Session fetch error'));
+        const response = await (0, _route.GET)();
+        const responseBody = await response.json();
+        expect(response.status).toBe(200); // APIはエラーをキャッチしてnullを返す
+        expect(responseBody.user).toBeNull();
+        expect(getServerSessionMock).toHaveBeenCalledWith(_authoptions.authOptions);
+    });
+});

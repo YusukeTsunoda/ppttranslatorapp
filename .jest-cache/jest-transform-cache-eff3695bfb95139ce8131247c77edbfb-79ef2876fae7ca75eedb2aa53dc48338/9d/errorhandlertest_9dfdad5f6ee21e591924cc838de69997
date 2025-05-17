@@ -1,0 +1,120 @@
+82dff6b8da2e178916cb3595915cb500
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+const _globals = require("@jest/globals");
+const _errorhandler = require("@/lib/translation/error-handler");
+(0, _globals.describe)('Translation Error Handler', ()=>{
+    (0, _globals.describe)('handleTranslationError', ()=>{
+        (0, _globals.it)('レート制限エラーを適切に処理する', ()=>{
+            const error = {
+                name: 'RateLimitError',
+                message: 'Rate limit exceeded',
+                retryAfter: 30
+            };
+            const response = (0, _errorhandler.handleTranslationError)(error);
+            (0, _globals.expect)(response.status).toBe(429);
+            (0, _globals.expect)(response.headers.get('Retry-After')).toBe('30');
+            (0, _globals.expect)(response.headers.get('Content-Type')).toBe('application/json');
+            (0, _globals.expect)(response.headers.get('Cache-Control')).toBe('no-store');
+        });
+        (0, _globals.it)('タイムアウトエラーを適切に処理する', ()=>{
+            const error = {
+                name: 'TimeoutError',
+                message: 'Request timeout'
+            };
+            const response = (0, _errorhandler.handleTranslationError)(error);
+            (0, _globals.expect)(response.status).toBe(504);
+            (0, _globals.expect)(response.headers.get('Content-Type')).toBe('application/json');
+        });
+        (0, _globals.it)('ネットワークエラーを適切に処理する', ()=>{
+            const error = {
+                name: 'NetworkError',
+                message: 'Network error'
+            };
+            const response = (0, _errorhandler.handleTranslationError)(error);
+            (0, _globals.expect)(response.status).toBe(503);
+            (0, _globals.expect)(response.headers.get('Content-Type')).toBe('application/json');
+        });
+        (0, _globals.it)('バリデーションエラーを適切に処理する', ()=>{
+            const error = {
+                name: 'ValidationError',
+                message: 'Invalid request'
+            };
+            const response = (0, _errorhandler.handleTranslationError)(error);
+            (0, _globals.expect)(response.status).toBe(400);
+            (0, _globals.expect)(response.headers.get('Content-Type')).toBe('application/json');
+        });
+        (0, _globals.it)('不明なエラーを適切に処理する', ()=>{
+            const error = {
+                name: 'UnknownError',
+                message: 'Unknown error'
+            };
+            const response = (0, _errorhandler.handleTranslationError)(error);
+            (0, _globals.expect)(response.status).toBe(500);
+            (0, _globals.expect)(response.headers.get('Content-Type')).toBe('application/json');
+        });
+    });
+    (0, _globals.describe)('withRetry', ()=>{
+        (0, _globals.it)('最初の試行で成功した場合', async ()=>{
+            const operation = _globals.jest.fn().mockResolvedValue('success');
+            const result = await (0, _errorhandler.withRetry)(operation);
+            (0, _globals.expect)(result).toBe('success');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(1);
+        });
+        (0, _globals.it)('リトライ後に成功する場合', async ()=>{
+            const operation = _globals.jest.fn().mockRejectedValueOnce(new Error('Temporary error')).mockResolvedValue('success');
+            const result = await (0, _errorhandler.withRetry)(operation);
+            (0, _globals.expect)(result).toBe('success');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(2);
+        });
+        (0, _globals.it)('最大リトライ回数を超えた場合', async ()=>{
+            const operation = _globals.jest.fn().mockRejectedValue(new Error('Persistent error'));
+            await (0, _globals.expect)((0, _errorhandler.withRetry)(operation, 3)).rejects.toThrow('最大リトライ回数を超えました');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(3);
+        });
+        (0, _globals.it)('リトライ不可能なエラーの場合は即座に失敗する', async ()=>{
+            const error = new Error('Authentication failed');
+            error.name = 'AuthenticationError';
+            const operation = _globals.jest.fn().mockRejectedValue(error);
+            await (0, _globals.expect)((0, _errorhandler.withRetry)(operation)).rejects.toThrow('Authentication failed');
+            (0, _globals.expect)(operation).toHaveBeenCalledTimes(1);
+        });
+    });
+    (0, _globals.describe)('logTranslationError', ()=>{
+        (0, _globals.it)('エラーログを適切にフォーマットする', ()=>{
+            // コンソール出力をモック
+            const consoleSpy = _globals.jest.spyOn(console, 'error').mockImplementation();
+            const error = new Error('Test error');
+            const context = {
+                userId: 'test-user',
+                operation: 'translate'
+            };
+            (0, _errorhandler.logTranslationError)(error, context);
+            (0, _globals.expect)(consoleSpy).toHaveBeenCalled();
+            const loggedData = JSON.parse(consoleSpy.mock.calls[0][1]);
+            (0, _globals.expect)(loggedData).toHaveProperty('timestamp');
+            (0, _globals.expect)(loggedData).toHaveProperty('name', 'Error');
+            (0, _globals.expect)(loggedData).toHaveProperty('message', 'Test error');
+            (0, _globals.expect)(loggedData).toHaveProperty('stack');
+            (0, _globals.expect)(loggedData).toHaveProperty('context.userId', 'test-user');
+            (0, _globals.expect)(loggedData).toHaveProperty('context.operation', 'translate');
+            // モックをリストア
+            consoleSpy.mockRestore();
+        });
+        (0, _globals.it)('コンテキストなしでもエラーログを記録する', ()=>{
+            const consoleSpy = _globals.jest.spyOn(console, 'error').mockImplementation();
+            const error = new Error('Test error');
+            (0, _errorhandler.logTranslationError)(error);
+            (0, _globals.expect)(consoleSpy).toHaveBeenCalled();
+            const loggedData = JSON.parse(consoleSpy.mock.calls[0][1]);
+            (0, _globals.expect)(loggedData).toHaveProperty('timestamp');
+            (0, _globals.expect)(loggedData).toHaveProperty('name', 'Error');
+            (0, _globals.expect)(loggedData).toHaveProperty('message', 'Test error');
+            (0, _globals.expect)(loggedData).toHaveProperty('context');
+            (0, _globals.expect)(Object.keys(loggedData.context)).toHaveLength(0);
+            consoleSpy.mockRestore();
+        });
+    });
+});

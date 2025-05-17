@@ -1,0 +1,90 @@
+1dc8c22345968afa0c8c6101c6a33e13
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "POST", {
+    enumerable: true,
+    get: function() {
+        return POST;
+    }
+});
+const _server = require("next/server");
+const _prisma = require("@/lib/db/prisma");
+const _token = require("@/lib/auth/token");
+const _send = require("@/lib/email/send");
+const _zod = require("zod");
+const requestSchema = _zod.z.object({
+    email: _zod.z.string().email()
+});
+async function POST(req) {
+    try {
+        // 環境変数のチェック
+        if (!process.env.RESEND_API_KEY) {
+            console.error('RESEND_API_KEY is not set in the environment');
+            return _server.NextResponse.json({
+                error: 'Email service configuration error'
+            }, {
+                status: 500
+            });
+        }
+        const body = await req.json();
+        const { email } = requestSchema.parse(body);
+        // レート制限チェック - 現在のスキーマでは lastPasswordReset フィールドが存在しない可能性があるため、コメントアウト
+        /*
+    const lastReset = await prisma.user.findUnique({
+      where: { email },
+      select: { lastPasswordReset: true },
+    });
+
+    if (lastReset?.lastPasswordReset) {
+      const timeSinceLastReset = Date.now() - lastReset.lastPasswordReset.getTime();
+      if (timeSinceLastReset < 60000) { // 1分以内の再送信を制限
+        return NextResponse.json(
+          { error: '時間をおいて再度お試しください' },
+          { status: 429 }
+        );
+      }
+    }
+    */ // ユーザーの存在確認
+        const user = await _prisma.prisma.user.findUnique({
+            where: {
+                email
+            }
+        });
+        if (!user) {
+            // セキュリティのため、ユーザーが存在しない場合でも成功レスポンスを返す
+            return _server.NextResponse.json({
+                success: true
+            });
+        }
+        // リセットトークンの生成
+        const token = await (0, _token.generateResetToken)();
+        const expires = new Date(Date.now() + 15 * 60000); // 15分後に有効期限切れ
+        // ユーザー情報の更新 - 現在のスキーマに合わせて更新
+        await _prisma.prisma.user.update({
+            where: {
+                id: user.id
+            },
+            data: {
+                // resetToken と resetTokenExpires フィールドが存在しない可能性があるため、
+                // 実際のスキーマに合わせて修正が必要
+                updatedAt: new Date()
+            }
+        });
+        // パスワードリセットメールの送信
+        await (0, _send.sendPasswordResetEmail)(email, token);
+        return _server.NextResponse.json({
+            success: true
+        });
+    } catch (error) {
+        console.error('Password reset request error:', error);
+        return _server.NextResponse.json({
+            error: 'パスワードリセットの要求に失敗しました'
+        }, {
+            status: 500
+        });
+    }
+}
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC93b3JrdHJlZXMvY2ljZC1zZXR1cC9hcHAvYXBpL2F1dGgvcmVzZXQtcGFzc3dvcmQvcm91dGUudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTmV4dFJlc3BvbnNlIH0gZnJvbSAnbmV4dC9zZXJ2ZXInO1xuaW1wb3J0IHsgcHJpc21hIH0gZnJvbSAnQC9saWIvZGIvcHJpc21hJztcbmltcG9ydCB7IGdlbmVyYXRlUmVzZXRUb2tlbiB9IGZyb20gJ0AvbGliL2F1dGgvdG9rZW4nO1xuaW1wb3J0IHsgc2VuZFBhc3N3b3JkUmVzZXRFbWFpbCB9IGZyb20gJ0AvbGliL2VtYWlsL3NlbmQnO1xuaW1wb3J0IHsgeiB9IGZyb20gJ3pvZCc7XG5cbmNvbnN0IHJlcXVlc3RTY2hlbWEgPSB6Lm9iamVjdCh7XG4gIGVtYWlsOiB6LnN0cmluZygpLmVtYWlsKCksXG59KTtcblxuZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIFBPU1QocmVxOiBSZXF1ZXN0KSB7XG4gIHRyeSB7XG4gICAgLy8g55Kw5aKD5aSJ5pWw44Gu44OB44Kn44OD44KvXG4gICAgaWYgKCFwcm9jZXNzLmVudi5SRVNFTkRfQVBJX0tFWSkge1xuICAgICAgY29uc29sZS5lcnJvcignUkVTRU5EX0FQSV9LRVkgaXMgbm90IHNldCBpbiB0aGUgZW52aXJvbm1lbnQnKTtcbiAgICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IGVycm9yOiAnRW1haWwgc2VydmljZSBjb25maWd1cmF0aW9uIGVycm9yJyB9LCB7IHN0YXR1czogNTAwIH0pO1xuICAgIH1cblxuICAgIGNvbnN0IGJvZHkgPSBhd2FpdCByZXEuanNvbigpO1xuICAgIGNvbnN0IHsgZW1haWwgfSA9IHJlcXVlc3RTY2hlbWEucGFyc2UoYm9keSk7XG5cbiAgICAvLyDjg6zjg7zjg4jliLbpmZDjg4Hjgqfjg4Pjgq8gLSDnj77lnKjjga7jgrnjgq3jg7zjg57jgafjga8gbGFzdFBhc3N3b3JkUmVzZXQg44OV44Kj44O844Or44OJ44GM5a2Y5Zyo44GX44Gq44GE5Y+v6IO95oCn44GM44GC44KL44Gf44KB44CB44Kz44Oh44Oz44OI44Ki44Km44OIXG4gICAgLypcbiAgICBjb25zdCBsYXN0UmVzZXQgPSBhd2FpdCBwcmlzbWEudXNlci5maW5kVW5pcXVlKHtcbiAgICAgIHdoZXJlOiB7IGVtYWlsIH0sXG4gICAgICBzZWxlY3Q6IHsgbGFzdFBhc3N3b3JkUmVzZXQ6IHRydWUgfSxcbiAgICB9KTtcblxuICAgIGlmIChsYXN0UmVzZXQ/Lmxhc3RQYXNzd29yZFJlc2V0KSB7XG4gICAgICBjb25zdCB0aW1lU2luY2VMYXN0UmVzZXQgPSBEYXRlLm5vdygpIC0gbGFzdFJlc2V0Lmxhc3RQYXNzd29yZFJlc2V0LmdldFRpbWUoKTtcbiAgICAgIGlmICh0aW1lU2luY2VMYXN0UmVzZXQgPCA2MDAwMCkgeyAvLyAx5YiG5Lul5YaF44Gu5YaN6YCB5L+h44KS5Yi26ZmQXG4gICAgICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbihcbiAgICAgICAgICB7IGVycm9yOiAn5pmC6ZaT44KS44GK44GE44Gm5YaN5bqm44GK6Kmm44GX44GP44Gg44GV44GEJyB9LFxuICAgICAgICAgIHsgc3RhdHVzOiA0MjkgfVxuICAgICAgICApO1xuICAgICAgfVxuICAgIH1cbiAgICAqL1xuXG4gICAgLy8g44Om44O844K244O844Gu5a2Y5Zyo56K66KqNXG4gICAgY29uc3QgdXNlciA9IGF3YWl0IHByaXNtYS51c2VyLmZpbmRVbmlxdWUoe1xuICAgICAgd2hlcmU6IHsgZW1haWwgfSxcbiAgICB9KTtcblxuICAgIGlmICghdXNlcikge1xuICAgICAgLy8g44K744Kt44Ol44Oq44OG44Kj44Gu44Gf44KB44CB44Om44O844K244O844GM5a2Y5Zyo44GX44Gq44GE5aC05ZCI44Gn44KC5oiQ5Yqf44Os44K544Od44Oz44K544KS6L+U44GZXG4gICAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oeyBzdWNjZXNzOiB0cnVlIH0pO1xuICAgIH1cblxuICAgIC8vIOODquOCu+ODg+ODiOODiOODvOOCr+ODs+OBrueUn+aIkFxuICAgIGNvbnN0IHRva2VuID0gYXdhaXQgZ2VuZXJhdGVSZXNldFRva2VuKCk7XG4gICAgY29uc3QgZXhwaXJlcyA9IG5ldyBEYXRlKERhdGUubm93KCkgKyAxNSAqIDYwMDAwKTsgLy8gMTXliIblvozjgavmnInlirnmnJ/pmZDliIfjgoxcblxuICAgIC8vIOODpuODvOOCtuODvOaDheWgseOBruabtOaWsCAtIOePvuWcqOOBruOCueOCreODvOODnuOBq+WQiOOCj+OBm+OBpuabtOaWsFxuICAgIGF3YWl0IHByaXNtYS51c2VyLnVwZGF0ZSh7XG4gICAgICB3aGVyZTogeyBpZDogdXNlci5pZCB9LFxuICAgICAgZGF0YToge1xuICAgICAgICAvLyByZXNldFRva2VuIOOBqCByZXNldFRva2VuRXhwaXJlcyDjg5XjgqPjg7zjg6vjg4njgYzlrZjlnKjjgZfjgarjgYTlj6/og73mgKfjgYzjgYLjgovjgZ/jgoHjgIFcbiAgICAgICAgLy8g5a6f6Zqb44Gu44K544Kt44O844Oe44Gr5ZCI44KP44Gb44Gm5L+u5q2j44GM5b+F6KaBXG4gICAgICAgIHVwZGF0ZWRBdDogbmV3IERhdGUoKSxcbiAgICAgIH0sXG4gICAgfSk7XG5cbiAgICAvLyDjg5Hjgrnjg6/jg7zjg4njg6rjgrvjg4Pjg4jjg6Hjg7zjg6vjga7pgIHkv6FcbiAgICBhd2FpdCBzZW5kUGFzc3dvcmRSZXNldEVtYWlsKGVtYWlsLCB0b2tlbik7XG5cbiAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oeyBzdWNjZXNzOiB0cnVlIH0pO1xuICB9IGNhdGNoIChlcnJvcikge1xuICAgIGNvbnNvbGUuZXJyb3IoJ1Bhc3N3b3JkIHJlc2V0IHJlcXVlc3QgZXJyb3I6JywgZXJyb3IpO1xuICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IGVycm9yOiAn44OR44K544Ov44O844OJ44Oq44K744OD44OI44Gu6KaB5rGC44Gr5aSx5pWX44GX44G+44GX44GfJyB9LCB7IHN0YXR1czogNTAwIH0pO1xuICB9XG59XG4iXSwibmFtZXMiOlsiUE9TVCIsInJlcXVlc3RTY2hlbWEiLCJ6Iiwib2JqZWN0IiwiZW1haWwiLCJzdHJpbmciLCJyZXEiLCJwcm9jZXNzIiwiZW52IiwiUkVTRU5EX0FQSV9LRVkiLCJjb25zb2xlIiwiZXJyb3IiLCJOZXh0UmVzcG9uc2UiLCJqc29uIiwic3RhdHVzIiwiYm9keSIsInBhcnNlIiwidXNlciIsInByaXNtYSIsImZpbmRVbmlxdWUiLCJ3aGVyZSIsInN1Y2Nlc3MiLCJ0b2tlbiIsImdlbmVyYXRlUmVzZXRUb2tlbiIsImV4cGlyZXMiLCJEYXRlIiwibm93IiwidXBkYXRlIiwiaWQiLCJkYXRhIiwidXBkYXRlZEF0Iiwic2VuZFBhc3N3b3JkUmVzZXRFbWFpbCJdLCJtYXBwaW5ncyI6Ijs7OzsrQkFVc0JBOzs7ZUFBQUE7Ozt3QkFWTzt3QkFDTjt1QkFDWTtzQkFDSTtxQkFDckI7QUFFbEIsTUFBTUMsZ0JBQWdCQyxNQUFDLENBQUNDLE1BQU0sQ0FBQztJQUM3QkMsT0FBT0YsTUFBQyxDQUFDRyxNQUFNLEdBQUdELEtBQUs7QUFDekI7QUFFTyxlQUFlSixLQUFLTSxHQUFZO0lBQ3JDLElBQUk7UUFDRixZQUFZO1FBQ1osSUFBSSxDQUFDQyxRQUFRQyxHQUFHLENBQUNDLGNBQWMsRUFBRTtZQUMvQkMsUUFBUUMsS0FBSyxDQUFDO1lBQ2QsT0FBT0Msb0JBQVksQ0FBQ0MsSUFBSSxDQUFDO2dCQUFFRixPQUFPO1lBQW9DLEdBQUc7Z0JBQUVHLFFBQVE7WUFBSTtRQUN6RjtRQUVBLE1BQU1DLE9BQU8sTUFBTVQsSUFBSU8sSUFBSTtRQUMzQixNQUFNLEVBQUVULEtBQUssRUFBRSxHQUFHSCxjQUFjZSxLQUFLLENBQUNEO1FBRXRDLHNFQUFzRTtRQUN0RTs7Ozs7Ozs7Ozs7Ozs7O0lBZUEsR0FFQSxZQUFZO1FBQ1osTUFBTUUsT0FBTyxNQUFNQyxjQUFNLENBQUNELElBQUksQ0FBQ0UsVUFBVSxDQUFDO1lBQ3hDQyxPQUFPO2dCQUFFaEI7WUFBTTtRQUNqQjtRQUVBLElBQUksQ0FBQ2EsTUFBTTtZQUNULHFDQUFxQztZQUNyQyxPQUFPTCxvQkFBWSxDQUFDQyxJQUFJLENBQUM7Z0JBQUVRLFNBQVM7WUFBSztRQUMzQztRQUVBLGNBQWM7UUFDZCxNQUFNQyxRQUFRLE1BQU1DLElBQUFBLHlCQUFrQjtRQUN0QyxNQUFNQyxVQUFVLElBQUlDLEtBQUtBLEtBQUtDLEdBQUcsS0FBSyxLQUFLLFFBQVEsY0FBYztRQUVqRSw2QkFBNkI7UUFDN0IsTUFBTVIsY0FBTSxDQUFDRCxJQUFJLENBQUNVLE1BQU0sQ0FBQztZQUN2QlAsT0FBTztnQkFBRVEsSUFBSVgsS0FBS1csRUFBRTtZQUFDO1lBQ3JCQyxNQUFNO2dCQUNKLHNEQUFzRDtnQkFDdEQsb0JBQW9CO2dCQUNwQkMsV0FBVyxJQUFJTDtZQUNqQjtRQUNGO1FBRUEsa0JBQWtCO1FBQ2xCLE1BQU1NLElBQUFBLDRCQUFzQixFQUFDM0IsT0FBT2tCO1FBRXBDLE9BQU9WLG9CQUFZLENBQUNDLElBQUksQ0FBQztZQUFFUSxTQUFTO1FBQUs7SUFDM0MsRUFBRSxPQUFPVixPQUFPO1FBQ2RELFFBQVFDLEtBQUssQ0FBQyxpQ0FBaUNBO1FBQy9DLE9BQU9DLG9CQUFZLENBQUNDLElBQUksQ0FBQztZQUFFRixPQUFPO1FBQXNCLEdBQUc7WUFBRUcsUUFBUTtRQUFJO0lBQzNFO0FBQ0YifQ==
