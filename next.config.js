@@ -37,8 +37,9 @@ const nextConfig = {
     // バンドルから除外するファイルパスパターン
     ignoredModuleFiles: [
       '**/.next/cache/**',
-      '**/node_modules/.prisma/client/libquery_engine-*',
-      '!**/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node',
+      // Prismaエンジンバイナリを除外せず、必要なものを含める
+      // '**/node_modules/.prisma/client/libquery_engine-*',
+      // '!**/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node',
       '**/node_modules/sharp/**/*.node', // 使っていない場合は不要
     ],
   },
