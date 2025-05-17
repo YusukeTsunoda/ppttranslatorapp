@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { expect } from '@jest/globals';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { promisify } from 'util';
 import { exec } from 'child_process';
 
 // next-authのモック
@@ -16,64 +17,26 @@ jest.mock('next-auth', () => ({
 
 // fs/promisesのモック
 jest.mock('fs/promises', () => ({
+  access: jest.fn().mockResolvedValue(undefined),
   mkdir: jest.fn().mockResolvedValue(undefined),
   writeFile: jest.fn().mockResolvedValue(undefined),
-  readFile: jest.fn().mockResolvedValue(Buffer.from('test file content')),
-  readdir: jest.fn().mockResolvedValue(['original.pptx', 'translated.pptx']),
-  access: jest.fn().mockImplementation((path) => {
-    if (path.includes('not-exist')) {
-      return Promise.reject(new Error('File not found'));
-    }
-    return Promise.resolve();
-  }),
+  readdir: jest.fn().mockResolvedValue(['test.pptx']),
   unlink: jest.fn().mockResolvedValue(undefined),
 }));
 
 // child_processのモック
 jest.mock('child_process', () => ({
-  exec: jest.fn().mockImplementation((cmd, callback) => {
-    callback(null, 'success', '');
-  }),
+  exec: jest.fn(),
 }));
 
-// file-utilsのモック
+// filePathManagerのモック
 jest.mock('@/lib/utils/file-utils', () => ({
   filePathManager: {
-    findActualFilePath: jest.fn().mockResolvedValue('/path/to/original.pptx'),
-    getTempPath: jest.fn().mockReturnValue('/path/to/temp/file.pptx'),
-    getPublicPath: jest.fn().mockReturnValue('uploads/test-user/file.pptx'),
+    findActualFilePath: jest.fn().mockResolvedValue('/path/to/test.pptx'),
   },
 }));
 
-// app/api/pptx/generate/route.tsのモック
-jest.mock('@/app/api/pptx/generate/route', () => {
-  // モック用のレスポンス生成関数
-  const mockJsonResponse = (data: any, status = 200) => {
-    return {
-      json: () => Promise.resolve(data),
-      status,
-    };
-  };
-
-  return {
-    POST: jest.fn().mockImplementation(async (req) => {
-      const body = await req.json();
-
-      if (!body.fileId || !body.translations) {
-        return mockJsonResponse({ error: 'Missing required parameters' }, 400);
-      }
-
-      return mockJsonResponse({
-        success: true,
-        fileId: body.fileId,
-        filePath: 'uploads/test-user/test-file_translated.pptx',
-        message: 'PPTXファイルが正常に生成されました',
-      });
-    }),
-  };
-});
-
-// インポートはモックの後に行う
+// app/api/pptx/generate/route.tsのインポート
 import { POST } from '@/app/api/pptx/generate/route';
 
 describe('PPTX Generate API', () => {
@@ -82,102 +45,118 @@ describe('PPTX Generate API', () => {
   });
 
   describe('POST /api/pptx/generate', () => {
-    it('翻訳データからPPTXファイルを生成する', async () => {
-      // リクエストボディの作成
-      const requestBody = {
-        fileId: 'test-file',
-        translations: [
-          {
-            slideId: 'slide1',
-            title: {
-              original: 'Original Title',
-              translated: '翻訳されたタイトル',
-            },
-            content: [
-              {
-                original: 'Original Content',
-                translated: '翻訳されたコンテンツ',
-              },
-            ],
-          },
-        ],
-      };
+    it('認証されていない場合はエラーを返す', async () => {
+      // getServerSessionをnullを返すようにモック
+      const { getServerSession } = require('next-auth');
+      getServerSession.mockResolvedValueOnce(null);
 
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        json: jest.fn().mockResolvedValue(requestBody),
-      } as unknown as NextRequest;
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: 'test-file',
+          translations: [{ text: 'Hello', translation: 'こんにちは' }],
+        }),
+      }) as NextRequest;
 
-      // APIハンドラを呼び出す
       const response = await POST(mockReq);
+      expect(response.status).toBe(401);
 
-      // レスポンスを検証
+      const data = await response.json();
+      expect(data.error).toBe('Unauthorized');
+    });
+
+    it('必須パラメータが不足している場合はエラーを返す', async () => {
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }) as NextRequest;
+
+      const response = await POST(mockReq);
+      expect(response.status).toBe(400);
+
+      const data = await response.json();
+      expect(data.error).toBe('Missing required parameters');
+    });
+
+    it('元のファイルが見つからない場合は404エラーを返す', async () => {
+      // filePathManagerのfindActualFilePathをnullを返すようにモック
+      const { filePathManager } = require('@/lib/utils/file-utils');
+      filePathManager.findActualFilePath.mockResolvedValueOnce(null);
+
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: 'non-existent',
+          translations: [{ text: 'Hello', translation: 'こんにちは' }],
+        }),
+      }) as NextRequest;
+
+      const response = await POST(mockReq);
+      expect(response.status).toBe(404);
+
+      const data = await response.json();
+      expect(data.error).toBe('Original PPTX file not found');
+    });
+
+    it('Pythonスクリプトが見つからない場合は500エラーを返す', async () => {
+      // fs.accessをエラーを投げるようにモック
+      const fs = require('fs/promises');
+      fs.access.mockRejectedValueOnce(new Error('ENOENT'));
+
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: 'test-file',
+          translations: [{ text: 'Hello', translation: 'こんにちは' }],
+        }),
+      }) as NextRequest;
+
+      const response = await POST(mockReq);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.error).toBe('Python script not found');
+    });
+
+    it('Pythonスクリプトの実行に失敗した場合は500エラーを返す', async () => {
+      // execをエラーを投げるようにモック
+      const { exec } = require('child_process');
+      exec.mockImplementationOnce((cmd, cb) => cb(new Error('Python error')));
+
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: 'test-file',
+          translations: [{ text: 'Hello', translation: 'こんにちは' }],
+        }),
+      }) as NextRequest;
+
+      const response = await POST(mockReq);
+      expect(response.status).toBe(500);
+
+      const data = await response.json();
+      expect(data.error).toContain('Failed to generate PPTX');
+    });
+
+    it('PPTXファイルを正常に生成する', async () => {
+      // execを成功するようにモック
+      const { exec } = require('child_process');
+      exec.mockImplementationOnce((cmd, cb) => cb(null, { stdout: '{"success":true}' }));
+
+      const mockReq = new Request('http://localhost:3000/api/pptx/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: 'test-file',
+          translations: [{ text: 'Hello', translation: 'こんにちは' }],
+        }),
+      }) as NextRequest;
+
+      const response = await POST(mockReq);
       expect(response.status).toBe(200);
 
-      // レスポンスボディを取得
       const data = await response.json();
-
-      // レスポンスボディを検証
       expect(data.success).toBe(true);
-      expect(data.fileId).toBe('test-file');
-      expect(data.filePath).toBe('uploads/test-user/test-file_translated.pptx');
-      expect(data.message).toBe('PPTXファイルが正常に生成されました');
-    });
-
-    it('必須パラメータが欠けている場合はエラーを返す', async () => {
-      // 無効なリクエストボディの作成（fileIdが欠けている）
-      const requestBody = {
-        translations: [
-          {
-            slideId: 'slide1',
-            title: {
-              original: 'Original Title',
-              translated: '翻訳されたタイトル',
-            },
-          },
-        ],
-      };
-
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        json: jest.fn().mockResolvedValue(requestBody),
-      } as unknown as NextRequest;
-
-      // APIハンドラを呼び出す
-      const response = await POST(mockReq);
-
-      // レスポンスを検証
-      expect(response.status).toBe(400);
-
-      // レスポンスボディを取得
-      const data = await response.json();
-
-      // レスポンスボディを検証
-      expect(data.error).toBe('Missing required parameters');
-    });
-
-    it('翻訳データが欠けている場合はエラーを返す', async () => {
-      // 無効なリクエストボディの作成（translationsが欠けている）
-      const requestBody = {
-        fileId: 'test-file',
-      };
-
-      // リクエストオブジェクトのモック
-      const mockReq = {
-        json: jest.fn().mockResolvedValue(requestBody),
-      } as unknown as NextRequest;
-
-      // APIハンドラを呼び出す
-      const response = await POST(mockReq);
-
-      // レスポンスを検証
-      expect(response.status).toBe(400);
-
-      // レスポンスボディを取得
-      const data = await response.json();
-
-      // レスポンスボディを検証
-      expect(data.error).toBe('Missing required parameters');
+      expect(data.downloadUrl).toBe('/api/download/test-user/test-file_translated.pptx');
     });
   });
 });
