@@ -1,0 +1,54 @@
+bacf4545f9f3461dbced945831598163
+'use strict';
+var implementation = require('./implementation');
+var lacksProperEnumerationOrder = function() {
+    if (!Object.assign) {
+        return false;
+    }
+    /*
+	 * v8, specifically in node 4.x, has a bug with incorrect property enumeration order
+	 * note: this does not detect the bug unless there's 20 characters
+	 */ var str = 'abcdefghijklmnopqrst';
+    var letters = str.split('');
+    var map = {};
+    for(var i = 0; i < letters.length; ++i){
+        map[letters[i]] = letters[i];
+    }
+    var obj = Object.assign({}, map);
+    var actual = '';
+    for(var k in obj){
+        actual += k;
+    }
+    return str !== actual;
+};
+var assignHasPendingExceptions = function() {
+    if (!Object.assign || !Object.preventExtensions) {
+        return false;
+    }
+    /*
+	 * Firefox 37 still has "pending exception" logic in its Object.assign implementation,
+	 * which is 72% slower than our shim, and Firefox 40's native implementation.
+	 */ var thrower = Object.preventExtensions({
+        1: 2
+    });
+    try {
+        Object.assign(thrower, 'xy');
+    } catch (e) {
+        return thrower[1] === 'y';
+    }
+    return false;
+};
+module.exports = function getPolyfill() {
+    if (!Object.assign) {
+        return implementation;
+    }
+    if (lacksProperEnumerationOrder()) {
+        return implementation;
+    }
+    if (assignHasPendingExceptions()) {
+        return implementation;
+    }
+    return Object.assign;
+};
+
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy95dXN1a2V0c3Vub2RhL0RvY3VtZW50cy9jdXJzb3IvcHB0dHJhbnNsYXRvcmFwcC9ub2RlX21vZHVsZXMvb2JqZWN0LmFzc2lnbi9wb2x5ZmlsbC5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyIndXNlIHN0cmljdCc7XG5cbnZhciBpbXBsZW1lbnRhdGlvbiA9IHJlcXVpcmUoJy4vaW1wbGVtZW50YXRpb24nKTtcblxudmFyIGxhY2tzUHJvcGVyRW51bWVyYXRpb25PcmRlciA9IGZ1bmN0aW9uICgpIHtcblx0aWYgKCFPYmplY3QuYXNzaWduKSB7XG5cdFx0cmV0dXJuIGZhbHNlO1xuXHR9XG5cdC8qXG5cdCAqIHY4LCBzcGVjaWZpY2FsbHkgaW4gbm9kZSA0LngsIGhhcyBhIGJ1ZyB3aXRoIGluY29ycmVjdCBwcm9wZXJ0eSBlbnVtZXJhdGlvbiBvcmRlclxuXHQgKiBub3RlOiB0aGlzIGRvZXMgbm90IGRldGVjdCB0aGUgYnVnIHVubGVzcyB0aGVyZSdzIDIwIGNoYXJhY3RlcnNcblx0ICovXG5cdHZhciBzdHIgPSAnYWJjZGVmZ2hpamtsbW5vcHFyc3QnO1xuXHR2YXIgbGV0dGVycyA9IHN0ci5zcGxpdCgnJyk7XG5cdHZhciBtYXAgPSB7fTtcblx0Zm9yICh2YXIgaSA9IDA7IGkgPCBsZXR0ZXJzLmxlbmd0aDsgKytpKSB7XG5cdFx0bWFwW2xldHRlcnNbaV1dID0gbGV0dGVyc1tpXTtcblx0fVxuXHR2YXIgb2JqID0gT2JqZWN0LmFzc2lnbih7fSwgbWFwKTtcblx0dmFyIGFjdHVhbCA9ICcnO1xuXHRmb3IgKHZhciBrIGluIG9iaikge1xuXHRcdGFjdHVhbCArPSBrO1xuXHR9XG5cdHJldHVybiBzdHIgIT09IGFjdHVhbDtcbn07XG5cbnZhciBhc3NpZ25IYXNQZW5kaW5nRXhjZXB0aW9ucyA9IGZ1bmN0aW9uICgpIHtcblx0aWYgKCFPYmplY3QuYXNzaWduIHx8ICFPYmplY3QucHJldmVudEV4dGVuc2lvbnMpIHtcblx0XHRyZXR1cm4gZmFsc2U7XG5cdH1cblx0Lypcblx0ICogRmlyZWZveCAzNyBzdGlsbCBoYXMgXCJwZW5kaW5nIGV4Y2VwdGlvblwiIGxvZ2ljIGluIGl0cyBPYmplY3QuYXNzaWduIGltcGxlbWVudGF0aW9uLFxuXHQgKiB3aGljaCBpcyA3MiUgc2xvd2VyIHRoYW4gb3VyIHNoaW0sIGFuZCBGaXJlZm94IDQwJ3MgbmF0aXZlIGltcGxlbWVudGF0aW9uLlxuXHQgKi9cblx0dmFyIHRocm93ZXIgPSBPYmplY3QucHJldmVudEV4dGVuc2lvbnMoeyAxOiAyIH0pO1xuXHR0cnkge1xuXHRcdE9iamVjdC5hc3NpZ24odGhyb3dlciwgJ3h5Jyk7XG5cdH0gY2F0Y2ggKGUpIHtcblx0XHRyZXR1cm4gdGhyb3dlclsxXSA9PT0gJ3knO1xuXHR9XG5cdHJldHVybiBmYWxzZTtcbn07XG5cbm1vZHVsZS5leHBvcnRzID0gZnVuY3Rpb24gZ2V0UG9seWZpbGwoKSB7XG5cdGlmICghT2JqZWN0LmFzc2lnbikge1xuXHRcdHJldHVybiBpbXBsZW1lbnRhdGlvbjtcblx0fVxuXHRpZiAobGFja3NQcm9wZXJFbnVtZXJhdGlvbk9yZGVyKCkpIHtcblx0XHRyZXR1cm4gaW1wbGVtZW50YXRpb247XG5cdH1cblx0aWYgKGFzc2lnbkhhc1BlbmRpbmdFeGNlcHRpb25zKCkpIHtcblx0XHRyZXR1cm4gaW1wbGVtZW50YXRpb247XG5cdH1cblx0cmV0dXJuIE9iamVjdC5hc3NpZ247XG59O1xuIl0sIm5hbWVzIjpbImltcGxlbWVudGF0aW9uIiwicmVxdWlyZSIsImxhY2tzUHJvcGVyRW51bWVyYXRpb25PcmRlciIsIk9iamVjdCIsImFzc2lnbiIsInN0ciIsImxldHRlcnMiLCJzcGxpdCIsIm1hcCIsImkiLCJsZW5ndGgiLCJvYmoiLCJhY3R1YWwiLCJrIiwiYXNzaWduSGFzUGVuZGluZ0V4Y2VwdGlvbnMiLCJwcmV2ZW50RXh0ZW5zaW9ucyIsInRocm93ZXIiLCJlIiwibW9kdWxlIiwiZXhwb3J0cyIsImdldFBvbHlmaWxsIl0sIm1hcHBpbmdzIjoiQUFBQTtBQUVBLElBQUlBLGlCQUFpQkMsUUFBUTtBQUU3QixJQUFJQyw4QkFBOEI7SUFDakMsSUFBSSxDQUFDQyxPQUFPQyxNQUFNLEVBQUU7UUFDbkIsT0FBTztJQUNSO0lBQ0E7OztFQUdDLEdBQ0QsSUFBSUMsTUFBTTtJQUNWLElBQUlDLFVBQVVELElBQUlFLEtBQUssQ0FBQztJQUN4QixJQUFJQyxNQUFNLENBQUM7SUFDWCxJQUFLLElBQUlDLElBQUksR0FBR0EsSUFBSUgsUUFBUUksTUFBTSxFQUFFLEVBQUVELEVBQUc7UUFDeENELEdBQUcsQ0FBQ0YsT0FBTyxDQUFDRyxFQUFFLENBQUMsR0FBR0gsT0FBTyxDQUFDRyxFQUFFO0lBQzdCO0lBQ0EsSUFBSUUsTUFBTVIsT0FBT0MsTUFBTSxDQUFDLENBQUMsR0FBR0k7SUFDNUIsSUFBSUksU0FBUztJQUNiLElBQUssSUFBSUMsS0FBS0YsSUFBSztRQUNsQkMsVUFBVUM7SUFDWDtJQUNBLE9BQU9SLFFBQVFPO0FBQ2hCO0FBRUEsSUFBSUUsNkJBQTZCO0lBQ2hDLElBQUksQ0FBQ1gsT0FBT0MsTUFBTSxJQUFJLENBQUNELE9BQU9ZLGlCQUFpQixFQUFFO1FBQ2hELE9BQU87SUFDUjtJQUNBOzs7RUFHQyxHQUNELElBQUlDLFVBQVViLE9BQU9ZLGlCQUFpQixDQUFDO1FBQUUsR0FBRztJQUFFO0lBQzlDLElBQUk7UUFDSFosT0FBT0MsTUFBTSxDQUFDWSxTQUFTO0lBQ3hCLEVBQUUsT0FBT0MsR0FBRztRQUNYLE9BQU9ELE9BQU8sQ0FBQyxFQUFFLEtBQUs7SUFDdkI7SUFDQSxPQUFPO0FBQ1I7QUFFQUUsT0FBT0MsT0FBTyxHQUFHLFNBQVNDO0lBQ3pCLElBQUksQ0FBQ2pCLE9BQU9DLE1BQU0sRUFBRTtRQUNuQixPQUFPSjtJQUNSO0lBQ0EsSUFBSUUsK0JBQStCO1FBQ2xDLE9BQU9GO0lBQ1I7SUFDQSxJQUFJYyw4QkFBOEI7UUFDakMsT0FBT2Q7SUFDUjtJQUNBLE9BQU9HLE9BQU9DLE1BQU07QUFDckIifQ==
