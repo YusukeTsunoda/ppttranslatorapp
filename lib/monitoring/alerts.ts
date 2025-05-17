@@ -112,4 +112,6 @@ export class AlertManager {
       }
     }
   }
-} 
+}
+
+export const alertManager = AlertManager.getInstance(); 

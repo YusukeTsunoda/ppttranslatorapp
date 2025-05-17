@@ -30,3 +30,10 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
+
+/**
+ * 数値を3桁区切りでフォーマットする
+ */
+export function formatNumber(num: number): string {
+  return new Intl.NumberFormat('ja-JP').format(num);
+}
