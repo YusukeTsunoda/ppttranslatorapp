@@ -1,0 +1,90 @@
+name: Performance Tests
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 毎日00:00に実行
+  workflow_dispatch:      # 手動実行も可能
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'lib/**'         # libディレクトリの変更時のみ実行
+      - 'tests/**'       # testsディレクトリの変更時のみ実行
+
+jobs:
+  performance-test:
+    name: Run Performance Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Create reports directory
+        run: mkdir -p reports/performance
+      
+      - name: Run performance tests
+        run: |
+          npm run test:performance
+        env:
+          CI: true
+          NODE_ENV: test
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-results
+          path: reports/performance
+      
+      - name: Check performance thresholds
+        run: |
+          node scripts/check-performance-thresholds.js
+        continue-on-error: true
+      
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  analyze-trends:
+    needs: performance-test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          name: performance-test-results
+          path: reports/performance
+      
+      - name: Generate trend analysis
+        run: |
+          node scripts/analyze-performance-trends.js
+      
+      - name: Upload trend analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-trends
+          path: reports/performance/trends
+      
+      - name: Update performance dashboard
+        if: github.ref == 'refs/heads/main'
+        run: |
+          node scripts/update-performance-dashboard.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

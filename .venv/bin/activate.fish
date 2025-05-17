@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/.venv
+set -gx VIRTUAL_ENV /Users/yusuketsunoda/Documents/cursor/ppttranslatorapp/worktrees/fix-text-position-alignment/.venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

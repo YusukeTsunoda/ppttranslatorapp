@@ -105,7 +105,7 @@ def detect_language(text):
     return "en"
 
 def adjust_font_size(paragraph, min_size=8, max_size=None):
-    """テキストのフォントサイズを調整する"""
+    """テキストのフォントサイズを二分探索で最適化する"""
     
     # 現在のフォントサイズを取得
     current_size = None
@@ -122,21 +122,43 @@ def adjust_font_size(paragraph, min_size=8, max_size=None):
     if max_size is None:
         max_size = current_size
     
-    # テキストが長すぎる場合はフォントサイズを小さくする
-    text_length = len(paragraph.text)
+    def check_text_fits(size):
+        """指定されたフォントサイズでテキストが収まるかチェック"""
+        # テキストフレームの幅と高さを取得
+        frame_width = paragraph._parent.width
+        frame_height = paragraph._parent.height
+        
+        # テキストの予想サイズを計算
+        text = paragraph.text
+        estimated_width = len(text) * size * 0.6  # 文字あたりの平均幅を概算
+        estimated_height = size * 1.2  # 行の高さを概算
+        
+        # 行数を計算
+        lines = estimated_width / frame_width
+        total_height = lines * estimated_height
+        
+        return total_height <= frame_height
     
-    if text_length > 200:  # 非常に長いテキスト
-        new_size = max(min_size, current_size * 0.7)  # 70%に縮小
-    elif text_length > 100:  # 長いテキスト
-        new_size = max(min_size, current_size * 0.8)  # 80%に縮小
-    elif text_length > 50:   # 中程度のテキスト
-        new_size = max(min_size, current_size * 0.9)  # 90%に縮小
-    else:
-        new_size = min(max_size, current_size)  # 現在のサイズを維持または最大サイズに制限
+    # 二分探索でフォントサイズを決定
+    left = min_size
+    right = max_size
+    optimal_size = min_size
     
-    # すべてのランのフォントサイズを設定
+    while left <= right:
+        mid = (left + right) / 2
+        if check_text_fits(mid):
+            optimal_size = mid
+            left = mid + 0.5  # より大きいサイズを試す
+        else:
+            right = mid - 0.5  # より小さいサイズを試す
+        
+        # 十分な精度に達したら終了
+        if right - left < 0.5:
+            break
+    
+    # 最適なサイズを設定
     for run in paragraph.runs:
-        run.font.size = Pt(new_size)
+        run.font.size = Pt(optimal_size)
 
 def update_slide_text(slide, slide_data):
     """スライド内のテキストを翻訳文で更新する"""

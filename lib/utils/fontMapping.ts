@@ -181,4 +181,178 @@ export function getTextDirection(language: LanguageCode): 'ltr' | 'rtl' {
   // RTL（右から左）言語
   const rtlLanguages = ['ar', 'he', 'fa', 'ur'];
   return rtlLanguages.includes(language) ? 'rtl' : 'ltr';
+}
+
+// キャッシュ設定
+const MAX_CACHE_SIZE = process.env.NODE_ENV === 'production' ? 2000 : 1000;
+const CACHE_CLEANUP_THRESHOLD = MAX_CACHE_SIZE * 0.8;
+const CHAR_TYPE_CACHE_SIZE = 1000;
+
+// テキストサイズ計算のキャッシュ
+interface CacheEntry {
+  width: number;
+  height: number;
+  lastAccess: number;
+}
+
+const textSizeCache = new Map<string, CacheEntry>();
+const charTypeCache = new Map<string, string>();
+
+// 事前コンパイルされた正規表現パターン
+const PATTERNS = {
+  japanese: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/,
+  latin: /[A-Za-z]/,
+  number: /[0-9]/,
+  arabic: /[\u0600-\u06FF]/,
+  hiragana: /[\u3040-\u309F]/,
+  katakana: /[\u30A0-\u30FF]/,
+  kanji: /[\u4E00-\u9FAF]/
+};
+
+/**
+ * キャッシュのクリーンアップを実行
+ */
+function cleanupCache(cache: Map<string, any>, maxSize: number) {
+  if (cache.size > CACHE_CLEANUP_THRESHOLD) {
+    if (cache === textSizeCache) {
+      // テキストサイズキャッシュの場合、最終アクセス時刻でソート
+      const entries = Array.from(cache.entries());
+      entries.sort((a, b) => (a[1] as CacheEntry).lastAccess - (b[1] as CacheEntry).lastAccess);
+      const deleteCount = entries.length - Math.floor(maxSize / 2);
+      for (let i = 0; i < deleteCount; i++) {
+        cache.delete(entries[i][0]);
+      }
+    } else {
+      // その他のキャッシュの場合、単純に古いエントリを削除
+      const deleteCount = cache.size - Math.floor(maxSize / 2);
+      const keys = Array.from(cache.keys()).slice(0, deleteCount);
+      keys.forEach(key => cache.delete(key));
+    }
+  }
+}
+
+/**
+ * キャッシュキーを生成
+ */
+function generateCacheKey(text: string, fontSize: number, fontName: string): string {
+  return `${text}_${fontSize}_${fontName}`;
+}
+
+/**
+ * テキストサイズを計算（キャッシュ対応）
+ */
+export function calculateTextSize(
+  text: string,
+  fontSize: number,
+  fontName: string
+): { width: number; height: number } {
+  const cacheKey = generateCacheKey(text, fontSize, fontName);
+  
+  // キャッシュチェック
+  const cachedEntry = textSizeCache.get(cacheKey);
+  if (cachedEntry) {
+    cachedEntry.lastAccess = Date.now();
+    return { width: cachedEntry.width, height: cachedEntry.height };
+  }
+  
+  // 近似計算による実装
+  const avgCharWidth = fontSize * 0.6;
+  const lineHeight = fontSize * 1.2;
+  
+  // 文字種別による調整（最適化された実装）
+  const composition = analyzeTextComposition(text);
+  const adjustedWidth = text.length * avgCharWidth * (
+    1 +
+    (composition.japanese || 0) * 0.4 +
+    (composition.chinese || 0) * 0.4 +
+    (composition.korean || 0) * 0.3
+  );
+  
+  const size = {
+    width: Math.ceil(adjustedWidth),
+    height: Math.ceil(lineHeight)
+  };
+  
+  // キャッシュに保存
+  cleanupCache(textSizeCache, MAX_CACHE_SIZE);
+  textSizeCache.set(cacheKey, {
+    ...size,
+    lastAccess: Date.now()
+  });
+  
+  return size;
+}
+
+/**
+ * 文字の種別を判定（最適化版）
+ */
+export function getCharacterType(char: string): string {
+  // キャッシュチェック
+  if (charTypeCache.has(char)) {
+    return charTypeCache.get(char)!;
+  }
+  
+  let type = 'other';
+  
+  // 事前コンパイルされたパターンを使用
+  if (PATTERNS.japanese.test(char)) {
+    if (PATTERNS.hiragana.test(char)) type = 'hiragana';
+    else if (PATTERNS.katakana.test(char)) type = 'katakana';
+    else if (PATTERNS.kanji.test(char)) type = 'kanji';
+    else type = 'japanese';
+  } else if (PATTERNS.latin.test(char)) {
+    type = 'latin';
+  } else if (PATTERNS.number.test(char)) {
+    type = 'number';
+  } else if (PATTERNS.arabic.test(char)) {
+    type = 'arabic';
+  }
+  
+  // キャッシュに保存
+  cleanupCache(charTypeCache, CHAR_TYPE_CACHE_SIZE);
+  charTypeCache.set(char, type);
+  
+  return type;
+}
+
+/**
+ * テキスト内の文字種別の割合を計算（最適化版）
+ */
+export function analyzeTextComposition(text: string): { [key: string]: number } {
+  const composition: { [key: string]: number } = {
+    japanese: 0,
+    hiragana: 0,
+    katakana: 0,
+    kanji: 0,
+    latin: 0,
+    number: 0,
+    arabic: 0,
+    other: 0
+  };
+  
+  // バッチ処理による最適化
+  const length = text.length;
+  const batchSize = 100;
+  
+  for (let i = 0; i < length; i += batchSize) {
+    const endIndex = Math.min(i + batchSize, length);
+    const batch = text.slice(i, endIndex);
+    
+    for (let j = 0; j < batch.length; j++) {
+      const type = getCharacterType(batch[j]);
+      composition[type]++;
+    }
+    
+    // メモリ解放のためのガベージコレクションのヒント
+    if (i + batchSize < length) {
+      global.gc?.();
+    }
+  }
+  
+  // パーセンテージに変換
+  Object.keys(composition).forEach(key => {
+    composition[key] = (composition[key] / length) * 100;
+  });
+  
+  return composition;
 } 

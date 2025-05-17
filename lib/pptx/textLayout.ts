@@ -44,6 +44,65 @@ export function calculateAdjustedTextStyle(
 }
 
 /**
+ * マージン調整の基本設定
+ */
+const MARGIN_CONFIG = {
+  baseMargin: 0.01, // フォントサイズの1%をベースマージンとする
+  languageFactors: {
+    'en': 1.0,   // 英語（基準）
+    'ja': 0.1,   // 日本語（90%減）
+    'zh': 0.1,   // 中国語（90%減）
+    'ko': 0.2,   // 韓国語（80%減）
+    'ar': 8.0,   // アラビア語
+    'he': 8.0,   // ヘブライ語
+  },
+  rtlConfig: {
+    languages: ['ar', 'he'],
+    rightMarginMultiplier: 10.0,
+    leftMarginMultiplier: 0.01
+  }
+};
+
+/**
+ * マージンを計算する
+ */
+function calculateMargin(
+  fontSize: number,
+  sourceLanguage: string,
+  targetLanguage: string,
+  isRTL: boolean = false
+): { 
+  marginLeft: number, 
+  marginRight: number,
+  marginTop: number,
+  marginBottom: number 
+} {
+  const baseMargin = fontSize * MARGIN_CONFIG.baseMargin;
+  const sourceFactor = MARGIN_CONFIG.languageFactors[sourceLanguage] || 1.0;
+  const targetFactor = MARGIN_CONFIG.languageFactors[targetLanguage] || 1.0;
+  
+  // 基本マージンを計算
+  let margin = baseMargin * (targetFactor / sourceFactor);
+  
+  // RTL言語の場合、左右のマージンを調整
+  if (isRTL) {
+    return {
+      marginLeft: margin * MARGIN_CONFIG.rtlConfig.leftMarginMultiplier,
+      marginRight: margin * MARGIN_CONFIG.rtlConfig.rightMarginMultiplier,
+      marginTop: margin,
+      marginBottom: margin
+    };
+  }
+  
+  return {
+    marginLeft: margin,
+    marginRight: margin,
+    marginTop: margin,
+    marginBottom: margin
+  };
+}
+
+/**
  * テキスト要素の位置とサイズを調整
  * @param element テキスト要素
  * @param originalText 原文テキスト
@@ -59,31 +118,35 @@ export function adjustTextElement(
   sourceLanguage: string = 'en',
   targetLanguage: string = 'ja'
 ): TextElement {
-  // テキスト要素のディープコピー
   const adjustedElement = {...element};
   
-  // ポジションの調整
   if (adjustedElement.position) {
-    const { width, height } = adjustedElement.position;
+    const fontSize = adjustedElement.fontInfo?.size || 12; // デフォルトフォントサイズ
+    const isRTL = MARGIN_CONFIG.rtlConfig.languages.includes(targetLanguage);
+    
+    // マージンを計算
+    const margins = calculateMargin(fontSize, sourceLanguage, targetLanguage, isRTL);
+    
+    // 位置とサイズを調整
+    adjustedElement.position = {
+      ...adjustedElement.position,
+      ...margins
+    };
     
     // サイズの調整
-    const adjustedSize = adjustTextBoxSize(
+    const { width, height } = adjustTextBoxSize(
       translatedText,
-      width,
-      height,
+      adjustedElement.position.width,
+      adjustedElement.position.height,
       sourceLanguage,
       targetLanguage
     );
     
-    // 調整されたサイズをセット
-    adjustedElement.position = {
-      ...adjustedElement.position,
-      width: adjustedSize.width,
-      height: adjustedSize.height
-    };
+    adjustedElement.position.width = width;
+    adjustedElement.position.height = height;
   }
   
-  // フォント情報があれば調整
+  // フォント情報の調整
   if (adjustedElement.fontInfo) {
     adjustedElement.fontInfo = calculateAdjustedTextStyle(
       originalText,

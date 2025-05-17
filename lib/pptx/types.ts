@@ -8,6 +8,11 @@ export interface Position {
   y: number;
   width: number;
   height: number;
+  marginLeft?: number;
+  marginRight?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  margin?: number; // 下位互換性のため
 }
 
 // テキスト要素のスタイル情報
