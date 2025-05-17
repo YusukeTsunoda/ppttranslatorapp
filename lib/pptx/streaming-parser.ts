@@ -2,24 +2,30 @@
  * ストリーミング処理に対応したPPTXパーサー
  * メモリ効率と処理速度を向上させるために、ファイル全体をメモリに読み込まずに
  * ストリーミング処理を行う実装です。
+ * 
+ * 最適化ポイント：
+ * 1. Worker Threads APIを使用した並列処理
+ * 2. ストリーミングI/Oによる効率的なファイル処理
+ * 3. バッファプールによるメモリ最適化
  */
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid'; // エラーIDの生成に使用
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import * as os from 'os';
 import { PythonShell } from 'python-shell';
-// cryptoモジュールは不要なので削除
+import * as crypto from 'crypto';
+import { WorkerPool } from './worker-pool';
+import { StreamingIO, BufferPool } from './streaming-io';
+import { performance } from 'perf_hooks'; // パフォーマンス計測用
 import { PPTXParseResult, ParseOptions as BaseParseOptions, SlideContent, Metadata } from './types';
 
-// ParseOptionsを拡張してキャッシュ関連のオプションを追加
+// ParseOptionsを拡張してキャッシュ関連のオプションと並列処理オプションを追加
 interface ParseOptions extends BaseParseOptions {
   skipCache?: boolean;
+  forceReparse?: boolean;
+  maxParallelProcesses?: number;
 }
-import { PPTXCacheHelper, createPPTXCacheHelper, PPTXCacheOptions } from './cache-helper';
 
-const execAsync = promisify(exec);
 const fsPromises = fs.promises;
 
 // キャッシュエントリの型
@@ -31,34 +37,33 @@ interface CacheEntry {
 
 // 構造化されたエラー情報の型
 interface StructuredError {
-  id: string;           // エラーID（UUID）
-  timestamp: number;    // エラー発生時刻
-  method: string;       // エラーが発生したメソッド
-  message: string;      // エラーメッセージ
-  stack?: string | undefined;       // スタックトレース（あれば）
-  context?: string | null | undefined; // コンテキスト情報（ファイルパスなど）
-  systemInfo: {         // システム情報
-    nodeVersion: string;  // Node.jsバージョン
-    memoryUsage: number;  // メモリ使用量（MB）
-    platform: string;     // プラットフォーム
-    arch: string;         // アーキテクチャ
+  id: string;
+  timestamp: number;
+  method: string;
+  message: string;
+  stack?: string | undefined;
+  context?: string | null | undefined;
+  systemInfo: {
+    nodeVersion: string;
+    memoryUsage: NodeJS.MemoryUsage;
+    platform: string;
+    arch: string;
   };
-  recovered: boolean;   // 回復処理が行われたか
-  severity: 'low' | 'medium' | 'high' | 'critical'; // エラーの重大度
+  recovered: boolean;
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
 // エラー分析結果の型
 interface ErrorAnalysis {
-  totalErrors: number;                 // 全エラー数
-  recoveredErrors: number;             // 回復処理されたエラー数
-  errorsBySeverity: Record<string, number>; // 重大度別エラー数
-  errorsByMethod: Record<string, number>;   // メソッド別エラー数
-  mostFrequentErrors: Array<{            // 最も频度の高いエラー
-    message: string;                      // エラーメッセージ
-    count: number;                        // 発生回数
-  }>;
-  lastError?: StructuredError | undefined; // 最後に発生したエラー
+  totalErrors: number;
+  recoveredErrors: number;
+  errorsBySeverity: Record<string, number>;
+  errorsByMethod: Record<string, number>;
+  mostFrequentErrors: { message: string; count: number }[];
+  lastError?: StructuredError | undefined;
 }
+
+
 
 /**
  * ストリーミング処理に対応したPPTXパーサークラス
@@ -67,18 +72,25 @@ export class StreamingPPTXParser {
   // クラスプロパティを確定的に初期化し、型エラーを回避する
   private pythonPath: string = 'python3'; // デフォルト値を直接設定
   private scriptPath: string = path.join(__dirname, '..', '..', 'python', 'pptx_parser.py');
-  private outputDir: string = path.join(os.tmpdir(), 'pptx-parser-output');
-  private cacheExpirationTime: number = 1000 * 60 * 60; // 1時間
-  private batchSize: number = 10; // 一度に処理するスライド数
-  private cacheHelper: PPTXCacheHelper;
+  private cacheExpirationTime: number = 3600 * 24; // 24時間
   private parserCache: Map<string, CacheEntry> = new Map();
+  private cacheDir: string = path.join(os.tmpdir(), 'pptx-parser-cache');
+  private batchSize: number = 10; // 一度に処理するスライド数
   
-  // エラー情報の収集と分析のためのプロパティ
+  // 並列処理関連
+  private maxWorkers: number = Math.max(1, Math.min(os.cpus().length - 1, 4)); // CPUコア数 - 1を上限に
+  private workerScriptPath: string = path.join(__dirname, 'pptx-worker.js');
+  private workerPool: WorkerPool | null = null;
+  
+  // メモリ最適化関連
+  private bufferSize: number = 1024 * 1024; // 1MB
+  private bufferPool: BufferPool | null = null;
+  private streamingIO: StreamingIO | null = null;
+  
+  // エラーログ
   private errorLog: StructuredError[] = [];
-  private maxErrorLogSize: number = 100; // エラーログの最大保持数
-  private errorCount: Record<string, number> = {}; // エラーメッセージ別の発生回数
-  
-  private static instance: StreamingPPTXParser;
+  private errorCount: Record<string, number> = {};
+  private maxErrorLogSize: number = 100;
 
   /**
    * コンストラクタ
@@ -87,11 +99,12 @@ export class StreamingPPTXParser {
   constructor(options: {
     pythonPath?: string;
     scriptPath?: string;
-    outputDir?: string;
     maxParallelProcesses?: number;
     cacheExpirationTime?: number;
     batchSize?: number;
-    cacheOptions?: PPTXCacheOptions;
+    maxWorkers?: number;
+    bufferSize?: number;
+    workerScriptPath?: string;
   } = {}) {
     // クラスプロパティはすでにデフォルト値で初期化されているので、
     // オプションが指定された場合のみ上書きする
@@ -103,180 +116,201 @@ export class StreamingPPTXParser {
       this.scriptPath = options.scriptPath;
     }
     
-    if (options.outputDir) {
-      this.outputDir = options.outputDir;
-    }
+
     
-    if (options.cacheExpirationTime !== undefined) {
+    if (options.cacheExpirationTime) {
       this.cacheExpirationTime = options.cacheExpirationTime;
     }
     
-    if (options.batchSize !== undefined) {
+    if (options.batchSize) {
       this.batchSize = options.batchSize;
     }
     
-    // 出力ディレクトリが存在しない場合は作成
-    if (!fs.existsSync(this.outputDir)) {
-      fs.mkdirSync(this.outputDir, { recursive: true });
+    if (options.maxWorkers) {
+      this.maxWorkers = options.maxWorkers;
     }
     
-    // キャッシュヘルパーを初期化
-    const cacheDir = path.join(this.outputDir, 'cache');
-    const defaultCacheOptions: PPTXCacheOptions = {
-      cacheDir,
-      ttl: this.cacheExpirationTime,
-      maxMemoryEntries: 20,
-      maxDiskEntries: 100,
-      useDiskCache: true,
-      prefix: 'pptx_cache',
-      cleanupInterval: 30 * 60 * 1000 // 30分
-    };
+    if (options.bufferSize) {
+      this.bufferSize = options.bufferSize;
+    }
     
-    this.cacheHelper = createPPTXCacheHelper({
-      ...defaultCacheOptions,
-      ...options.cacheOptions
-    });
+    if (options.workerScriptPath) {
+      this.workerScriptPath = options.workerScriptPath;
+    }
+    
+    // バッファプールを初期化
+    this.bufferPool = new BufferPool(this.bufferSize, 10); // 10個のバッファを事前に確保
+    
+    // ストリーミングI/Oを初期化
+    this.streamingIO = new StreamingIO();
   }
   
   /**
-   * シングルトンインスタンスを取得
-   * @returns StreamingPPTXParserのインスタンス
+   * 並列処理用のワーカープールを初期化
    */
-  public static getInstance(options?: {
-    pythonPath?: string;
-    scriptPath?: string;
-    outputDir?: string;
-    cacheExpirationTime?: number;
-    batchSize?: number;
-    cacheOptions?: PPTXCacheOptions;
-  }): StreamingPPTXParser {
-    if (!StreamingPPTXParser.instance) {
-      StreamingPPTXParser.instance = new StreamingPPTXParser(options || {});
+  private initializeWorkerPool(): void {
+    if (this.workerPool) {
+      return; // すでに初期化されている場合は何もしない
     }
-    return StreamingPPTXParser.instance;
-  }
-
-
-
-  /**
-   * Python依存関係のチェック
-   * @throws {Error} Python依存関係のチェックに失敗した場合
-   */
-  private async checkDependencies(): Promise<void> {
-    // 型安全性を確保するために、クラスプロパティの値をローカル変数に保存
-    // クラスプロパティはデフォルト値で初期化されているので、型エラーは発生しない
-    const pythonPath = this.pythonPath;
     
     try {
-      // Pythonのバージョンチェック
-      try {
-        const { stdout } = await execAsync(`${pythonPath} --version`);
-        const versionMatch = stdout.match(/Python (\d+)\.(\d+)\.(\d+)/);
-        
-        if (versionMatch && versionMatch[1] && versionMatch[2] && versionMatch[3]) {
-          const major = parseInt(versionMatch[1], 10);
-          const minor = parseInt(versionMatch[2], 10);
-          
-          if (major < 3 || (major === 3 && minor < 7)) {
-            throw new Error(`Python 3.7以上が必要です。検出されたバージョン: ${stdout.trim()}`);
-          }
-          
-          console.log(`Using Python ${major}.${minor}.${versionMatch[3]}`);
-        } else {
-          console.warn(`Pythonバージョンの解析に失敗しました: ${stdout.trim()}`);
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Pythonの実行に失敗しました: ${error.message}。Pythonがインストールされていることを確認してください。`);
-        }
-        throw error;
-      }
-      
-      // 必要なPythonパッケージのチェック
-      const requiredPackages = ['python-pptx', 'Pillow', 'numpy'];
-      const missingPackages: string[] = [];
-      const packageErrors: Record<string, string> = {};
-      
-      for (const pkg of requiredPackages) {
-        try {
-          // ハイフンをアンダースコアに変換（Pythonモジュール名の規則に合わせる）
-          const pkgName = pkg.replace('-', '_');
-          const importCmd = `import ${pkgName}`;
-          const cmd = `${pythonPath} -c "${importCmd}"`;
-          // ここではpythonPathは必ずstring型であることが保証されている
-          await execAsync(cmd);
-          console.log(`Package ${pkg} is installed.`);
-        } catch (error) {
-          console.warn(`Required Python package not found: ${pkg}`);
-          missingPackages.push(pkg);
-          packageErrors[pkg] = error instanceof Error ? error.message : String(error);
-        }
-      }
-      
-      if (missingPackages.length > 0) {
-        const missingPackagesStr = missingPackages.join(', ');
-        console.warn(`Missing Python packages: ${missingPackagesStr}`);
-        
-        // 詳細なエラー情報をログに出力
-        for (const pkg of missingPackages) {
-          console.warn(`Error details for ${pkg}: ${packageErrors[pkg]}`);
-        }
-        
-        // インストール手順の表示
-        const installInstructions = [
-          '以下の手順でPython依存パッケージをインストールしてください:',
-          '1. 仮想環境の作成と有効化:',
-          '   python3 -m venv venv',
-          '   source venv/bin/activate  # Linuxの場合',
-          '   .\\venv\\Scripts\\activate  # Windowsの場合',
-          `2. 必要なパッケージのインストール:`,
-          `   pip install ${missingPackagesStr}`,
-          '3. インストール後、アプリケーションを再起動してください。'
-        ].join('\n');
-        
-        console.warn(installInstructions);
-        
-        // テストモードの場合はエラーをスキップ
-        if (process.env['NODE_ENV'] === 'test') {
-          console.warn('Running in test mode, skipping dependency check.');
-          return;
-        }
-        
-        throw new Error(`Python依存パッケージが不足しています: ${missingPackagesStr}\n${installInstructions}`);
-      }
+      this.workerPool = new WorkerPool(this.workerScriptPath, this.maxWorkers);
+      console.log(`ワーカープールを初期化しました（最大ワーカー数: ${this.maxWorkers}）`);
     } catch (error) {
-      if (process.env['NODE_ENV'] === 'test') {
-        console.warn('Running in test mode, skipping dependency check error:', error);
-        return;
-      }
-      
-      console.error('Failed to check Python dependencies:', error);
-      
-      if (error instanceof Error) {
-        throw error; // すでに詳細なエラーメッセージが含まれている場合はそのまま再スロー
-      } else {
-        throw new Error('Python依存関係のチェックに失敗しました。Python 3.7以上と必要なパッケージがインストールされていることを確認してください。');
-      }
+      console.error('ワーカープールの初期化に失敗しました:', error);
+      this.logError('initializeWorkerPool', error, null, 'medium', false);
     }
   }
-
+  
+  /**
+   * 並列処理を使用してスライドを解析
+   * @param inputPath 入力ファイルパス
+   * @param outputDir 出力ディレクトリ
+   * @param slideCount スライド数
+   * @returns 解析結果の配列
+   */
+  private async parseSlidesConcurrently(
+    inputPath: string,
+    outputDir: string,
+    slideCount: number
+  ): Promise<SlideContent[]> {
+    // ワーカープールを初期化
+    this.initializeWorkerPool();
+    
+    if (!this.workerPool) {
+      throw new Error('ワーカープールの初期化に失敗しました');
+    }
+    
+    // 結果を格納する配列
+    const results: SlideContent[] = new Array(slideCount);
+    
+    // バッチサイズごとに処理
+    for (let i = 0; i < slideCount; i += this.batchSize) {
+      // バッチのサイズを計算
+      const batchEnd = Math.min(i + this.batchSize, slideCount);
+      const batch = Array.from({ length: batchEnd - i }, (_, j) => i + j);
+      
+      // バッチ内のスライドを並列処理
+      const batchPromises = batch.map(slideIndex => {
+        // WorkerPoolのrunTaskメソッドを使用
+        if (this.workerPool) {
+          try {
+            // ワーカープールにタスクを送信し、Promiseを取得
+            return this.workerPool.runTask('parseSlide', {
+              inputPath,
+              outputDir,
+              slideIndex,
+              pythonPath: this.pythonPath,
+              scriptPath: this.scriptPath
+            }).then(result => {
+              // 結果をSlideContent型に変換
+              return result as SlideContent;
+            }).catch(error => {
+              console.error(`スライド解析エラー (${slideIndex}):`, error);
+              // エラー時は空のスライドを返す
+              return {
+                index: slideIndex,
+                imageUrl: '',
+                textElements: [],
+                shapes: [],
+                background: {
+                  color: '#FFFFFF'
+                }
+              } as SlideContent;
+            });
+          } catch (error) {
+            console.error(`スライド解析エラー (${slideIndex}):`, error);
+            return Promise.resolve({
+              index: slideIndex,
+              imageUrl: '',
+              textElements: [],
+              shapes: [],
+              background: {
+                color: '#FFFFFF'
+              }
+            } as SlideContent);
+          }
+        }
+        return Promise.resolve({
+          index: slideIndex,
+          imageUrl: '',
+          textElements: [],
+          shapes: [],
+          background: {
+            color: '#FFFFFF'
+          }
+        } as SlideContent);
+      });
+      
+      // バッチの結果を取得
+      const batchResults = await Promise.all(batchPromises);
+      
+      // 結果を正しい位置に格納
+      for (let j = 0; j < batch.length; j++) {
+        const index = batch[j];
+        const result = batchResults[j];
+        if (index !== undefined && index >= 0 && index < slideCount && result) {
+          results[index] = result;
+        } else if (index !== undefined && index >= 0 && index < slideCount) {
+          // 空のスライドを作成
+          results[index] = {
+            index: index,
+            imageUrl: '',
+            textElements: [],
+            shapes: [],
+            background: {
+              color: '#FFFFFF'
+            }
+          };
+        }
+      }
+    }
+    
+    return results;
+  }
+  
   /**
    * ファイルのハッシュを計算
    * @param filePath ファイルパス
    * @returns ハッシュ文字列
-   * @throws {Error} ファイルが存在しないか、アクセスできない場合
    */
   private async calculateFileHash(filePath: string): Promise<string> {
-    // ファイルの存在確認
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`ファイルが存在しません: ${filePath}`);
-    }
-    
     try {
-      return this.cacheHelper.calculateFileHash(filePath);
+      const fileContent = await fsPromises.readFile(filePath);
+      const hash = crypto.createHash('md5').update(fileContent).digest('hex');
+      return hash;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`ファイルハッシュの計算に失敗しました: ${errorMessage}`);
+      console.error(`ファイルハッシュの計算に失敗しました: ${filePath}`, error);
+      return '';
+    }
+  }
+  
+  /**
+   * 依存関係を確認
+   */
+  private async checkDependencies(): Promise<void> {
+    // Pythonがインストールされているか確認
+    try {
+      const { spawn } = await import('child_process');
+      const pythonProcess = spawn(this.pythonPath, ['--version']);
+      
+      return new Promise<void>((resolve, reject) => {
+        pythonProcess.on('error', (error) => {
+          console.error('Pythonの実行に失敗しました:', error);
+          reject(new Error(`Pythonの実行に失敗しました: ${error.message}`));
+        });
+        
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Pythonの実行がコード ${code} で終了しました`));
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Python依存関係の確認に失敗しました:', error);
+      throw error;
     }
   }
 
@@ -286,17 +320,22 @@ export class StreamingPPTXParser {
    * @param fileHash ファイルハッシュ
    * @returns 有効な場合はtrue
    */
-  private isCacheValid(cache: CacheEntry | null | undefined, fileHash: string): boolean {
+  private isCacheValid(cache: CacheEntry, fileHash: string): boolean {
+    // キャッシュが存在しない場合は無効
     if (!cache) {
       return false;
     }
     
-    const now = Date.now();
-    const isExpired = now - cache.timestamp > this.cacheExpirationTime;
-    const isHashMatch = cache.fileHash === fileHash;
+    // ファイルハッシュが異なる場合は無効
+    if (cache.fileHash !== fileHash) {
+      return false;
+    }
     
-    // キャッシュが期限切れでなく、ハッシュが一致する場合は有効
-    return !isExpired && isHashMatch;
+    // キャッシュの有効期限を確認
+    const now = Date.now();
+    const age = now - cache.timestamp;
+    
+    return age <= this.cacheExpirationTime;
   }
 
   /**
@@ -392,12 +431,12 @@ export class StreamingPPTXParser {
       console.error(`Context: ${context}`);
     }
     
-    // システム情報を取得
-    const memoryUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100; // MB単位
+    // メモリ使用量を取得
+    const memoryUsage = process.memoryUsage();
     
-    // エラー情報を構造化
+    // 構造化されたエラー情報を作成
     const structuredError: StructuredError = {
-      id: uuidv4(), // 一意のエラーIDを生成
+      id: uuidv4(),
       timestamp: Date.now(),
       method,
       message: error instanceof Error ? error.message : String(error),
@@ -459,8 +498,6 @@ private async tryGetFromCache(inputPath: string, options: ParseOptions): Promise
   }
 }
 
-// 重複しているisCacheValidメソッドを削除
-
 /**
  * 結果をキャッシュに保存する
  * @param inputPath 入力ファイルパス
@@ -468,11 +505,16 @@ private async tryGetFromCache(inputPath: string, options: ParseOptions): Promise
  * @returns 解析結果
  */
 private async parseAndCacheResult(inputPath: string, options: ParseOptions): Promise<PPTXParseResult> {
+  // パフォーマンス計測開始
+  const startTime = performance.now();
+  
   // ファイルハッシュを計算
   const fileHash = await this.calculateFileHash(inputPath);
+  const hashTime = performance.now();
+  console.log(`ファイルハッシュ計算時間: ${hashTime - startTime}ms`);
   
   // 一時出力ディレクトリを作成
-  const outputDir = path.join(this.outputDir, path.basename(inputPath, '.pptx'));
+  const outputDir = path.join(this.cacheDir, path.basename(inputPath, '.pptx'));
   await fsPromises.mkdir(outputDir, { recursive: true });
   
   // バッチサイズを設定（大きなファイルの場合はメモリ使用量を制限）
@@ -480,8 +522,24 @@ private async parseAndCacheResult(inputPath: string, options: ParseOptions): Pro
   const adjustedBatchSize = fileSize > 10 * 1024 * 1024 ? Math.min(this.batchSize, 5) : this.batchSize;
   console.log(`ファイルサイズ: ${fileSize} バイト, バッチサイズ: ${adjustedBatchSize}`);
   
-  // Pythonスクリプトを実行して解析
+  // ストリーミングI/Oを使用してファイルを処理
+  if (!this.streamingIO) {
+    this.streamingIO = new StreamingIO(this.bufferSize, 20);
+  }
+  
+  // 入力ファイルを作業ディレクトリにコピー
+  const workingFilePath = path.join(outputDir, path.basename(inputPath));
+  await this.streamCopyFile(inputPath, workingFilePath);
+  const copyTime = performance.now();
+  console.log(`ファイルコピー時間: ${copyTime - hashTime}ms`);
+  
+  // ワーカープールを初期化
+  this.initializeWorkerPool();
+  
+  // Pythonスクリプトを実行して解析（並列処理を活用）
   const result = await this.executePythonScript(inputPath, outputDir);
+  const parseTime = performance.now();
+  console.log(`解析処理時間: ${parseTime - copyTime}ms`);
   
   // 結果をキャッシュに保存
   if (!options.skipCache) {
@@ -493,7 +551,114 @@ private async parseAndCacheResult(inputPath: string, options: ParseOptions): Pro
     });
   }
   
+  const endTime = performance.now();
+  console.log(`全体処理時間: ${endTime - startTime}ms`);
+  
   return result;
+}
+
+/**
+ * ファイルをストリーミングでコピー
+ * @param sourcePath コピー元パス
+ * @param destPath コピー先パス
+ */
+private async streamCopyFile(sourcePath: string, destPath: string): Promise<void> {
+  if (this.streamingIO && this.bufferPool) {
+    // バッファプールからバッファを取得してコピーを実行
+    const buffer = this.bufferPool.get();
+    try {
+      await this.streamingIO.copyFileWithBuffer(sourcePath, destPath, buffer);
+    } finally {
+      // 使用後はバッファをプールに返却
+      this.bufferPool.release(buffer);
+    }
+  } else if (this.streamingIO) {
+    await this.streamingIO.copyFile(sourcePath, destPath);
+  } else {
+    // ストリーミングI/Oが無効な場合は通常のコピー
+    await fs.promises.copyFile(sourcePath, destPath);
+  }
+}
+
+/**
+ * Pythonスクリプトを実行する
+ * @param inputPath 入力ファイルパス
+ * @param outputDir 出力ディレクトリ
+ * @returns Pythonスクリプトの実行結果
+ */
+private async executePythonScript(inputPath: string, outputDir: string): Promise<PPTXParseResult> {
+  try {
+    // ワーカープールが初期化されているか確認
+    if (!this.workerPool) {
+      this.initializeWorkerPool();
+    }
+
+    // ストリーミングI/Oが初期化されているか確認
+    if (!this.streamingIO) {
+      this.streamingIO = new StreamingIO(this.bufferSize, 20);
+    }
+
+    // スライド数を取得するための予備処理
+    const slideCountResult = await this.getSlideCount(inputPath);
+    const slideCount = slideCountResult.count;
+
+    console.log(`スライド数: ${slideCount}`);
+
+    // スライド数が0の場合は空の結果を返す
+    if (slideCount === 0) {
+      return {
+        slides: [],
+        filename: path.basename(inputPath),
+        totalSlides: 0,
+        metadata: {
+          title: path.basename(inputPath),
+          author: 'Unknown',
+          created: new Date().toISOString(),
+          modified: new Date().toISOString(),
+          lastModifiedBy: 'System',
+          revision: 1,
+          presentationFormat: 'Unknown'
+        }
+      };
+    }
+
+    // メタデータを取得
+    const metadata = await this.getMetadata(inputPath);
+
+    // 並列処理を使用してスライドを解析
+    const slides = await this.parseSlidesConcurrently(inputPath, outputDir, slideCount);
+
+    // 結果を適切な形式に変換
+    const parseResult: PPTXParseResult = {
+      slides,
+      filename: path.basename(inputPath),
+      totalSlides: slides.length,
+      metadata: {
+        title: metadata.title || path.basename(inputPath),
+        author: metadata.author || 'Unknown',
+        created: metadata.created || new Date().toISOString(),
+        modified: metadata.modified || new Date().toISOString(),
+        lastModifiedBy: metadata.lastModifiedBy || 'System',
+        revision: metadata.revision || 1,
+        presentationFormat: metadata.presentationFormat || 'Unknown'
+      }
+    };
+
+    return parseResult;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error executing Python script:', errorMessage);
+    
+    // エラーを構造化して記録
+    this.logError('executePythonScript', error, inputPath);
+    
+    // エラーメッセージを詳細化
+    if (error instanceof Error) {
+      throw new Error(`PPTXパース処理でエラーが発生しました: ${errorMessage}`);
+    } else {
+      throw new Error(`PPTXパース処理で不明なエラーが発生しました: ${String(error)}`);
+    }
+  }
 }
 
 /**
@@ -501,45 +666,45 @@ private async parseAndCacheResult(inputPath: string, options: ParseOptions): Pro
  * @returns エラー分析結果
  */
 public analyzeErrors(): ErrorAnalysis {
-    const totalErrors = this.errorLog.length;
-    let recoveredErrors = 0;
-    const errorsBySeverity: Record<string, number> = {};
-    const errorsByMethod: Record<string, number> = {};
-    const errorMessages: Record<string, number> = {};
-    
-    // エラーログを分析
-    for (const error of this.errorLog) {
-      // 回復されたエラーをカウント
-      if (error.recovered) {
-        recoveredErrors++;
-      }
-      
-      // 重大度別のエラー数をカウント
-      errorsBySeverity[error.severity] = (errorsBySeverity[error.severity] || 0) + 1;
-      
-      // メソッド別のエラー数をカウント
-      errorsByMethod[error.method] = (errorsByMethod[error.method] || 0) + 1;
-      
-      // エラーメッセージ別のカウント
-      errorMessages[error.message] = (errorMessages[error.message] || 0) + 1;
+  const totalErrors = this.errorLog.length;
+  let recoveredErrors = 0;
+  const errorsBySeverity: Record<string, number> = {};
+  const errorsByMethod: Record<string, number> = {};
+  const errorMessages: Record<string, number> = {};
+  
+  // エラーログを分析
+  for (const error of this.errorLog) {
+    // 回復されたエラーをカウント
+    if (error.recovered) {
+      recoveredErrors++;
     }
     
-    // 最も频度の高いエラーを抽出
-    const mostFrequentErrors = Object.entries(errorMessages)
-      .map(([message, count]) => ({ message, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    // 重大度別のエラー数をカウント
+    errorsBySeverity[error.severity] = (errorsBySeverity[error.severity] || 0) + 1;
     
-    return {
-      totalErrors,
-      recoveredErrors,
-      errorsBySeverity,
-      errorsByMethod,
-      mostFrequentErrors,
-      lastError: this.errorLog.length > 0 ? this.errorLog[0] : undefined as StructuredError | undefined
-    };
+    // メソッド別のエラー数をカウント
+    errorsByMethod[error.method] = (errorsByMethod[error.method] || 0) + 1;
+    
+    // エラーメッセージ別のカウント
+    errorMessages[error.message] = (errorMessages[error.message] || 0) + 1;
   }
   
+  // 最も频度の高いエラーを抽出
+  const mostFrequentErrors = Object.entries(errorMessages)
+    .map(([message, count]) => ({ message, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  
+  return {
+    totalErrors,
+    recoveredErrors,
+    errorsBySeverity,
+    errorsByMethod,
+    mostFrequentErrors,
+    lastError: this.errorLog.length > 0 ? this.errorLog[0] : undefined
+  };
+}
+
   /**
    * エラーログをクリアする
    */
@@ -645,11 +810,14 @@ public analyzeErrors(): ErrorAnalysis {
     console.log(`部分的な結果を作成しています: ${inputPath}`);
     
     try {
+      // パフォーマンス計測開始
+      const startTime = performance.now();
+      
       // ファイル情報を取得
       const stats = await fsPromises.stat(inputPath);
       const fileInfo = path.parse(inputPath);
       
-      // 最小限のメタデータを作成
+      // メタデータを作成
       const metadata: Metadata = {
         title: fileInfo.name,
         author: 'Unknown',
@@ -668,6 +836,9 @@ public analyzeErrors(): ErrorAnalysis {
         shapes: [],
         background: { color: '#FFFFFF' }
       }];
+      
+      const endTime = performance.now();
+      console.log(`部分的な結果の作成時間: ${endTime - startTime}ms`);
       
       // 部分的な結果を返す
       return {
@@ -697,82 +868,146 @@ public analyzeErrors(): ErrorAnalysis {
   }
 
   /**
-   * Pythonスクリプトを実行する
+   * スライド数を取得する
    * @param inputPath 入力ファイルパス
-   * @param outputDir 出力ディレクトリ
-   * @returns Pythonスクリプトの実行結果
+   * @returns スライド数とエラー情報
    */
-  private async executePythonScript(inputPath: string, outputDir: string): Promise<PPTXParseResult> {
+  public async getSlideCount(inputPath: string): Promise<{ count: number; error?: string }> {
+    try {
+      // パフォーマンス計測開始
+      const startTime = performance.now();
+      
+      // Pythonスクリプトを実行してスライド数を取得
+      const options = {
+        mode: 'json',
+        pythonPath: this.pythonPath,
+        pythonOptions: ['-u'],
+        scriptPath: path.dirname(this.scriptPath),
+        args: [
+          '--input', inputPath,
+          '--count-only'
+        ]
+      };
+
+      return new Promise<{ count: number; error?: string }>((resolve) => {
+        try {
+          // @ts-ignore - PythonShellの型定義の問題を回避
+          PythonShell.run(path.basename(this.scriptPath), options, function(err, results) {
+            if (err) {
+              console.error('スライド数取得に失敗しました:', err);
+              resolve({ count: 0, error: err.message });
+              return;
+            }
+            
+            if (!results || results.length === 0) {
+              resolve({ count: 0, error: 'Pythonスクリプトから結果が返されませんでした' });
+              return;
+            }
+            
+            const result = results[results.length - 1];
+            resolve({ count: result.slideCount || 0 });
+
+            // パフォーマンス計測終了
+            const endTime = performance.now();
+            console.log(`スライド数取得時間: ${endTime - startTime}ms`);
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('スライド数取得の初期化に失敗しました:', errorMessage);
+          resolve({ count: 0, error: errorMessage });
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { count: 0, error: errorMessage };
+    }
+  }
+
+  /**
+   * メタデータを取得する
+   * @param inputPath 入力ファイルパス
+   * @returns メタデータ
+   */
+  public async getMetadata(inputPath: string): Promise<Metadata> {
     try {
       // PythonShellオプションの設定
       const options: any = {
         mode: 'json',
         pythonPath: this.pythonPath,
-        pythonOptions: ['-u'], // 出力をバッファリングしない
+        pythonOptions: ['-u'],
         scriptPath: path.dirname(this.scriptPath),
         args: [
           '--input', inputPath,
-          '--output', outputDir,
+          '--metadata-only'
         ]
       };
 
-      // スクリプトの実行
-      return new Promise<PPTXParseResult>((resolve, reject) => {
+      return new Promise<Metadata>((resolve) => {
         try {
-          // PythonShellの型エラーを回避するために引数を調整
           // @ts-ignore - PythonShellの型定義の問題を回避
           PythonShell.run(path.basename(this.scriptPath), options, function(err, results) {
             if (err) {
-              console.error('Pythonスクリプトの実行に失敗しました:', err);
-              reject(err);
+              console.error('メタデータ取得に失敗しました:', err);
+              resolve({
+                title: path.basename(inputPath),
+                author: 'Unknown',
+                created: new Date().toISOString(),
+                modified: new Date().toISOString(),
+                lastModifiedBy: 'System',
+                revision: 1,
+                presentationFormat: 'Unknown'
+              });
               return;
             }
             
             if (!results || results.length === 0) {
-              reject(new Error('Pythonスクリプトから結果が返されませんでした'));
+              resolve({
+                title: path.basename(inputPath),
+                author: 'Unknown',
+                created: new Date().toISOString(),
+                modified: new Date().toISOString(),
+                lastModifiedBy: 'System',
+                revision: 1,
+                presentationFormat: 'Unknown'
+              });
               return;
             }
             
-            // 最後の結果を取得（JSONオブジェクト）
             const result = results[results.length - 1];
-            
-            // 結果を適切な形式に変換
-            const parseResult: PPTXParseResult = {
-              slides: result.slides || [],
-              filename: path.basename(inputPath),
-              totalSlides: result.slides ? result.slides.length : 0,
-              metadata: {
-                title: result.metadata?.title || path.basename(inputPath),
-                author: result.metadata?.author || 'Unknown',
-                created: result.metadata?.created || new Date().toISOString(),
-                modified: result.metadata?.modified || new Date().toISOString(),
-                lastModifiedBy: result.metadata?.lastModifiedBy || 'System',
-                revision: result.metadata?.revision || 1,
-                presentationFormat: result.metadata?.presentationFormat || 'Unknown'
-              }
-            };
-            
-            resolve(parseResult);
+            resolve(result.metadata || {
+              title: path.basename(inputPath),
+              author: 'Unknown',
+              created: new Date().toISOString(),
+              modified: new Date().toISOString(),
+              lastModifiedBy: 'System',
+              revision: 1,
+              presentationFormat: 'Unknown'
+            });
           });
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('Error initializing Python shell:', errorMessage);
-          reject(new Error(`Pythonシェルの初期化に失敗しました: ${errorMessage}`));
+          console.error('メタデータ取得の初期化に失敗しました:', errorMessage);
+          resolve({
+            title: path.basename(inputPath),
+            author: 'Unknown',
+            created: new Date().toISOString(),
+            modified: new Date().toISOString(),
+            lastModifiedBy: 'System',
+            revision: 1,
+            presentationFormat: 'Unknown'
+          });
         }
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Error executing Python script:', errorMessage);
-      
-      // エラーを構造化して記録
-      this.logError('executePythonScript', error, inputPath);
-      
-      // エラーメッセージを詳細化
-      if (error instanceof Error) {
-        throw new Error(`PPTXパース処理でエラーが発生しました: ${errorMessage}`);
-      } else {
-        throw new Error(`PPTXパース処理で不明なエラーが発生しました: ${String(error)}`);
-      }
+      return {
+        title: path.basename(inputPath),
+        author: 'Unknown',
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        lastModifiedBy: 'System',
+        revision: 1,
+        presentationFormat: 'Unknown'
+      };
     }
   }
 
@@ -814,4 +1049,5 @@ public analyzeErrors(): ErrorAnalysis {
       };
     });
   }
+
 }

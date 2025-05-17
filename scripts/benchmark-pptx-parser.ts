@@ -4,6 +4,7 @@
  */
 
 import { StreamingPPTXParser } from '../lib/pptx/streaming-parser';
+import { performance } from 'perf_hooks';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -25,6 +26,8 @@ interface BenchmarkResult {
   initialParseTime: number; // ミリ秒
   cachedParseTime: number; // ミリ秒
   forcedReparseTime: number; // ミリ秒
+  slideCountTime: number; // ミリ秒
+  metadataTime: number; // ミリ秒
   memoryBefore: ReturnType<typeof getMemoryUsage>;
   memoryAfterInitial: ReturnType<typeof getMemoryUsage>;
   memoryAfterCached: ReturnType<typeof getMemoryUsage>;
@@ -32,11 +35,12 @@ interface BenchmarkResult {
   slideCount: number;
   textElementCount: number;
   shapeCount: number;
+  metadata?: any;
 }
 
 // ベンチマーク関数
 async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
-  const parser = StreamingPPTXParser.getInstance({
+  const parser = new StreamingPPTXParser({
     batchSize: 10, // デフォルトのバッチサイズ
   });
 
@@ -45,9 +49,6 @@ async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
   const filename = path.basename(filePath);
 
   console.log(`\n===== ベンチマーク: ${filename} (${Math.round(fileSize / 1024)} KB) =====`);
-
-  // キャッシュをクリア
-  parser.clearCache();
 
   // 初期メモリ使用量
   const memoryBefore = getMemoryUsage();
@@ -86,6 +87,22 @@ async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
   const memoryAfterForced = getMemoryUsage();
   console.log(`メモリ使用量（強制再解析後）: ${memoryAfterForced.heapUsed} MB (${memoryAfterForced.heapUsed - memoryAfterCached.heapUsed} MB増加)`);
 
+  // getSlideCountのパフォーマンス測定
+  console.time('getSlideCount');
+  const startSlideCount = Date.now();
+  const slideCountResult = await parser.getSlideCount(filePath);
+  const slideCountTime = Date.now() - startSlideCount;
+  console.timeEnd('getSlideCount');
+  console.log(`スライド数取得結果: ${slideCountResult.count} スライド`);
+  
+  // getMetadataのパフォーマンス測定
+  console.time('getMetadata');
+  const startMetadata = Date.now();
+  const metadata = await parser.getMetadata(filePath);
+  const metadataTime = Date.now() - startMetadata;
+  console.timeEnd('getMetadata');
+  console.log('メタデータ取得結果:', metadata);
+
   // 結果の集計
   const slideCount = result1.slides.length;
   let textElementCount = 0;
@@ -100,9 +117,8 @@ async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
   console.log(`テキスト要素数: ${textElementCount}`);
   console.log(`シェイプ数: ${shapeCount}`);
 
-  // キャッシュ統計
-  const cacheStats = parser.getCacheStats();
-  console.log('キャッシュ統計:', cacheStats);
+  // キャッシュ統計は実装されていないためスキップ
+  console.log('キャッシュ統計: 実装されていません');
 
   return {
     filename,
@@ -110,6 +126,8 @@ async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
     initialParseTime,
     cachedParseTime,
     forcedReparseTime,
+    slideCountTime,
+    metadataTime,
     memoryBefore,
     memoryAfterInitial,
     memoryAfterCached,
@@ -117,6 +135,7 @@ async function runBenchmark(filePath: string): Promise<BenchmarkResult> {
     slideCount,
     textElementCount,
     shapeCount,
+    metadata,
   };
 }
 
@@ -130,8 +149,7 @@ async function testBatchSizes(filePath: string, batchSizes: number[]): Promise<v
       batchSize,
     });
 
-    // キャッシュをクリア
-    parser.clearCache();
+    // キャッシュクリアは実装されていないためスキップ
 
     console.log(`\n--- バッチサイズ: ${batchSize} ---`);
     console.time(`パース時間（バッチサイズ: ${batchSize}）`);
@@ -143,8 +161,7 @@ async function testBatchSizes(filePath: string, batchSizes: number[]): Promise<v
     console.log(`スライド数: ${result.slides.length}`);
     console.log(`処理時間: ${parseTime} ms`);
 
-    // リソース解放
-    parser.dispose();
+    // リソース解放は実装されていないためスキップ
   }
 }
 
@@ -190,6 +207,8 @@ async function main() {
       初回パース: `${r.initialParseTime} ms`,
       キャッシュ使用: `${r.cachedParseTime} ms`,
       強制再解析: `${r.forcedReparseTime} ms`,
+      スライド数取得: `${r.slideCountTime} ms`,
+      メタデータ取得: `${r.metadataTime} ms`,
       キャッシュ効率: `${Math.round((1 - r.cachedParseTime / r.initialParseTime) * 100)}%`,
       メモリ増加: `${Math.round((r.memoryAfterInitial.heapUsed - r.memoryBefore.heapUsed) * 100) / 100} MB`,
     })));
